@@ -428,6 +428,15 @@ impl ByteMatcher {
     }
 }
 
+#[verifier::external_body]
+fn MIMEChecker_validate_empty_pattern_error(mt: &Mime) -> (result: String) {
+    format!("Zero length pattern for {:?}", mt)
+}
+#[verifier::external_body]
+fn MIMEChecker_validate_unequal_pattern_error(mt: &Mime) -> (result: String) {
+    format!("Unequal pattern and mask length for {:?}", mt)
+}
+
 impl MIMEChecker for ByteMatcher {
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         self.matches(data).map(|_| self.content_type.clone())
@@ -435,13 +444,15 @@ impl MIMEChecker for ByteMatcher {
 
     fn validate(&self) -> Result<(), String> {
         if self.pattern.is_empty() {
-            return Err(format!("Zero length pattern for {:?}", self.content_type));
+            // return Err(format!("Zero length pattern for {:?}", self.content_type));
+            return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
         }
         if self.pattern.len() != self.mask.len() {
-            return Err(format!(
-                "Unequal pattern and mask length for {:?}",
-                self.content_type
-            ));
+            // return Err(format!(
+            //     "Unequal pattern and mask length for {:?}",
+            //     self.content_type
+            // ));
+            return Err(MIMEChecker_validate_unequal_pattern_error(&self.content_type));
         }
         if self
             .pattern
@@ -462,10 +473,23 @@ struct TagTerminatedByteMatcher {
     matcher: ByteMatcher,
 }
 
+spec fn spec_equal_b_space_or_g(d: u8) -> bool {
+    d == 0x20u8 || d == 0x3eu8
+}
+
+#[verifier::external_body]
+fn equal_b_space_or_g (d: u8) -> (result: bool) 
+    ensures
+        result == spec_equal_b_space_or_g(d),
+{
+    d == b' ' || d == b'>'
+}
+
 impl MIMEChecker for TagTerminatedByteMatcher {
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         self.matcher.matches(data).and_then(|j| {
-            if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
+            // if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
+            if j < data.len() && (equal_b_space_or_g(data[j])) {
                 Some(self.matcher.content_type.clone())
             } else {
                 None
