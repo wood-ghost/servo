@@ -2,9 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use vstd::prelude::*;
+
 use mime::{self, Mime};
 
 use crate::LoadContext;
+
+verus! {
 
 pub struct MimeClassifier {
     image_classifier: GroupedClassifier,
@@ -79,6 +83,7 @@ impl Default for MimeClassifier {
     }
 }
 
+
 impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#mime-type-sniffing-algorithm>
     pub fn classify<'a>(
@@ -119,6 +124,8 @@ impl MimeClassifier {
                     if apache_bug_flag == ApacheBugFlag::On {
                         return self.sniff_text_or_data(data);
                     }
+                    assert(MimeClassifier::get_media_type(supplied_type) != Some(MediaType::Html));
+                    assert(MimeClassifier::get_media_type(supplied_type) != Some(MediaType::Xml));
                     match MimeClassifier::get_media_type(supplied_type) {
                         // Step 5. If the supplied MIME type is an image MIME type supported by the user agent,
                         // let matched-type be the result of executing the image type pattern matching algorithm with
@@ -134,7 +141,7 @@ impl MimeClassifier {
                             // Step 8. If matched-type is not undefined, the computed MIME type is matched-type.
                             self.audio_video_classifier.classify(data)
                         },
-                        Some(MediaType::Html) | Some(MediaType::Xml) => unreachable!(),
+                        // Some(MediaType::Html) | Some(MediaType::Xml) => unreachable!(),
                         _ => None,
                     }
                     // Step 9. The computed MIME type is the supplied MIME type.
@@ -264,6 +271,19 @@ impl MimeClassifier {
     fn is_html(mt: &Mime) -> bool {
         mt.essence_str() == "text/html"
     }
+
+    // uninterp spec fn spec_mime_type_is_image(mt: &Mime) -> bool;
+    // #[verifier::external_body]
+    // fn mime_type_is_image(mt: &Mime) -> (result: bool)
+    //     ensures
+    //         result == Self::spec_mime_type_is_image(mt),
+    // {
+    //     mt.type_() == mime::IMAGE
+    // }
+
+    // spec fn spec_is_image(mt: &Mime) -> bool {
+    //     Self::mime_type_is_image(mt);
+    // }
 
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
     fn is_image(mt: &Mime) -> bool {
@@ -668,6 +688,7 @@ impl MIMEChecker for GroupedClassifier {
 // TODO: These should be configured and not hard coded
 impl ByteMatcher {
     // A Windows Icon signature
+    #[verifier::external_body]
     fn image_x_icon() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
@@ -677,6 +698,7 @@ impl ByteMatcher {
         }
     }
     // A Windows Cursor signature.
+    #[verifier::external_body]
     fn image_x_icon_cursor() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
@@ -686,6 +708,7 @@ impl ByteMatcher {
         }
     }
     // The string "BM", a BMP signature.
+    #[verifier::external_body]
     fn image_bmp() -> ByteMatcher {
         ByteMatcher {
             pattern: b"BM",
@@ -695,6 +718,7 @@ impl ByteMatcher {
         }
     }
     // The string "GIF89a", a GIF signature.
+    #[verifier::external_body]
     fn image_gif89a() -> ByteMatcher {
         ByteMatcher {
             pattern: b"GIF89a",
@@ -704,6 +728,7 @@ impl ByteMatcher {
         }
     }
     // The string "GIF87a", a GIF signature.
+    #[verifier::external_body]
     fn image_gif87a() -> ByteMatcher {
         ByteMatcher {
             pattern: b"GIF87a",
@@ -713,6 +738,7 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "WEBPVP".
+    #[verifier::external_body]
     fn image_webp() -> ByteMatcher {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WEBPVP",
@@ -723,6 +749,7 @@ impl ByteMatcher {
     }
     // An error-checking byte followed by the string "PNG" followed by CR LF SUB LF, the PNG
     // signature.
+    #[verifier::external_body]
     fn image_png() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x89PNG\r\n\x1A\n",
@@ -732,6 +759,7 @@ impl ByteMatcher {
         }
     }
     // The JPEG Start of Image marker followed by the indicator byte of another marker.
+    #[verifier::external_body]
     fn image_jpeg() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\xFF\xD8\xFF",
@@ -741,6 +769,7 @@ impl ByteMatcher {
         }
     }
     // The WebM signature. [TODO: Use more bytes?]
+    #[verifier::external_body]
     fn video_webm() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x1A\x45\xDF\xA3",
@@ -750,6 +779,7 @@ impl ByteMatcher {
         }
     }
     // The string ".snd", the basic audio signature.
+    #[verifier::external_body]
     fn audio_basic() -> ByteMatcher {
         ByteMatcher {
             pattern: b".snd",
@@ -759,6 +789,7 @@ impl ByteMatcher {
         }
     }
     // The string "FORM" followed by four bytes followed by the string "AIFF", the AIFF signature.
+    #[verifier::external_body]
     fn audio_aiff() -> ByteMatcher {
         ByteMatcher {
             pattern: b"FORM\x00\x00\x00\x00AIFF",
@@ -768,6 +799,7 @@ impl ByteMatcher {
         }
     }
     // The string "ID3", the ID3v2-tagged MP3 signature.
+    #[verifier::external_body]
     fn audio_mpeg() -> ByteMatcher {
         ByteMatcher {
             pattern: b"ID3",
@@ -777,6 +809,7 @@ impl ByteMatcher {
         }
     }
     // The string "OggS" followed by NUL, the Ogg container signature.
+    #[verifier::external_body]
     fn application_ogg() -> ByteMatcher {
         ByteMatcher {
             pattern: b"OggS\x00",
@@ -787,6 +820,7 @@ impl ByteMatcher {
     }
     // The string "MThd" followed by four bytes representing the number 6 in 32 bits (big-endian),
     // the MIDI signature.
+    #[verifier::external_body]
     fn audio_midi() -> ByteMatcher {
         ByteMatcher {
             pattern: b"MThd\x00\x00\x00\x06",
@@ -796,6 +830,7 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "AVI ", the AVI signature.
+    #[verifier::external_body]
     fn video_avi() -> ByteMatcher {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00AVI ",
@@ -805,6 +840,7 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "WAVE", the WAVE signature.
+    #[verifier::external_body]
     fn audio_wave() -> ByteMatcher {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WAVE",
@@ -814,6 +850,7 @@ impl ByteMatcher {
         }
     }
     // doctype terminated with Tag terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_doctype() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -826,6 +863,7 @@ impl ByteMatcher {
     }
 
     // HTML terminated with Tag terminating (TT) Byte: 0x20 (SP)
+    #[verifier::external_body]
     fn text_html_page() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -838,6 +876,7 @@ impl ByteMatcher {
     }
 
     // head terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_head() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -850,6 +889,7 @@ impl ByteMatcher {
     }
 
     // script terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_script() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -862,6 +902,7 @@ impl ByteMatcher {
     }
 
     // iframe terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_iframe() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -874,6 +915,7 @@ impl ByteMatcher {
     }
 
     // h1 terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_h1() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -886,6 +928,7 @@ impl ByteMatcher {
     }
 
     // div terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_div() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -898,6 +941,7 @@ impl ByteMatcher {
     }
 
     // font terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_font() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -910,6 +954,7 @@ impl ByteMatcher {
     }
 
     // table terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_table() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -922,6 +967,7 @@ impl ByteMatcher {
     }
 
     // a terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_a() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -934,6 +980,7 @@ impl ByteMatcher {
     }
 
     // style terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_style() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -946,6 +993,7 @@ impl ByteMatcher {
     }
 
     // title terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_title() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -958,6 +1006,7 @@ impl ByteMatcher {
     }
 
     // b terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_b() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -970,6 +1019,7 @@ impl ByteMatcher {
     }
 
     // body terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_body() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -982,6 +1032,7 @@ impl ByteMatcher {
     }
 
     // br terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_br() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -994,6 +1045,7 @@ impl ByteMatcher {
     }
 
     // p terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_p() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -1006,6 +1058,7 @@ impl ByteMatcher {
     }
 
     // comment terminated with Tag Terminating (TT) Byte
+    #[verifier::external_body]
     fn text_html_comment() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
@@ -1018,6 +1071,7 @@ impl ByteMatcher {
     }
 
     // The string "<?xml".
+    #[verifier::external_body]
     fn text_xml() -> ByteMatcher {
         ByteMatcher {
             pattern: b"<?xml",
@@ -1027,6 +1081,7 @@ impl ByteMatcher {
         }
     }
     // The string "%PDF-", the PDF signature.
+    #[verifier::external_body]
     fn application_pdf() -> ByteMatcher {
         ByteMatcher {
             pattern: b"%PDF-",
@@ -1036,6 +1091,7 @@ impl ByteMatcher {
         }
     }
     // 34 bytes followed by the string "LP", the Embedded OpenType signature.
+    #[verifier::external_body]
     fn application_vnd_ms_font_object() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -1049,6 +1105,7 @@ impl ByteMatcher {
         }
     }
     // 4 bytes representing the version number 1.0, a TrueType signature.
+    #[verifier::external_body]
     fn true_type() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x01\x00\x00",
@@ -1058,6 +1115,7 @@ impl ByteMatcher {
         }
     }
     // The string "OTTO", the OpenType signature.
+    #[verifier::external_body]
     fn open_type() -> ByteMatcher {
         ByteMatcher {
             pattern: b"OTTO",
@@ -1067,6 +1125,7 @@ impl ByteMatcher {
         }
     }
     // The string "ttcf", the TrueType Collection signature.
+    #[verifier::external_body]
     fn true_type_collection() -> ByteMatcher {
         ByteMatcher {
             pattern: b"ttcf",
@@ -1076,6 +1135,7 @@ impl ByteMatcher {
         }
     }
     // The string "wOFF", the Web Open Font Format signature.
+    #[verifier::external_body]
     fn application_font_woff() -> ByteMatcher {
         ByteMatcher {
             pattern: b"wOFF",
@@ -1085,6 +1145,7 @@ impl ByteMatcher {
         }
     }
     // The GZIP archive signature.
+    #[verifier::external_body]
     fn application_x_gzip() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x1F\x8B\x08",
@@ -1094,6 +1155,7 @@ impl ByteMatcher {
         }
     }
     // The string "PK" followed by ETX EOT, the ZIP archive signature.
+    #[verifier::external_body]
     fn application_zip() -> ByteMatcher {
         ByteMatcher {
             pattern: b"PK\x03\x04",
@@ -1103,6 +1165,7 @@ impl ByteMatcher {
         }
     }
     // The string "Rar " followed by SUB BEL NUL, the RAR archive signature.
+    #[verifier::external_body]
     fn application_x_rar_compressed() -> ByteMatcher {
         ByteMatcher {
             pattern: b"Rar \x1A\x07\x00",
@@ -1112,6 +1175,7 @@ impl ByteMatcher {
         }
     }
     // The string "%!PS-Adobe-", the PostScript signature.
+    #[verifier::external_body]
     fn application_postscript() -> ByteMatcher {
         ByteMatcher {
             pattern: b"%!PS-Adobe-",
@@ -1121,6 +1185,7 @@ impl ByteMatcher {
         }
     }
     // UTF-16BE BOM
+    #[verifier::external_body]
     fn text_plain_utf_16be_bom() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\xFE\xFF\x00\x00",
@@ -1130,6 +1195,7 @@ impl ByteMatcher {
         }
     }
     // UTF-16LE BOM
+    #[verifier::external_body]
     fn text_plain_utf_16le_bom() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\xFF\xFE\x00\x00",
@@ -1139,6 +1205,7 @@ impl ByteMatcher {
         }
     }
     // UTF-8 BOM
+    #[verifier::external_body]
     fn text_plain_utf_8_bom() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\xEF\xBB\xBF\x00",
@@ -1148,3 +1215,5 @@ impl ByteMatcher {
         }
     }
 }
+
+} // verus!
