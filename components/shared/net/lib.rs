@@ -33,6 +33,7 @@ use servo_base::generic_channel::{
 use servo_base::id::{CookieStoreId, HistoryStateId, PipelineId};
 use servo_url::{ImmutableOrigin, ServoUrl};
 use uuid::Uuid;
+use vstd::prelude::*;
 
 /// Identifies a pending asynchronous cookie operation initiated by the embedder.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -49,6 +50,7 @@ pub mod blob_url_store;
 pub mod filemanager_thread;
 pub mod http_status;
 pub mod image_cache;
+pub mod mime_classifier_specs;
 pub mod mime_classifier;
 pub mod policy_container;
 pub mod pub_domains;
@@ -70,9 +72,11 @@ pub mod fetch {
     pub mod headers;
 }
 
+verus! {
 /// A loading context, for context-specific sniffing, as defined in
 /// <https://mimesniff.spec.whatwg.org/#context-specific-sniffing>
-#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
+// #[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
+#[cfg_attr(not(verus_only),derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize))]
 pub enum LoadContext {
     Browsing,
     Image,
@@ -84,6 +88,7 @@ pub enum LoadContext {
     TextTrack,
     CacheManifest,
 }
+} // verus!
 
 #[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub struct CustomResponse {

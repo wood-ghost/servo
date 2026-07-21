@@ -8,6 +8,8 @@ use mime::{self, Mime};
 
 use crate::LoadContext;
 
+use crate::mime_classifier_specs::*;
+
 verus! {
 
 pub struct MimeClassifier {
@@ -86,6 +88,7 @@ impl Default for MimeClassifier {
 
 impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#mime-type-sniffing-algorithm>
+    #[verifier::external_body]
     pub fn classify<'a>(
         &'a self,
         context: LoadContext,
@@ -260,7 +263,10 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
-    fn is_xml(mt: &Mime) -> bool {
+    fn is_xml(mt: &Mime) -> (result: bool) 
+        ensures
+            result == SpecMimeClassifier::is_xml(mt),
+    {
         !Self::is_image(mt) &&
             (mt.suffix() == Some(mime::XML) ||
                 mt.essence_str() == "text/xml" ||
@@ -417,7 +423,11 @@ impl ByteMatcher {
                         .iter()
                         .zip(self.pattern.iter())
                         .zip(self.mask.iter())
-                        .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
+                        // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
+                        .all(|x| {
+                            let ((data_p, pattern_p), mask_p) = x;
+                            (*data_p & *mask_p) == *pattern_p
+                        })
                     {
                         Some(start + self.pattern.len())
                     } else {
@@ -436,10 +446,15 @@ fn MIMEChecker_validate_empty_pattern_error(mt: &Mime) -> (result: String) {
 fn MIMEChecker_validate_unequal_pattern_error(mt: &Mime) -> (result: String) {
     format!("Unequal pattern and mask length for {:?}", mt)
 }
+#[verifier::external_body]
+fn MIMEChecker_validate_premasked_error(mt: &Mime) -> (result: String) {
+    format!("Pattern not pre-masked for {:?}", mt)
+}
 
 impl MIMEChecker for ByteMatcher {
     fn classify(&self, data: &[u8]) -> Option<Mime> {
-        self.matches(data).map(|_| self.content_type.clone())
+        // self.matches(data).map(|_| self.content_type.clone())
+        self.matches(data).map(|x| self.content_type.clone())
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -458,12 +473,17 @@ impl MIMEChecker for ByteMatcher {
             .pattern
             .iter()
             .zip(self.mask.iter())
-            .any(|(&pattern, &mask)| pattern & mask != pattern)
+            // .any(|(&pattern, &mask)| pattern & mask != pattern)
+            .any(|x| {
+                let (pattern_p, mask_p) = x;
+                *pattern_p & *mask_p != *pattern_p
+            })
         {
-            return Err(format!(
-                "Pattern not pre-masked for {:?}",
-                self.content_type
-            ));
+            // return Err(format!(
+            //     "Pattern not pre-masked for {:?}",
+            //     self.content_type
+            // ));
+            return Err(MIMEChecker_validate_premasked_error(&self.content_type));
         }
         Ok(())
     }
@@ -477,6 +497,7 @@ spec fn spec_equal_b_space_or_g(d: u8) -> bool {
     d == 0x20u8 || d == 0x3eu8
 }
 
+#[cfg(verus_only)]
 #[verifier::external_body]
 fn equal_b_space_or_g (d: u8) -> (result: bool) 
     ensures
@@ -577,11 +598,16 @@ impl BinaryOrPlaintextClassifier {
             data.starts_with(&[0xEFu8, 0xBBu8, 0xBFu8])
         {
             mime::TEXT_PLAIN
-        } else if data.iter().any(|&x| {
-            x <= 0x08u8 ||
-                x == 0x0Bu8 ||
-                (0x0Eu8..=0x1Au8).contains(&x) ||
-                (0x1Cu8..=0x1Fu8).contains(&x)
+        // } else if data.iter().any(|&x| {
+            // x <= 0x08u8 ||
+                // x == 0x0Bu8 ||
+                // (0x0Eu8..=0x1Au8).contains(&x) ||
+                // (0x1Cu8..=0x1Fu8).contains(&x)
+        } else if data.iter().any(|xp| {
+            *xp <= 0x08u8 ||
+                *xp == 0x0Bu8 ||
+                (0x0Eu8..=0x1Au8).contains(xp) ||
+                (0x1Cu8..=0x1Fu8).contains(xp)
         }) {
             // Step 5. The computed MIME type is "application/octet-stream".
             mime::APPLICATION_OCTET_STREAM
@@ -601,9 +627,26 @@ impl MIMEChecker for BinaryOrPlaintextClassifier {
         Ok(())
     }
 }
+#[cfg(not(verus_only))]
 struct GroupedClassifier {
     byte_matchers: Vec<Box<dyn MIMEChecker + Send + Sync>>,
 }
+
+#[cfg(verus_only)]
+trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {}
+
+#[cfg(verus_only)]
+impl<T> ThreadSafeMIMEChecker for T
+where
+    T: MIMEChecker + Send + Sync,
+{}
+
+#[cfg(verus_only)]
+struct GroupedClassifier {
+    byte_matchers: Vec<Box<dyn ThreadSafeMIMEChecker>>,
+}
+
+
 impl GroupedClassifier {
     fn image_classifer() -> GroupedClassifier {
         GroupedClassifier {

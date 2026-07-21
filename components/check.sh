@@ -1,6 +1,6 @@
-cargo verus verify \
+cargo +1.96.0 verus focus \
   -p servo-net-traits \
-  --fwd-verus-args-to roots \
   -- \
+  --no-lifetime \
   --verify-module mime_classifier \
   --expand-errors
