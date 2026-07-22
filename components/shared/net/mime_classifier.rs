@@ -49,7 +49,10 @@ pub enum ApacheBugFlag {
 
 impl ApacheBugFlag {
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
-    pub fn from_content_type(mime_type: Option<&Mime>) -> ApacheBugFlag {
+    pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
+        ensures
+            result == SpecApacheBugFlag::from_content_type(mime_type),
+    {
         // TODO(36801): also handle charset ISO-8859-1
         if mime_type.is_some_and(|mime_type| {
             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
