@@ -1,8 +1,14 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// use verus_state_machines_macros::tokenized_state_machine;
+// use std::sync::Arc;
+// use vstd::atomic_ghost::*;
+// use vstd::modes::*;
 use vstd::prelude::*;
+// use vstd::thread::*;
+// use vstd::{pervasive::*, prelude::*, *};
+
 
 use mime::{self, Mime};
 
@@ -96,7 +102,12 @@ impl MimeClassifier {
         apache_bug_flag: ApacheBugFlag,
         supplied_type: &Option<Mime>,
         data: &'a [u8],
-    ) -> Mime {
+    ) -> (result: Mime)
+        requires
+            SpecMimeClassifier::classify_input_is_valid(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
+        ensures
+            result == SpecMimeClassifier::classify(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
+    {
         let supplied_type_or_octet_stream = supplied_type
             .clone()
             .unwrap_or(mime::APPLICATION_OCTET_STREAM);
@@ -274,25 +285,18 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
-    fn is_html(mt: &Mime) -> bool {
+    fn is_html(mt: &Mime) -> (result: bool)
+        ensures
+            result == SpecMimeClassifier::is_html(mt),
+    {
         mt.essence_str() == "text/html"
     }
 
-    // uninterp spec fn spec_mime_type_is_image(mt: &Mime) -> bool;
-    // #[verifier::external_body]
-    // fn mime_type_is_image(mt: &Mime) -> (result: bool)
-    //     ensures
-    //         result == Self::spec_mime_type_is_image(mt),
-    // {
-    //     mt.type_() == mime::IMAGE
-    // }
-
-    // spec fn spec_is_image(mt: &Mime) -> bool {
-    //     Self::mime_type_is_image(mt);
-    // }
-
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
-    fn is_image(mt: &Mime) -> bool {
+    fn is_image(mt: &Mime) -> (result: bool)
+        ensures
+            result == SpecMimeClassifier::is_image(mt),
+    {
         mt.type_() == mime::IMAGE
     }
 
@@ -493,15 +497,10 @@ struct TagTerminatedByteMatcher {
     matcher: ByteMatcher,
 }
 
-spec fn spec_equal_b_space_or_g(d: u8) -> bool {
-    d == 0x20u8 || d == 0x3eu8
-}
-
-#[cfg(verus_only)]
 #[verifier::external_body]
 fn equal_b_space_or_g (d: u8) -> (result: bool) 
     ensures
-        result == spec_equal_b_space_or_g(d),
+        result == SpecMimeChecker::equal_b_space_or_g(d),
 {
     d == b' ' || d == b'>'
 }

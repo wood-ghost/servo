@@ -1,12 +1,13 @@
 #![allow(unsafe_code)]
 
 use vstd::prelude::*;
+use crate::LoadContext;
 
 use mime::{self, Mime, Name};
 
+use crate::mime_classifier::{MediaType, ApacheBugFlag, NoSniffFlag};
+
 verus! {
-
-
 
 pub mod SpecMime {
     use super::*;
@@ -167,10 +168,17 @@ pub mod SpecMime {
         essence_str(mt) == "application/xml"@
     }
 
+    pub(crate) open spec fn essence_is_text_html(mt: &Mime) -> bool {
+        essence_str(mt) == "text/html"@
+    }
+
     pub(crate) uninterp spec fn is_image(mt: &Mime) -> bool;
     pub(crate) uninterp spec fn has_xml_suffix(mt: &Mime) -> bool;
+    pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
     pub(crate) uninterp spec fn is_text_plain(mt: &Mime) -> bool;
     pub(crate) uninterp spec fn is_text_plain_utf8(mt: &Mime) -> bool;
+
+    pub uninterp spec fn dummy_mime() -> Mime;
 }
 
 pub mod SpecStd {
@@ -282,12 +290,57 @@ pub mod SpecStd {
 pub mod SpecMimeClassifier {
     use super::*;
     
+    // Let supplied-type be null. 
+    pub(crate) open spec fn is_text_plain(mt: &Mime) -> bool {
+        SpecMime::is_text_plain(mt)
+    }
+
+    // check if the resource is retrieved via HTTP
     pub(crate) open spec fn is_xml(mt: &Mime) -> bool {
         !SpecMime::is_image(mt) && (
             SpecMime::has_xml_suffix(mt)
                 || SpecMime::essence_is_text_xml(mt)
                 || SpecMime::essence_is_application_xml(mt))
     } 
+
+    pub(crate) open spec fn is_html(mt: &Mime) -> bool {
+        SpecMime::essence_is_text_html(mt)
+    }
+
+    pub(crate) open spec fn is_image(mt: &Mime) -> bool {
+        SpecMime::is_image(mt)
+    }
+
+    pub open spec fn classify_input_is_valid<'a>(
+        context: LoadContext,
+        no_sniff_flag: NoSniffFlag,
+        apache_bug_flag: ApacheBugFlag,
+        supplied_type: &Option<Mime>,
+        data: &'a [u8],
+    ) -> bool {
+        // TODO:
+        true
+    }
+    
+    pub open spec fn classify<'a>(
+        context: LoadContext,
+        no_sniff_flag: NoSniffFlag,
+        apache_bug_flag: ApacheBugFlag,
+        supplied_type: &Option<Mime>,
+        data: &'a [u8],
+    ) -> Mime {
+        // TODO:
+        SpecMime::dummy_mime()
+    }
+}
+
+pub mod SpecMimeChecker {
+    use super::*;
+
+    pub open spec fn equal_b_space_or_g(d: u8) -> bool {
+        d == 0x20u8 || d == 0x3eu8
+    }
+
 }
 
 } // verus!
