@@ -49,6 +49,7 @@ pub enum ApacheBugFlag {
 
 impl ApacheBugFlag {
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
+    #[verifier::external_body] //TODO:
     pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
         ensures
             result == SpecApacheBugFlag::from_content_type(mime_type),
@@ -71,6 +72,7 @@ pub enum NoSniffFlag {
 }
 
 impl From<bool> for NoSniffFlag {
+    #[verifier::external_body] //TODO:
     fn from(boolean: bool) -> Self {
         if boolean {
             NoSniffFlag::On
@@ -251,6 +253,7 @@ impl MimeClassifier {
     }
 
     // some sort of iterator over the classifiers might be better?
+    #[verifier::external_body] //TODO:
     fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: &[u8]) -> Mime {
         let should_sniff_scriptable = no_sniff_flag == NoSniffFlag::Off;
         let sniffed = if should_sniff_scriptable {
@@ -268,34 +271,49 @@ impl MimeClassifier {
             .expect("BinaryOrPlaintextClassifier always succeeds")
     }
 
+    #[verifier::external_body] //TODO:
     fn sniff_text_or_data<'a>(&'a self, data: &'a [u8]) -> Mime {
         self.binary_or_plaintext
             .classify(data)
             .expect("BinaryOrPlaintextClassifier always succeeds")
     }
+    
+    #[verifier::external_body]
+    fn str_equal(a: &str, b: &str) -> (result: bool)
+        ensures
+            result == (a@ =~= b@),
+    {
+        a == b
+    }
 
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
+    #[verifier::external_body] //TODO:
     fn is_xml(mt: &Mime) -> (result: bool) 
         ensures
             result == SpecMimeClassifier::is_xml(mt),
     {
         !Self::is_image(mt) &&
             (mt.suffix() == Some(mime::XML) ||
-                mt.essence_str() == "text/xml" ||
-                mt.essence_str() == "application/xml")
+                // mt.essence_str() == "text/xml" ||
+                Self::str_equal(mt.essence_str(), "text/xml") ||
+                // mt.essence_str() == "application/xml")
+                Self::str_equal(mt.essence_str(), "application/xml"))
     }
 
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
+    #[verifier::external_body] //TODO:
     fn is_html(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_html(mt),
     {
-        mt.essence_str() == "text/html"
+        // mt.essence_str() == "text/html"
+        Self::str_equal(mt.essence_str(), "text/html")
     }
 
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
+    #[verifier::external_body] //TODO:
     fn is_image(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_image(mt),
@@ -304,13 +322,15 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
+    #[verifier::external_body] //TODO:
     fn is_audio_video(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_audio_video(mt),
     {
         mt.type_() == mime::AUDIO ||
             mt.type_() == mime::VIDEO ||
-            mt.essence_str() == "application/ogg"
+            Self::str_equal(mt.essence_str(), "application/ogg")
+            // mt.essence_str() == "application/ogg"
     }
 
     fn is_explicit_unknown(mt: &Mime) -> bool {
@@ -437,15 +457,19 @@ impl ByteMatcher {
                     start <= max_start + 1,
                     self.pattern.len() <= data.len(),
                     self.pattern.len() == self.mask.len(),
+                    max_start == data.len() - self.pattern.len(), 
+                    self.pattern.len() > 0,
                 decreases
                     max_start + 1 - start,
             {
                 if !self.leading_ignore.contains(&data[start]) {
+                    assert(start + self.pattern.len() <= data.len());
                     let mut i: usize = 0;
                     while i < self.pattern.len()
                         invariant
                             i <= self.pattern.len(),
                             self.pattern.len() == self.mask.len(),
+                            start + self.pattern.len() <= data.len(),
                         decreases
                             self.pattern.len() - i,
                     {
@@ -500,6 +524,7 @@ fn MIMEChecker_validate_premasked_error(mt: &Mime) -> (result: String) {
 }
 
 impl MIMEChecker for ByteMatcher {
+    #[verifier::external_body] //TODO:
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         // self.matches(data).map(|_| self.content_type.clone())
         self.matches(data).map(|x| self.content_type.clone())
@@ -565,6 +590,7 @@ fn equal_b_space_or_g (d: u8) -> (result: bool)
 }
 
 impl MIMEChecker for TagTerminatedByteMatcher {
+    #[verifier::external_body] //TODO:
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         self.matcher.matches(data).and_then(|j| {
             // if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
@@ -585,6 +611,7 @@ pub struct Mp4Matcher;
 
 impl Mp4Matcher {
     /// <https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4>
+    #[verifier::external_body] //TODO:
     pub fn matches(&self, data: &[u8]) -> bool {
         // Step 1. Let sequence be the byte sequence to be matched,
         // where sequence[s] is byte s in sequence and sequence[0] is the first byte in sequence.

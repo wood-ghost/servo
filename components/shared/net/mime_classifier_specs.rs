@@ -25,6 +25,16 @@ pub mod SpecMime {
     #[verifier::external_body]
     pub struct ExFromStrError(mime::FromStrError);
     
+    // abstract Mime
+    pub struct MimeView {
+        pub type_: Seq<char>,
+        pub subtype: Seq<char>,
+        pub suffix: Option<Seq<char>>,
+        pub essence: Seq<char>,
+    }
+
+    pub uninterp spec fn view(mt: &Mime) -> MimeView;
+
     // Constant
     pub uninterp spec fn mime_identity(mt: &Mime) -> int;
 
@@ -117,17 +127,21 @@ pub mod SpecMime {
     ;
 
 
-    pub uninterp spec fn essence_str(mt: &Mime) -> Seq<char>;
+    pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
+        view(mt).essence
+    }
     pub assume_specification<'a>
         [Mime::essence_str]
         (mt: &'a Mime) -> (result: &'a str)
         ensures
-            result@ == essence_str(mt),
+            result@ =~= essence_str(mt),
     ;
 
     pub uninterp spec fn name_text<'a>(name: Name<'a>) -> Seq<char>;
 
-    pub uninterp spec fn suffix_name(mt: &Mime) -> Option<Seq<char>>;
+    pub open spec fn suffix_name(mt: &Mime) -> Option<Seq<char>> {
+        view(mt).suffix
+    }
     pub assume_specification<'a>
         [Mime::suffix]
         (mt: &'a Mime) -> (result: Option<Name<'a>>)
@@ -138,7 +152,9 @@ pub mod SpecMime {
             },
     ;
 
-    pub uninterp spec fn type_name(mt: &Mime) -> Seq<char>;
+    pub open spec fn type_name(mt: &Mime) -> Seq<char> {
+        view(mt).type_
+    }
     pub assume_specification<'a>
         [Mime::type_]
         (mt: &'a Mime) -> (result: Name<'a>)
@@ -162,25 +178,34 @@ pub mod SpecMime {
     ;
 
     pub(crate) open spec fn essence_is_text_xml(mt: &Mime) -> bool {
-        essence_str(mt) == "text/xml"@
+        essence_str(mt) =~= "text/xml"@
     }
 
     pub(crate) open spec fn essence_is_application_xml(mt: &Mime) -> bool {
-        essence_str(mt) == "application/xml"@
+        essence_str(mt) =~= "application/xml"@
     }
 
     pub(crate) open spec fn essence_is_text_html(mt: &Mime) -> bool {
-        essence_str(mt) == "text/html"@
+        essence_str(mt) =~= "text/html"@
     }
 
     pub(crate) open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
-        essence_str(mt) == "application/ogg"@
+        essence_str(mt) =~= "application/ogg"@
     }
 
-    pub(crate) uninterp spec fn is_image(mt: &Mime) -> bool;
-    pub(crate) uninterp spec fn is_audio(mt: &Mime) -> bool;
-    pub(crate) uninterp spec fn is_video(mt: &Mime) -> bool;
-    pub(crate) uninterp spec fn has_xml_suffix(mt: &Mime) -> bool;
+    pub open spec fn is_image(mt: &Mime) -> bool {
+        type_name(mt) =~= "image"@
+    }
+
+    pub open spec fn is_audio(mt: &Mime) -> bool {
+        type_name(mt) =~= "audio"@
+    }
+    pub open spec fn is_video(mt: &Mime) -> bool {
+        type_name(mt) =~= "video"@
+    }
+    pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
+        suffix_name(mt) == Some("xml"@)
+    }
     pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
     pub uninterp spec fn is_text_plain(mt: &Mime) -> bool;
     pub uninterp spec fn is_text_plain_utf8(mt: &Mime) -> bool;
