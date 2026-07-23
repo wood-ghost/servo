@@ -195,8 +195,12 @@ pub mod SpecMime {
     }
    
     pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
-    pub uninterp spec fn is_text_plain(mt: &Mime) -> bool;
-    pub uninterp spec fn is_text_plain_utf8(mt: &Mime) -> bool;
+    pub open spec fn is_text_plain(mt: &Mime) -> bool {
+        mime_identity(mt) == text_plain_identity()
+    }
+    pub open spec fn is_text_plain_utf8(mt: &Mime) -> bool {
+        mime_identity(mt) == text_plain_utf8_identity()
+    }
 
     pub uninterp spec fn dummy_mime() -> Mime;
 

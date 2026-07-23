@@ -48,15 +48,25 @@ pub enum ApacheBugFlag {
 }
 
 impl ApacheBugFlag {
+    #[verifier::external_body]
+    fn mime_equal(a: &Mime, b: Mime) -> (result: bool)
+        ensures
+            result == (SpecMime::mime_identity(a) == SpecMime::mime_identity(&b)),
+    {
+        *a == b
+    }
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
-    #[verifier::external_body] //TODO:
     pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
         ensures
             result == SpecApacheBugFlag::from_content_type(mime_type),
     {
         // TODO(36801): also handle charset ISO-8859-1
-        if mime_type.is_some_and(|mime_type| {
-            *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+        if mime_type.is_some_and(|mime_type| -> (r: bool)
+            ensures 
+                r == (SpecMime::is_text_plain(mime_type) || SpecMime::is_text_plain_utf8(mime_type))
+            {
+            // *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+            Self::mime_equal(mime_type, mime::TEXT_PLAIN) || Self::mime_equal(mime_type, mime::TEXT_PLAIN_UTF_8) 
         }) {
             ApacheBugFlag::On
         } else {
@@ -306,6 +316,7 @@ impl MimeClassifier {
     {
         a == b
     }
+
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
