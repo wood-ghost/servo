@@ -294,16 +294,28 @@ impl MimeClassifier {
         a == b
     }
 
+    #[verifier::external_body]
+    fn suffix_equal<'a, 'b>(a: Option<Name<'a>>, b: Option<Name<'b>>) -> (result: bool)
+        ensures
+            result == match (a, b) {
+                    (Some(a_name), Some(b_name)) =>
+                        SpecMime::name_text(a_name) =~= SpecMime::name_text(b_name),
+                    (None, None) => true,
+                    _ => false,
+                },
+    {
+        a == b
+    }
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
-    #[verifier::external_body] //TODO:
     fn is_xml(mt: &Mime) -> (result: bool) 
         ensures
             result == SpecMimeClassifier::is_xml(mt),
     {
         !Self::is_image(mt) &&
-            (mt.suffix() == Some(mime::XML) ||
+            // (mt.suffix() == Some(mime::XML) ||
+            (Self::suffix_equal(mt.suffix(), Some(mime::XML)) ||
                 // mt.essence_str() == "text/xml" ||
                 Self::str_equal(mt.essence_str(), "text/xml") ||
                 // mt.essence_str() == "application/xml")
@@ -311,7 +323,6 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
-    #[verifier::external_body] //TODO:
     fn is_html(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_html(mt),
@@ -330,15 +341,16 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
-    #[verifier::external_body] //TODO:
     fn is_audio_video(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_audio_video(mt),
     {
-        mt.type_() == mime::AUDIO ||
-            mt.type_() == mime::VIDEO ||
-            Self::str_equal(mt.essence_str(), "application/ogg")
+        // mt.type_() == mime::AUDIO ||
+        Self::name_equal(mt.type_(), mime::AUDIO) ||
+            // mt.type_() == mime::VIDEO ||
+            Self::name_equal(mt.type_(), mime::VIDEO) ||
             // mt.essence_str() == "application/ogg"
+            Self::str_equal(mt.essence_str(), "application/ogg")
     }
 
     fn is_explicit_unknown(mt: &Mime) -> bool {

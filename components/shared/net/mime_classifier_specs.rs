@@ -76,6 +76,7 @@ pub mod SpecMime {
     pub assume_specification [mime::XML] -> (result: Name<'static>)
         ensures
             name_identity(&result) == xml_identity(),
+            name_text(result) =~= xml_name()
     ;
 
     pub uninterp spec fn image_identity() -> int;
@@ -89,12 +90,14 @@ pub mod SpecMime {
     pub assume_specification [mime::AUDIO] -> (result: Name<'static>)
         ensures
             name_identity(&result) == audio_identity(),
+            name_text(result) =~= audio_name(),
     ;
 
     pub uninterp spec fn video_identity() -> int;
     pub assume_specification [mime::VIDEO] -> (result: Name<'static>)
         ensures
             name_identity(&result) == video_identity(),
+            name_text(result) =~= video_name(),
     ;
 
     pub uninterp spec fn application_identity() -> int;
@@ -153,9 +156,6 @@ pub mod SpecMime {
             },
     ;
 
-    // pub open spec fn type_name(mt: &Mime) -> Seq<char> {
-    //     view(mt).type_
-    // }
     pub assume_specification<'a>
         [Mime::type_]
         (mt: &'a Mime) -> (result: Name<'a>)
@@ -179,41 +179,48 @@ pub mod SpecMime {
     ;
 
     pub(crate) open spec fn essence_is_text_xml(mt: &Mime) -> bool {
-        essence_str(mt) =~= "text/xml"@
+        view(mt).essence =~= "text/xml"@
     }
 
     pub(crate) open spec fn essence_is_application_xml(mt: &Mime) -> bool {
-        essence_str(mt) =~= "application/xml"@
+        view(mt).essence =~= "application/xml"@
     }
 
     pub(crate) open spec fn essence_is_text_html(mt: &Mime) -> bool {
-        essence_str(mt) =~= "text/html"@
+        view(mt).essence =~= "text/html"@
     }
 
     pub(crate) open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
-        essence_str(mt) =~= "application/ogg"@
+        view(mt).essence =~= "application/ogg"@
     }
-
-    pub open spec fn is_image(mt: &Mime) -> bool {
-        view(mt).type_ =~= image_name()
-    }
-
-    pub open spec fn is_audio(mt: &Mime) -> bool {
-        view(mt).type_ =~= "audio"@
-    }
-    pub open spec fn is_video(mt: &Mime) -> bool {
-        view(mt).type_ =~= "video"@
-    }
-    pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
-        suffix_name(mt) == Some("xml"@)
-    }
+   
     pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
     pub uninterp spec fn is_text_plain(mt: &Mime) -> bool;
     pub uninterp spec fn is_text_plain_utf8(mt: &Mime) -> bool;
 
     pub uninterp spec fn dummy_mime() -> Mime;
 
+    // Name
     pub open spec fn image_name() -> Seq<char> { "image"@ }
+    pub open spec fn audio_name() -> Seq<char> { "audio"@ }
+    pub open spec fn video_name() -> Seq<char> { "video"@ }
+    pub open spec fn xml_name() -> Seq<char> { "xml"@ }
+
+    pub open spec fn is_image(mt: &Mime) -> bool {
+        view(mt).type_ =~= image_name()
+    }
+    pub open spec fn is_audio(mt: &Mime) -> bool {
+        view(mt).type_ =~= audio_name()
+    }
+    pub open spec fn is_video(mt: &Mime) -> bool {
+        view(mt).type_ =~= video_name()
+    }
+    pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
+        match view(mt).suffix {
+            Some(suffix) => suffix =~= xml_name(),
+            None => false,
+        }
+    }
 
 }
 
