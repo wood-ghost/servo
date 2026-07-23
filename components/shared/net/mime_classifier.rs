@@ -10,7 +10,7 @@ use vstd::prelude::*;
 // use vstd::{pervasive::*, prelude::*, *};
 
 
-use mime::{self, Mime};
+use mime::{self, Mime, Name};
 
 use crate::LoadContext;
 
@@ -286,6 +286,14 @@ impl MimeClassifier {
         a == b
     }
 
+    #[verifier::external_body]
+    fn name_equal<'a, 'b>(a: Name<'a>, b: Name<'b>) -> (result: bool)
+        ensures
+            result == (SpecMime::name_text(a) =~= SpecMime::name_text(b)),
+    {
+        a == b
+    }
+
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
@@ -313,12 +321,12 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
-    #[verifier::external_body] //TODO:
     fn is_image(mt: &Mime) -> (result: bool)
         ensures
             result == SpecMimeClassifier::is_image(mt),
     {
-        mt.type_() == mime::IMAGE
+        // mt.type_() == mime::IMAGE
+        Self::name_equal(mt.type_(), mime::IMAGE)
     }
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>

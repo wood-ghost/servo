@@ -82,6 +82,7 @@ pub mod SpecMime {
     pub assume_specification [mime::IMAGE] -> (result: Name<'static>)
         ensures
             name_identity(&result) == image_identity(),
+            name_text(result) =~= image_name(),
     ;
 
     pub uninterp spec fn audio_identity() -> int;
@@ -152,14 +153,14 @@ pub mod SpecMime {
             },
     ;
 
-    pub open spec fn type_name(mt: &Mime) -> Seq<char> {
-        view(mt).type_
-    }
+    // pub open spec fn type_name(mt: &Mime) -> Seq<char> {
+    //     view(mt).type_
+    // }
     pub assume_specification<'a>
         [Mime::type_]
         (mt: &'a Mime) -> (result: Name<'a>)
         ensures
-            name_text(result) == type_name(mt),
+            name_text(result) =~= view(mt).type_,
     ;
 
     pub uninterp spec fn subtype_name(mt: &Mime) -> Seq<char>;
@@ -194,14 +195,14 @@ pub mod SpecMime {
     }
 
     pub open spec fn is_image(mt: &Mime) -> bool {
-        type_name(mt) =~= "image"@
+        view(mt).type_ =~= image_name()
     }
 
     pub open spec fn is_audio(mt: &Mime) -> bool {
-        type_name(mt) =~= "audio"@
+        view(mt).type_ =~= "audio"@
     }
     pub open spec fn is_video(mt: &Mime) -> bool {
-        type_name(mt) =~= "video"@
+        view(mt).type_ =~= "video"@
     }
     pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
         suffix_name(mt) == Some("xml"@)
@@ -211,6 +212,9 @@ pub mod SpecMime {
     pub uninterp spec fn is_text_plain_utf8(mt: &Mime) -> bool;
 
     pub uninterp spec fn dummy_mime() -> Mime;
+
+    pub open spec fn image_name() -> Seq<char> { "image"@ }
+
 }
 
 pub mod SpecStd {
