@@ -304,7 +304,10 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
-    fn is_audio_video(mt: &Mime) -> bool {
+    fn is_audio_video(mt: &Mime) -> (result: bool)
+        ensures
+            result == SpecMimeClassifier::is_audio_video(mt),
+    {
         mt.type_() == mime::AUDIO ||
             mt.type_() == mime::VIDEO ||
             mt.essence_str() == "application/ogg"
@@ -416,33 +419,71 @@ struct ByteMatcher {
 }
 
 impl ByteMatcher {
-    fn matches(&self, data: &[u8]) -> Option<usize> {
+    fn matches(&self, data: &[u8]) -> Option<usize> 
+        requires
+            self.pattern.len() > 0,
+            self.pattern.len() == self.mask.len(),
+    {
         if data.len() < self.pattern.len() {
-            None
+            return None;
         } else if data == self.pattern {
-            Some(self.pattern.len())
+            return Some(self.pattern.len());
         } else {
-            data[..data.len() - self.pattern.len() + 1]
-                .iter()
-                .position(|x| !self.leading_ignore.contains(x))
-                .and_then(|start| {
-                    if data[start..]
-                        .iter()
-                        .zip(self.pattern.iter())
-                        .zip(self.mask.iter())
-                        // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
-                        .all(|x| {
-                            let ((data_p, pattern_p), mask_p) = x;
-                            (*data_p & *mask_p) == *pattern_p
-                        })
+            let max_start = data.len() - self.pattern.len();
+            let mut start: usize = 0;
+
+            while start <= max_start
+                invariant
+                    start <= max_start + 1,
+                    self.pattern.len() <= data.len(),
+                    self.pattern.len() == self.mask.len(),
+                decreases
+                    max_start + 1 - start,
+            {
+                if !self.leading_ignore.contains(&data[start]) {
+                    let mut i: usize = 0;
+                    while i < self.pattern.len()
+                        invariant
+                            i <= self.pattern.len(),
+                            self.pattern.len() == self.mask.len(),
+                        decreases
+                            self.pattern.len() - i,
                     {
-                        Some(start + self.pattern.len())
-                    } else {
-                        None
+                        if (data[start + i] & self.mask[i]) != self.pattern[i] {
+                            return None;
+                        }
+                        i += 1;
                     }
-                })
+                    return Some(start + self.pattern.len());
+                }
+                start += 1;
+            }
+            return None;
         }
+        // } else {
+        //     data[..data.len() - self.pattern.len() + 1]
+        //         .iter()
+        //         .position(|x| !self.leading_ignore.contains(x))
+        
+        //         .and_then(|start| {
+        //             if data[start..]
+        //                 .iter()
+        //                 .zip(self.pattern.iter())
+        //                 .zip(self.mask.iter())
+        //                 // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
+        //                 .all(|x| {
+        //                     let ((data_p, pattern_p), mask_p) = x;
+        //                     (*data_p & *mask_p) == *pattern_p
+        //                 })
+        //             {
+        //                 Some(start + self.pattern.len())
+        //             } else {
+        //                 None
+        //             }
+        //         })
+        //     }
     }
+    
 }
 
 #[verifier::external_body]
@@ -476,22 +517,37 @@ impl MIMEChecker for ByteMatcher {
             // ));
             return Err(MIMEChecker_validate_unequal_pattern_error(&self.content_type));
         }
-        if self
-            .pattern
-            .iter()
-            .zip(self.mask.iter())
-            // .any(|(&pattern, &mask)| pattern & mask != pattern)
-            .any(|x| {
-                let (pattern_p, mask_p) = x;
-                *pattern_p & *mask_p != *pattern_p
-            })
+
+        let mut i: usize = 0;
+
+        while i < self.pattern.len()
+            invariant
+                i <= self.pattern.len(),
+                self.pattern.len() == self.mask.len(),
+            decreases
+                self.pattern.len() - i,
         {
-            // return Err(format!(
-            //     "Pattern not pre-masked for {:?}",
-            //     self.content_type
-            // ));
-            return Err(MIMEChecker_validate_premasked_error(&self.content_type));
+            if self.pattern[i] & self.mask[i] != self.pattern[i] {
+                return Err(MIMEChecker_validate_premasked_error(
+                    &self.content_type,
+                ));
+            }
+
+            i += 1;
         }
+
+        // if self
+        //     .pattern
+        //     .iter()
+        //     .zip(self.mask.iter())
+        //     .any(|(&pattern, &mask)| pattern & mask != pattern)
+        // {
+        //     // return Err(format!(
+        //     //     "Pattern not pre-masked for {:?}",
+        //     //     self.content_type
+        //     // ));
+        //     return Err(MIMEChecker_validate_premasked_error(&self.content_type));
+        // }
         Ok(())
     }
 }
@@ -570,6 +626,7 @@ impl Mp4Matcher {
     }
 }
 impl MIMEChecker for Mp4Matcher {
+    #[verifier::external_body]
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         if self.matches(data) {
             Some("video/mp4".parse().unwrap())
@@ -739,6 +796,7 @@ impl GroupedClassifier {
     }
 }
 impl MIMEChecker for GroupedClassifier {
+    #[verifier::external_body]
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         self.byte_matchers
             .iter()

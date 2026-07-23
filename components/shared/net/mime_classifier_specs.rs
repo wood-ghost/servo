@@ -173,7 +173,13 @@ pub mod SpecMime {
         essence_str(mt) == "text/html"@
     }
 
+    pub(crate) open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
+        essence_str(mt) == "application/ogg"@
+    }
+
     pub(crate) uninterp spec fn is_image(mt: &Mime) -> bool;
+    pub(crate) uninterp spec fn is_audio(mt: &Mime) -> bool;
+    pub(crate) uninterp spec fn is_video(mt: &Mime) -> bool;
     pub(crate) uninterp spec fn has_xml_suffix(mt: &Mime) -> bool;
     pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
     pub uninterp spec fn is_text_plain(mt: &Mime) -> bool;
@@ -298,6 +304,10 @@ pub mod SpecMimeClassifier {
         SpecMime::is_image(mt)
     }
 
+    pub(crate) open spec fn is_audio_video(mt: &Mime) -> bool {
+        SpecMime::is_audio(mt) || SpecMime::is_video(mt) || SpecMime::essence_is_application_ogg(mt)
+    }
+
     pub open spec fn classify_input_is_valid<'a>(
         context: LoadContext,
         no_sniff_flag: NoSniffFlag,
@@ -382,6 +392,7 @@ pub mod SpecSuppliedTypeDetect {
 
 }
 
+/*
 pub enum DetectionResult {
     Pending,
     Defined,
@@ -453,11 +464,11 @@ state_machine! {
                 let mime_type = resource.get_type_from_file_system();
                 // set supplied-type to the MIME type provided by the file system. 
                 update supplied_type = Some(mime_type);
-                if mime_type.is_none() {
-                    update detection_result = DetectionResult::Undefined;
-                } else {
+                // if mime_type == None {
+                    // update detection_result = DetectionResult::Undefined;
+                // } else {
                     update detection_result = DetectionResult::Defined;
-                }
+                // }
             }
         }
 
@@ -494,5 +505,6 @@ state_machine! {
         }
      }
 }
+*/
 
 } // verus!
