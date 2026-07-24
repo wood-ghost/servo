@@ -625,7 +625,7 @@ impl MIMEChecker for ByteMatcher {
         //     // ));
         //     return Err(MIMEChecker_validate_premasked_error(&self.content_type));
         // }
-        // Ok(())
+        Ok(())
     }
 }
 

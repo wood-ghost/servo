@@ -2,6 +2,8 @@ use vstd::prelude::*;
 
 verus! {
 
+
+
 #[verifier::allow(undeclared_external_trait)]
 pub assume_specification<T, F>
     [Option::<T>::or_else]
@@ -38,16 +40,7 @@ where
     std::slice::Iter<'a, T>: Sized,
 ;
 
-#[verifier::reject_recursive_types(A)]
-#[verifier::reject_recursive_types(B)]
-#[verifier::external_type_specification]
-#[verifier::external_body]
-pub struct ExZip<A, B>(core::iter::Zip<A, B>);
 
-#[verifier::reject_recursive_types(T)]
-#[verifier::external_type_specification]
-#[verifier::external_body]
-pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
 
 pub assume_specification<'a, T>
     [<[T]>::chunks]
@@ -90,28 +83,16 @@ where
         },
 ;
 
-pub assume_specification<'a, T, P>
-    [<std::slice::Iter<'a, T> as std::iter::Iterator>::position]
-    (
-        iter: &mut std::slice::Iter<'a, T>,
-        predicate: P,
-    ) -> Option<usize>
-where
-    P: FnMut(
-        <std::slice::Iter<'a, T> as std::iter::Iterator>::Item,
-    ) -> bool,
-    std::slice::Iter<'a, T>: Sized,
-;
+// #[verifier::reject_recursive_types(A)]
+// #[verifier::reject_recursive_types(B)]
+// #[verifier::external_type_specification]
+// #[verifier::external_body]
+// pub struct ExZip<A, B>(core::iter::Zip<A, B>);
 
-pub assume_specification<'a, 'b, T>
-    [<core::slice::Iter<'a, T> as core::iter::Iterator>::zip]
-    (
-        iter: core::slice::Iter<'a, T>, 
-        other: core::slice::Iter<'b, T>,
-    ) -> ( 
-        result: core::iter::Zip<core::slice::Iter<'a, T>, core::slice::Iter<'b, T>>
-    )
-;
+#[verifier::reject_recursive_types(T)]
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
 
 
 } // verus!
