@@ -479,11 +479,12 @@ impl ByteMatcher {
         requires
             self.pattern.len() > 0,
             self.pattern.len() == self.mask.len(),
-        // ensures
-        //     match result {
-        //         Some(r) =>
-        //         None =>
-        //     }
+        ensures
+            match result {
+                //TODO: more accurate
+                Some(r) => SpecByteMatcher::pattern_matching_algo(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()),
+                None => !SpecByteMatcher::pattern_matching_algo(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()),
+            }
     {
         if data.len() < self.pattern.len() {
             return None;
