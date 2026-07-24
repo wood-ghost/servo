@@ -14,7 +14,12 @@ use mime::{self, Mime, Name};
 
 use crate::LoadContext;
 
-use crate::mime_classifier_specs::*;
+use crate::mime_classifier_specs::{
+    model as Model,
+    predicates as Spec,
+    apache_bug_flag as SpecApacheBugFlag,
+    classifier as SpecClassifier,
+};
 
 verus! {
 
@@ -51,7 +56,7 @@ impl ApacheBugFlag {
     #[verifier::external_body]
     fn mime_equal(a: &Mime, b: Mime) -> (result: bool)
         ensures
-            result == (SpecMime::mime_identity(a) == SpecMime::mime_identity(&b)),
+            result == (Model::mime_identity(a) == Model::mime_identity(&b)),
     {
         *a == b
     }
@@ -63,7 +68,7 @@ impl ApacheBugFlag {
         // TODO(36801): also handle charset ISO-8859-1
         if mime_type.is_some_and(|mime_type| -> (r: bool)
             ensures 
-                r == (SpecMime::is_text_plain(mime_type) || SpecMime::is_text_plain_utf8(mime_type))
+                r == (Spec::is_text_plain(mime_type) || Spec::is_text_plain_utf8(mime_type))
             {
             // *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
             Self::mime_equal(mime_type, mime::TEXT_PLAIN) || Self::mime_equal(mime_type, mime::TEXT_PLAIN_UTF_8) 
@@ -119,9 +124,9 @@ impl MimeClassifier {
         data: &'a [u8],
     ) -> (result: Mime)
         requires
-            SpecMimeClassifier::classify_input_is_valid(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
+            SpecClassifier::classify_input_is_valid(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
         ensures
-            result == SpecMimeClassifier::classify(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
+            result == SpecClassifier::classify(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
     {
         let supplied_type_or_octet_stream = supplied_type
             .clone()
@@ -296,10 +301,10 @@ impl MimeClassifier {
         a == b
     }
 
-    #[verifier::external_body]
+    #[verifier::external_body] // For type_
     fn name_equal<'a, 'b>(a: Name<'a>, b: Name<'b>) -> (result: bool)
         ensures
-            result == (SpecMime::name_text(a) =~= SpecMime::name_text(b)),
+            result == (Model::name_text(a) =~= Model::name_text(b)),
     {
         a == b
     }
@@ -309,7 +314,7 @@ impl MimeClassifier {
         ensures
             result == match (a, b) {
                     (Some(a_name), Some(b_name)) =>
-                        SpecMime::name_text(a_name) =~= SpecMime::name_text(b_name),
+                        Model::name_text(a_name) =~= Model::name_text(b_name),
                     (None, None) => true,
                     _ => false,
                 },
@@ -322,7 +327,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
     fn is_xml(mt: &Mime) -> (result: bool) 
         ensures
-            result == SpecMimeClassifier::is_xml(mt),
+            result == Spec::is_xml(mt),
     {
         !Self::is_image(mt) &&
             // (mt.suffix() == Some(mime::XML) ||
@@ -336,7 +341,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
     fn is_html(mt: &Mime) -> (result: bool)
         ensures
-            result == SpecMimeClassifier::is_html(mt),
+            result == Spec::is_html(mt),
     {
         // mt.essence_str() == "text/html"
         Self::str_equal(mt.essence_str(), "text/html")
@@ -345,7 +350,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
     fn is_image(mt: &Mime) -> (result: bool)
         ensures
-            result == SpecMimeClassifier::is_image(mt),
+            result == Spec::is_image(mt),
     {
         // mt.type_() == mime::IMAGE
         Self::name_equal(mt.type_(), mime::IMAGE)
@@ -354,7 +359,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
     fn is_audio_video(mt: &Mime) -> (result: bool)
         ensures
-            result == SpecMimeClassifier::is_audio_video(mt),
+            result == Spec::is_audio_video(mt),
     {
         // mt.type_() == mime::AUDIO ||
         Self::name_equal(mt.type_(), mime::AUDIO) ||
@@ -615,7 +620,7 @@ struct TagTerminatedByteMatcher {
 #[verifier::external_body]
 fn equal_b_space_or_g (d: u8) -> (result: bool) 
     ensures
-        result == SpecMimeChecker::equal_b_space_or_g(d),
+        result == Spec::equal_b_space_or_g(d),
 {
     d == b' ' || d == b'>'
 }

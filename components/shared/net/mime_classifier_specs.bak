@@ -1,0 +1,192 @@
+#![allow(unsafe_code)]
+
+use vstd::prelude::*;
+use crate::LoadContext;
+use verus_state_machines_macros::state_machine;
+
+use mime::{self, Mime, Name};
+
+use crate::mime_classifier::{MediaType, ApacheBugFlag, NoSniffFlag};
+
+verus! {
+
+pub mod SpecMime {
+    use super::*;
+
+    
+
+    pub uninterp spec fn dummy_mime() -> Mime;
+
+    
+
+}
+
+
+pub mod SpecMimeClassifier {
+    use super::*;
+    
+    // Let supplied-type be null. 
+    pub(crate) open spec fn is_text_plain(mt: &Mime) -> bool {
+        SpecMime::is_text_plain(mt)
+    }
+
+    
+}
+
+pub mod SpecMimeChecker {
+    use super::*;
+
+    
+
+}
+
+// https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm
+//TODO: change to sm
+// pub mod SpecSuppliedTypeDetect {
+//     use super::*;
+
+//     pub struct ResourceModel {
+//         pub context: LoadContext,
+//         pub no_sniff_flag: NoSniffFlag,
+//         pub apache_bug_flag: ApacheBugFlag,
+//         pub supplied_type: Option<Mime>,
+//         // the resource is retrieved via ...
+//         pub retrieval_kind: RetrievalKind,
+//     }
+
+//     impl ResourceModel {
+//         pub uninterp spec fn retrieve_from(&self) -> RetrievalKind;
+//         pub uninterp spec fn get_content_type_headers(&self) -> Seq<Mime>;
+//         pub uninterp spec fn set_supplied_type(&self, mt: Option<Mime>);
+//         pub uninterp spec fn get_supplied_type(&self) -> Option<Mime>;
+//         pub uninterp spec fn set_check_for_apache_bug_flag(&self);
+//         pub uninterp spec fn get_type_from_file_system(&self) -> Mime;
+//         pub uninterp spec fn get_type_from_protocol(&self) -> Option<Mime>;
+//         pub uninterp spec fn supplied_type_is_mime_type(&self) -> bool;
+//     }
+
+//     pub enum RetrievalKind {
+//         Http,
+//         FileSystem,
+//         Protocol,
+//         Undefined,
+//     }
+
+// }
+
+/*
+pub enum DetectionResult {
+    Pending,
+    Defined,
+    Undefined,
+}
+
+state_machine! {
+    SuppliedTypeDetectSM {
+        //// The state definition
+         
+        fields {
+            pub supplied_type: Option<Mime>,
+            pub retrieval_kind: SpecSuppliedTypeDetect::RetrievalKind,
+            pub apache_bug_flag: ApacheBugFlag,
+            pub detection_result: DetectionResult,
+        }
+
+        //// The transitions
+
+        init!{
+            initialize() { // Let supplied-type be null. 
+                init supplied_type = None;
+                init retrieval_kind = SpecSuppliedTypeDetect::RetrievalKind::Undefined;
+                init apache_bug_flag = ApacheBugFlag::Off;
+                init detection_result = DetectionResult::Pending;
+            }
+        }
+
+        transition!{
+            get_retrieve_kind(resource: SpecSuppliedTypeDetect::ResourceModel) {
+                require(pre.retrieval_kind == SpecSuppliedTypeDetect::RetrievalKind::Undefined 
+                    && pre.supplied_type == None
+                    && pre.detection_result == DetectionResult::Pending
+                );
+                update retrieval_kind = resource.retrieve_from();
+            }
+        }
+
+        transition!{
+            // If the resource is retrieved via HTTP
+            handle_http(resource: SpecSuppliedTypeDetect::ResourceModel) {
+                require(pre.retrieval_kind == SpecSuppliedTypeDetect::RetrievalKind::Http 
+                    && pre.supplied_type == None
+                    && pre.detection_result == DetectionResult::Pending
+                );
+                let content_type_headers = resource.get_content_type_headers();
+                if content_type_headers.len() > 0 { // If one or more Content-Type headers are associated with the resource, execute the following steps: 
+                    let last_header = content_type_headers[content_type_headers.len() - 1];
+                    let new_apache_bug_flag = SpecApacheBugFlag::from_content_type(Some(&last_header));
+
+                    // Set supplied-type to the value of the last Content-Type header associated with the resource. 
+                    update supplied_type = Some(last_header);
+                    // Set the check-for-apache-bug flag if supplied-type is exactly equal to one of the values in the following table:
+                    update apache_bug_flag = new_apache_bug_flag;
+                    update detection_result = DetectionResult::Defined;
+                } else {
+                    update detection_result = DetectionResult::Undefined;
+                }
+            }
+        }
+
+        transition!{
+            // If the resource is retrieved directly from the file system
+            handle_file_system(resource: SpecSuppliedTypeDetect::ResourceModel) {
+                require(pre.retrieval_kind == SpecSuppliedTypeDetect::RetrievalKind::FileSystem 
+                    && pre.supplied_type == None
+                    && pre.detection_result == DetectionResult::Pending
+                );
+                let mime_type = resource.get_type_from_file_system();
+                // set supplied-type to the MIME type provided by the file system. 
+                update supplied_type = Some(mime_type);
+                // if mime_type == None {
+                    // update detection_result = DetectionResult::Undefined;
+                // } else {
+                    update detection_result = DetectionResult::Defined;
+                // }
+            }
+        }
+
+        transition!{
+            // If the resource is retrieved via another protocol (such as FTP)
+            handle_protocol(resource: SpecSuppliedTypeDetect::ResourceModel) {
+                require(pre.retrieval_kind == SpecSuppliedTypeDetect::RetrievalKind::Protocol 
+                    && pre.supplied_type == None
+                    && pre.detection_result == DetectionResult::Pending
+                );
+                let mime_type = resource.get_type_from_protocol();
+                // set supplied-type to the MIME type as determined by that protocol
+                update supplied_type = mime_type;
+                if mime_type.is_none() {
+                    update detection_result = DetectionResult::Undefined;
+                } else {
+                    update detection_result = DetectionResult::Defined;
+                }
+            }
+        }
+
+        property!{
+            supplied_type_valid() { //The supplied MIME type is supplied-type. 
+                require(pre.detection_result == DetectionResult::Defined);
+                assert(pre.supplied_type.is_some());
+            }
+        }
+
+        property!{
+            supplied_type_undefined() { //If supplied-type is not a MIME type, the supplied MIME type is undefined. Abort these steps.
+                require(pre.detection_result == DetectionResult::Undefined);
+                assert(pre.supplied_type.is_none());
+            }
+        }
+     }
+}
+*/
+
+} // verus!
