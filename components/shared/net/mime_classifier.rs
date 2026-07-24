@@ -475,10 +475,15 @@ struct ByteMatcher {
 }
 
 impl ByteMatcher {
-    fn matches(&self, data: &[u8]) -> Option<usize> 
+    fn matches(&self, data: &[u8]) -> (result: Option<usize>)
         requires
             self.pattern.len() > 0,
             self.pattern.len() == self.mask.len(),
+        // ensures
+        //     match result {
+        //         Some(r) =>
+        //         None =>
+        //     }
     {
         if data.len() < self.pattern.len() {
             return None;
@@ -620,7 +625,7 @@ impl MIMEChecker for ByteMatcher {
         //     // ));
         //     return Err(MIMEChecker_validate_premasked_error(&self.content_type));
         // }
-        Ok(())
+        // Ok(())
     }
 }
 
