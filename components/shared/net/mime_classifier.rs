@@ -17,8 +17,9 @@ use crate::LoadContext;
 use crate::mime_classifier_specs::{
     model as Model,
     predicates as Spec,
-    apache_bug_flag as SpecApacheBugFlag,
+    flag as SpecFlag,
     classifier as SpecClassifier,
+    byte_matcher as SpecByteMatcher,
 };
 
 verus! {
@@ -63,7 +64,7 @@ impl ApacheBugFlag {
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
     pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
         ensures
-            result == SpecApacheBugFlag::from_content_type(mime_type),
+            result == SpecFlag::from_content_type(mime_type),
     {
         // TODO(36801): also handle charset ISO-8859-1
         if mime_type.is_some_and(|mime_type| -> (r: bool)
@@ -87,7 +88,6 @@ pub enum NoSniffFlag {
 }
 
 impl From<bool> for NoSniffFlag {
-    #[verifier::external_body] //TODO:
     fn from(boolean: bool) -> Self {
         if boolean {
             NoSniffFlag::On
@@ -566,7 +566,13 @@ impl MIMEChecker for ByteMatcher {
         self.matches(data).map(|x| self.content_type.clone())
     }
 
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> (result: Result<(), String>)
+        ensures
+            match result {
+                Ok(()) => SpecByteMatcher::validate_ok(self.pattern@, self.mask@), 
+                Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
+            }
+    {
         if self.pattern.is_empty() {
             // return Err(format!("Zero length pattern for {:?}", self.content_type));
             return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
@@ -585,6 +591,7 @@ impl MIMEChecker for ByteMatcher {
             invariant
                 i <= self.pattern.len(),
                 self.pattern.len() == self.mask.len(),
+                forall |j: int| #![trigger self.pattern[j]] 0 <= j < i ==> (self.pattern[j] & self.mask[j]) == self.pattern[j]
             decreases
                 self.pattern.len() - i,
         {
@@ -601,7 +608,11 @@ impl MIMEChecker for ByteMatcher {
         //     .pattern
         //     .iter()
         //     .zip(self.mask.iter())
-        //     .any(|(&pattern, &mask)| pattern & mask != pattern)
+        //     // .any(|(&pattern, &mask)| pattern & mask != pattern)
+        //     .any(|x| {
+        //         let (pattern_p, mask_p) = x;
+        //         *pattern_p & *mask_p != *pattern_p
+        //     })
         // {
         //     // return Err(format!(
         //     //     "Pattern not pre-masked for {:?}",
@@ -620,7 +631,7 @@ struct TagTerminatedByteMatcher {
 #[verifier::external_body]
 fn equal_b_space_or_g (d: u8) -> (result: bool) 
     ensures
-        result == Spec::equal_b_space_or_g(d),
+        result == (d == 0x20u8 || d == 0x3eu8)
 {
     d == b' ' || d == b'>'
 }

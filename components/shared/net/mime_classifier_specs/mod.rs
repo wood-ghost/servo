@@ -3,7 +3,7 @@
 pub mod model;
 pub mod mime_api;
 pub mod predicates;
-pub mod apache_bug_flag;
+pub mod flag;
 pub mod byte_matcher;
 pub mod classifier;
 pub mod std_api;

@@ -59,9 +59,5 @@ pub(crate) open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
 }
 
-// for MIMEChecker
-pub open spec fn equal_b_space_or_g(d: u8) -> bool {
-    d == 0x20u8 || d == 0x3eu8
-}
 
 } // verus!
