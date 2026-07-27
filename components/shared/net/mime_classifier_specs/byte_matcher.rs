@@ -49,10 +49,6 @@ pub open spec fn match_result(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
     }
 }
 
-// pub open spec fn function(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, s: int) -> bool {
-//     &&& forall |p: int| 0 <= p < pattern.len() ==> (input[s+p] & mask[p] == pattern[p])
-// }
-
 
 
 } // verus!

@@ -549,6 +549,7 @@ impl ByteMatcher {
             }
             return None;
         }
+        // TODO: keep the original code 
         // } else {
         //     data[..data.len() - self.pattern.len() + 1]
         //         .iter()
