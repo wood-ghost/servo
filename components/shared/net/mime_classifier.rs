@@ -20,6 +20,7 @@ use crate::mime_classifier_specs::{
     flag as SpecFlag,
     classifier as SpecClassifier,
     byte_matcher as SpecByteMatcher,
+    // std_api as SpecStd,
 };
 
 verus! {
@@ -475,20 +476,33 @@ struct ByteMatcher {
 }
 
 impl ByteMatcher {
+    #[verifier::external_body]
+    fn byte_slice_equal(a: &[u8], b: &[u8],) -> (result: bool)
+        ensures
+            result == (a@ =~= b@),
+    {
+        a == b
+    }
     fn matches(&self, data: &[u8]) -> (result: Option<usize>)
         requires
             self.pattern.len() > 0,
             self.pattern.len() == self.mask.len(),
         ensures
             match result {
-                //TODO: more accurate
-                Some(r) => SpecByteMatcher::pattern_matching_algo(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()),
-                None => !SpecByteMatcher::pattern_matching_algo(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()),
+                Some(r) => {
+                   ||| (data@ =~= self.pattern@) && (r as int == self.pattern@.len())
+                   ||| SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int)
+                } 
+                None => {
+                    &&& !(data@ =~= self.pattern@) 
+                    &&& !SpecByteMatcher::pattern_matching_success(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set())
+                }
             }
     {
         if data.len() < self.pattern.len() {
             return None;
-        } else if data == self.pattern {
+        // } else if data == self.pattern {
+        } else if Self::byte_slice_equal(data, self.pattern) {
             return Some(self.pattern.len());
         } else {
             let max_start = data.len() - self.pattern.len();
@@ -501,17 +515,22 @@ impl ByteMatcher {
                     self.pattern.len() == self.mask.len(),
                     max_start == data.len() - self.pattern.len(), 
                     self.pattern.len() > 0,
+                    !(data@ =~= self.pattern@),
+                    forall|j: int| #![trigger data@[j]] 0 <= j < start as int ==> self.leading_ignore@.to_set().contains(data@[j]),
                 decreases
                     max_start + 1 - start,
             {
                 if !self.leading_ignore.contains(&data[start]) {
-                    assert(start + self.pattern.len() <= data.len());
                     let mut i: usize = 0;
                     while i < self.pattern.len()
                         invariant
                             i <= self.pattern.len(),
                             self.pattern.len() == self.mask.len(),
                             start + self.pattern.len() <= data.len(),
+                            !(data@ =~= self.pattern@),
+                            SpecByteMatcher::is_first_not_ignored_idx(data@,self.leading_ignore@.to_set(),start as int),
+                            forall |p: int| #![trigger data@[start as int + p]] 0 <= p < i as int 
+                                ==> (data@[start as int + p] & self.mask@[p]) == self.pattern@[p],
                         decreases
                             self.pattern.len() - i,
                     {
@@ -520,6 +539,10 @@ impl ByteMatcher {
                         }
                         i += 1;
                     }
+                    assert(SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), (start + self.pattern.len()) as int)) 
+                    by {
+                        assert(SpecByteMatcher::pattern_matching_at(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int));
+                    };
                     return Some(start + self.pattern.len());
                 }
                 start += 1;

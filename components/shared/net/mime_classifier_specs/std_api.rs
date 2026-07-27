@@ -22,9 +22,11 @@ where
 
 pub assume_specification<T>
     [<[T]>::contains]
-    (slice: &[T], value: &T) -> bool
+    (slice: &[T], value: &T) -> (result: bool)
 where
     T: std::cmp::PartialEq,
+    ensures
+        result == slice@.to_set().contains(*value),
 ;
 
 pub assume_specification<'a, T, P>
@@ -93,6 +95,5 @@ where
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
-
 
 } // verus!
