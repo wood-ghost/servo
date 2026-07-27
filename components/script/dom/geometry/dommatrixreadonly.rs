@@ -9,6 +9,7 @@ use cssparser::{Parser, ParserInput};
 use dom_struct::dom_struct;
 use euclid::Angle;
 use euclid::default::{Transform2D, Transform3D};
+use js::context::NoGC;
 use js::conversions::jsstr_to_string;
 use js::jsapi::JSObject;
 use js::jsval;
@@ -525,7 +526,12 @@ impl DOMMatrixReadOnlyMethods<crate::DomTypeHolder> for DOMMatrixReadOnly {
         global: &GlobalScope,
         array: CustomAutoRooterGuard<Float32Array>,
     ) -> Fallible<DomRoot<DOMMatrixReadOnly>> {
-        let vec: Vec<f64> = array.to_vec().iter().map(|&x| x as f64).collect();
+        let vec: Vec<f64> = array
+            .to_vec()
+            .unwrap_or_default()
+            .iter()
+            .map(|&x| x as f64)
+            .collect();
         DOMMatrixReadOnly::Constructor(
             cx,
             global,
@@ -540,7 +546,7 @@ impl DOMMatrixReadOnlyMethods<crate::DomTypeHolder> for DOMMatrixReadOnly {
         global: &GlobalScope,
         array: CustomAutoRooterGuard<Float64Array>,
     ) -> Fallible<DomRoot<DOMMatrixReadOnly>> {
-        let vec: Vec<f64> = array.to_vec();
+        let vec: Vec<f64> = array.to_vec().unwrap_or_default();
         DOMMatrixReadOnly::Constructor(
             cx,
             global,
@@ -987,7 +993,7 @@ impl Serializable for DOMMatrixReadOnly {
     type Index = DomMatrixIndex;
     type Data = DomMatrix;
 
-    fn serialize(&self) -> Result<(DomMatrixId, Self::Data), ()> {
+    fn serialize(&self, _no_gc: &NoGC) -> Result<(DomMatrixId, Self::Data), ()> {
         let serialized = if self.is2D() {
             DomMatrix {
                 matrix: Transform3D::new(

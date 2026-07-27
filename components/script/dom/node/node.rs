@@ -104,7 +104,8 @@ use crate::dom::html::htmllinkelement::HTMLLinkElement;
 use crate::dom::html::htmlslotelement::{HTMLSlotElement, Slottable};
 use crate::dom::html::htmlstyleelement::HTMLStyleElement;
 use crate::dom::iterators::{
-    ShadowIncluding, UnrootedFollowingNodeIterator, UnrootedPrecedingNodeIterator,
+    ShadowIncluding, UnrootedFollowingFlatTreeNodesTraversal, UnrootedFollowingNodeIterator,
+    UnrootedPrecedingNodeIterator,
 };
 use crate::dom::mutationobserver::{Mutation, MutationObserver, RegisteredObserver};
 use crate::dom::node::iterators::{
@@ -176,7 +177,7 @@ impl fmt::Debug for Node {
         if let Some(element) = self.downcast::<Element>() {
             element.fmt(f)
         } else if let Some(character_data) = self.downcast::<CharacterData>() {
-            write!(f, "[Text({})]", character_data.data())
+            write!(f, "[Text({})]", &*character_data.data())
         } else {
             write!(f, "[Node({:?})]", self.type_id())
         }
@@ -234,6 +235,14 @@ bitflags! {
 
         /// Whether this node has a pseudo-element style which uses `attr()` in the `content` attribute.
         const USES_ATTR_IN_CONTENT_ATTRIBUTE = 1 << 13;
+
+        /// Whether any part of this node or its flat tree descendants overlaps with
+        /// the [Document selection](https://w3c.github.io/selection-api/#dfn-selection).
+        ///
+        /// By definition, if a node has this flag set then all its flat tree ancestors
+        /// have it set too. Conversely, if a node has this flag unset then all its flat
+        /// tree descendants have it unset too.
+        const OVERLAPS_DOCUMENT_SELECTION = 1 << 14;
     }
 }
 
@@ -376,6 +385,7 @@ impl Node {
         if let Some(element) = self.downcast::<Element>() {
             element.clean_up_style_data();
         }
+        self.set_flag(NodeFlags::OVERLAPS_DOCUMENT_SELECTION, false);
     }
 
     /// Clean up flags and runs steps 11-14 of remove a node.
@@ -390,7 +400,8 @@ impl Node {
             .union(NodeFlags::IS_CONNECTED)
             .union(NodeFlags::HAS_DIRTY_DESCENDANTS)
             .union(NodeFlags::HAS_SNAPSHOT)
-            .union(NodeFlags::HANDLED_SNAPSHOT);
+            .union(NodeFlags::HANDLED_SNAPSHOT)
+            .union(NodeFlags::OVERLAPS_DOCUMENT_SELECTION);
 
         for node in root.traverse_preorder_non_rooting(cx.no_gc(), ShadowIncluding::No) {
             node.set_flag(RESET_FLAGS | NodeFlags::IS_IN_SHADOW_TREE, false);
@@ -472,7 +483,8 @@ impl Node {
             .union(NodeFlags::IS_CONNECTED)
             .union(NodeFlags::HAS_DIRTY_DESCENDANTS)
             .union(NodeFlags::HAS_SNAPSHOT)
-            .union(NodeFlags::HANDLED_SNAPSHOT);
+            .union(NodeFlags::HANDLED_SNAPSHOT)
+            .union(NodeFlags::OVERLAPS_DOCUMENT_SELECTION);
 
         for node in root.traverse_preorder(ShadowIncluding::No) {
             node.set_flag(RESET_FLAGS | NodeFlags::IS_IN_SHADOW_TREE, false);
@@ -512,7 +524,7 @@ impl Node {
     /// Fails unless `child` is a child of this node.
     fn remove_child(&self, cx: &mut JSContext, child: &Node, cached_index: Option<u32>) {
         assert!(child.parent_node.get().as_deref() == Some(self));
-        self.note_dirty_descendants();
+        self.note_dirty_descendants(cx.no_gc());
         self.add_pending_accessibility_damage(AccessibilityDamage::Children);
 
         let prev_sibling = child.GetPreviousSibling();
@@ -556,7 +568,7 @@ impl Node {
     fn move_child(&self, cx: &mut JSContext, child: &Node) {
         assert!(child.parent_node.get().as_deref() == Some(self));
         self.dirty(NodeDamage::ContentOrHeritage);
-        self.note_dirty_descendants();
+        self.note_dirty_descendants(cx.no_gc());
         self.add_pending_accessibility_damage(AccessibilityDamage::Children);
 
         child.prev_sibling.set(None);
@@ -872,8 +884,9 @@ impl Node {
     }
 
     // FIXME(emilio): This and the function below should move to Element.
-    pub(crate) fn note_dirty_descendants(&self) {
-        self.owner_doc().note_node_with_dirty_descendants(self);
+    pub(crate) fn note_dirty_descendants(&self, no_gc: &NoGC) {
+        self.owner_doc_unrooted(no_gc)
+            .note_node_with_dirty_descendants(self);
     }
 
     pub(crate) fn has_dirty_descendants(&self) -> bool {
@@ -948,7 +961,8 @@ impl Node {
         TreeIterator::new(self, shadow_including)
     }
 
-    /// Iterates over this node and all its descendants, in preorder. We take &NoGC to prevent GC which allows us to avoid rooting.
+    /// Iterates over this node and all its descendants, in preorder.
+    /// We take &NoGC to prevent GC which allows us to avoid rooting.
     pub(crate) fn traverse_preorder_non_rooting<'b>(
         &self,
         no_gc: &'b NoGC,
@@ -1003,6 +1017,13 @@ impl Node {
                 .inclusive_ancestors_in_flat_tree()
                 .any(|node| node == *ancestor)
         })
+    }
+
+    pub(crate) fn following_flat_tree_nodes_unrooted<'no_gc>(
+        &self,
+        no_gc: &'no_gc NoGC,
+    ) -> UnrootedFollowingFlatTreeNodesTraversal<'no_gc> {
+        UnrootedFollowingFlatTreeNodesTraversal::new(self, no_gc)
     }
 
     /// <https://dom.spec.whatwg.org/#concept-tree-inclusive-ancestor>
@@ -1703,7 +1724,7 @@ impl Node {
                     let Some(shadow_root) = n.downcast::<ShadowRoot>()
                 {
                     return Some(UnrootedDom::from_dom(
-                        Dom::from_ref(shadow_root.Host().upcast::<Node>()),
+                        Dom::from_ref(shadow_root.host_unrooted(no_gc).upcast::<Node>()),
                         no_gc,
                     ));
                 }
@@ -1715,6 +1736,10 @@ impl Node {
 
     pub(crate) fn owner_doc(&self) -> DomRoot<Document> {
         self.owner_doc.get().unwrap()
+    }
+
+    pub(crate) fn owner_doc_unrooted<'a>(&self, no_gc: &'a NoGC) -> UnrootedDom<'a, Document> {
+        self.owner_doc.get_unrooted(no_gc).unwrap()
     }
 
     pub(crate) fn set_owner_doc(&self, document: &Document) {
@@ -2704,6 +2729,8 @@ impl Node {
             }
         }
 
+        Self::maybe_dirty_visible_selection_for_newly_inserted_nodes(parent, new_nodes);
+
         if let SuppressObserver::Unsuppressed = suppress_observers {
             // Step 9. Run the children changed steps for parent.
             // TODO(xiaochengh): If we follow the spec and move it out of the if block, some WPT fail. Investigate.
@@ -2747,6 +2774,29 @@ impl Node {
 
         parent_document.remove_script_and_layout_blocker(cx);
         from_document.remove_script_and_layout_blocker(cx);
+    }
+
+    /// If insertion of any of the given nodes happened within an existing visible
+    /// selection, mark the [`Document`]'s visible selection as dirty.
+    pub(crate) fn maybe_dirty_visible_selection_for_newly_inserted_nodes(
+        parent: &Node,
+        inserted_nodes: &[&Node],
+    ) {
+        let Some(selection) = parent.owner_document().selection() else {
+            return;
+        };
+
+        for node in inserted_nodes {
+            match node.parent_in_flat_tree() {
+                FlatTreeParent::RootNode | FlatTreeParent::NotInFlatTree => {},
+                FlatTreeParent::Parent(parent) => {
+                    if parent.get_flag(NodeFlags::OVERLAPS_DOCUMENT_SELECTION) {
+                        selection.set_visible_selection_dirty();
+                        return;
+                    }
+                },
+            }
+        }
     }
 
     /// <https://dom.spec.whatwg.org/#concept-node-replace-all>
@@ -3349,6 +3399,25 @@ impl Node {
         self.next_sibling.get_unrooted(no_gc)
     }
 
+    pub(crate) fn next_flat_tree_sibling_unrooted<'a>(
+        &self,
+        no_gc: &'a NoGC,
+    ) -> Option<UnrootedDom<'a, Node>> {
+        if let Some(slot_element) = self.assigned_slot() {
+            // TODO(mrobinson): When traversing this is O(n²) against the number of
+            // slotted nodes, which isn't ideal. We could track the index of each
+            // slottable in the `<slot>` to fix this.
+            return slot_element
+                .assigned_nodes()
+                .iter()
+                .skip_while(|slottable| &*slottable.0 != self)
+                // Skip `self` so that this moves on the the next node in the list of slottables.
+                .nth(1)
+                .map(|next_slottable| UnrootedDom::from_dom(next_slottable.0.clone(), no_gc));
+        }
+        self.get_next_sibling_unrooted(no_gc)
+    }
+
     pub(crate) fn get_previous_sibling_unrooted<'a>(
         &self,
         no_gc: &'a NoGC,
@@ -3361,6 +3430,32 @@ impl Node {
         no_gc: &'a NoGC,
     ) -> Option<UnrootedDom<'a, Node>> {
         self.first_child.get_unrooted(no_gc)
+    }
+
+    pub(crate) fn first_flat_tree_child_unrooted<'a>(
+        &self,
+        no_gc: &'a NoGC,
+    ) -> Option<UnrootedDom<'a, Node>> {
+        let Some(element) = self.downcast::<Element>() else {
+            return self.get_first_child_unrooted(no_gc);
+        };
+        if let Some(shadow_root) = element.shadow_root_unrooted(no_gc) {
+            return shadow_root
+                .upcast::<Node>()
+                .first_flat_tree_child_unrooted(no_gc);
+        };
+
+        // Return the first slotted node if this is a `<slot>` that has slotted nodes.
+        // Important here is that fallback content (`self.first_child()`) is returned
+        // if there are no slotted nodes.
+        if let Some(slot_element) = element.downcast::<HTMLSlotElement>() &&
+            slot_element.has_assigned_nodes() &&
+            let Some(assigned_node) = slot_element.assigned_nodes().first()
+        {
+            return Some(UnrootedDom::from_dom(assigned_node.0.clone(), no_gc));
+        }
+
+        self.get_first_child_unrooted(no_gc)
     }
 
     fn get_last_child_unrooted<'b>(&self, no_gc: &'b NoGC) -> Option<UnrootedDom<'b, Node>> {
@@ -4275,7 +4370,8 @@ impl VirtualMethods for Node {
             list.as_children_list().children_changed(mutation);
         }
 
-        self.owner_doc().content_and_heritage_changed(self);
+        self.owner_doc_unrooted(cx.no_gc())
+            .content_and_heritage_changed(cx.no_gc(), self);
     }
 
     // This handles the ranges mentioned in steps 2-3 when removing a node.
@@ -4312,7 +4408,12 @@ impl VirtualMethods for Node {
             weak_ranges.drain_to_parent(old_parent, context.index(), self);
         }
 
-        self.owner_doc().content_and_heritage_changed(self);
+        self.owner_doc_unrooted(cx.no_gc())
+            .content_and_heritage_changed(cx.no_gc(), self);
+
+        if let Some(parent) = self.GetParentNode() {
+            Self::maybe_dirty_visible_selection_for_newly_inserted_nodes(&parent, &[self]);
+        }
     }
 
     fn handle_event(&self, cx: &mut JSContext, event: &Event) {

@@ -4,8 +4,9 @@
 
 //! Methods for layout of node
 
-use std::borrow::Cow;
+use std::ops::Range;
 
+use atomic_refcell::AtomicRef;
 use layout_api::{
     GenericLayoutData, HTMLCanvasData, HTMLMediaData, LayoutElementType, LayoutNodeType,
     SVGElementData, SharedSelection,
@@ -16,6 +17,7 @@ use script_bindings::codegen::InheritTypes::{
     ElementTypeId, HTMLElementTypeId, SVGElementTypeId, SVGGraphicsElementTypeId,
 };
 use servo_base::id::{BrowsingContextId, PipelineId};
+use servo_base::text::Utf32CodeUnits;
 use servo_url::ServoUrl;
 use style::dom::OpaqueNode;
 use style::selector_parser::PseudoElement;
@@ -239,12 +241,49 @@ impl<'dom> LayoutDom<'dom, Node> {
         self.is_single_line_text_inner_editor() || is_single_line_text_inner_placeholder
     }
 
-    pub(crate) fn text_content(self) -> Cow<'dom, str> {
+    pub(crate) fn text_content(self) -> AtomicRef<'dom, str> {
         self.downcast::<Text>()
             .expect("Called LayoutDom::text_content on non-Text node!")
             .upcast()
             .data_for_layout()
-            .into()
+    }
+
+    #[expect(unsafe_code)]
+    pub(crate) fn document_selection_in_text_node(&self) -> Option<Range<Utf32CodeUnits>> {
+        let unsafe_self = self.unsafe_get();
+        if !unsafe_self.get_flag(NodeFlags::OVERLAPS_DOCUMENT_SELECTION) {
+            return None;
+        }
+
+        let text_node = self.downcast::<Text>()?;
+        let text = text_node.upcast().data_for_layout();
+        let range = self
+            .owner_doc_for_layout()
+            .selection_for_layout()?
+            .range_for_layout()?
+            .unsafe_get();
+
+        let range_start = range.start();
+        let range_end = range.end();
+
+        // Text nodes are always the same node when projected into the flat tree, so
+        // it is fine to do the following check against the original unprojected nodes.
+        let is_start_node = unsafe { range_start.node().to_layout() } == *self;
+        let is_end_node = unsafe { range_end.node().to_layout() } == *self;
+
+        let start_offset = if is_start_node {
+            range_start.offset().to_utf32_code_units_in(&text)
+        } else {
+            Utf32CodeUnits(0)
+        };
+
+        let end_offset = if is_end_node {
+            range_end.offset().to_utf32_code_units_in(&text)
+        } else {
+            Utf32CodeUnits::length_of(&text)
+        };
+
+        Some(start_offset..end_offset)
     }
 
     /// Get the selection for the given node. This only works for text nodes that are in

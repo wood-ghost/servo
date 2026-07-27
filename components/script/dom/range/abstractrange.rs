@@ -8,6 +8,7 @@ use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use deny_public_fields::DenyPublicFields;
 use dom_struct::dom_struct;
 use script_bindings::reflector::Reflector;
+use servo_base::text::Utf16CodeUnits;
 
 use crate::dom::bindings::codegen::Bindings::AbstractRangeBinding::AbstractRangeMethods;
 use crate::dom::bindings::codegen::Bindings::NodeBinding::{NodeConstants, NodeMethods};
@@ -97,6 +98,10 @@ impl BoundaryPoint {
         self.set_offset(offset);
     }
 
+    pub(crate) fn offset(&self) -> Utf16CodeUnits {
+        Utf16CodeUnits::from(self.offset.get())
+    }
+
     pub(crate) fn set_offset(&self, offset: u32) {
         self.offset.set(offset);
     }
@@ -134,7 +139,7 @@ pub(crate) fn bp_position(a_node: &Node, a_offset: u32, b_node: &Node, b_offset:
 
     // Step 2: If nodeA is nodeB, then return equal if offsetA is offsetB, before if
     // offsetA is less than offsetB, and after if offsetA is greater than offsetB.
-    if std::ptr::eq(a_node, b_node) {
+    if a_node == b_node {
         return a_offset.cmp(&b_offset);
     }
 

@@ -1320,6 +1320,18 @@ impl<T: stylo_malloc_size_of::MallocSizeOf, const FRACTION_BITS: u16> MallocSize
     }
 }
 
+impl<Integer, Number, LinearStops> MallocSizeOf
+    for style::values::generics::easing::TimingFunction<Integer, Number, LinearStops>
+where
+    Integer: stylo_malloc_size_of::MallocSizeOf,
+    Number: stylo_malloc_size_of::MallocSizeOf,
+    LinearStops: stylo_malloc_size_of::MallocSizeOf,
+{
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        <Self as stylo_malloc_size_of::MallocSizeOf>::size_of(self, ops)
+    }
+}
+
 malloc_size_of_is_stylo_malloc_size_of!(style::properties::PropertyId);
 malloc_size_of_is_stylo_malloc_size_of!(style::animation::DocumentAnimationSet);
 malloc_size_of_is_stylo_malloc_size_of!(style::attr::AttrIdentifier);
@@ -1328,6 +1340,7 @@ malloc_size_of_is_stylo_malloc_size_of!(style::color::AbsoluteColor);
 malloc_size_of_is_stylo_malloc_size_of!(style::computed_values::font_variant_caps::T);
 malloc_size_of_is_stylo_malloc_size_of!(style::computed_values::font_variant_position::T);
 malloc_size_of_is_stylo_malloc_size_of!(style::computed_values::text_decoration_style::T);
+malloc_size_of_is_stylo_malloc_size_of!(style::computed_values::text_decoration_thickness::T);
 malloc_size_of_is_stylo_malloc_size_of!(style::computed_values::text_rendering::T);
 malloc_size_of_is_stylo_malloc_size_of!(style::dom::OpaqueNode);
 malloc_size_of_is_stylo_malloc_size_of!(style::font_face::ComputedFontStretchRange);

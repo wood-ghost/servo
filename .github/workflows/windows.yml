@@ -91,7 +91,7 @@ jobs:
     steps:
       - name: Runner select
         id: select
-        uses: servo/ci-runners/actions/runner-select@f0b81b95522256c64ee207b4236ec71fc23b99a1
+        uses: servo/ci-runners/actions/runner-select@a05e7e830e3f4d4c71bdc5a38f003f052b72668c
         with:
           GITHUB_TOKEN: ${{ github.token }}
           github-hosted-runner-label: windows-2022
@@ -111,7 +111,7 @@ jobs:
     outputs:
       release_artifact_ids: ${{ steps.artifact_ids.outputs.release_artifact_ids }}
     steps:
-      - uses: servo/ci-runners/actions/checkout@f0b81b95522256c64ee207b4236ec71fc23b99a1
+      - uses: servo/ci-runners/actions/checkout@a05e7e830e3f4d4c71bdc5a38f003f052b72668c
 
       - name: ccache
         # FIXME: “Error: Restoring cache failed: Error: Unable to locate executable file: sh.”
@@ -121,24 +121,9 @@ jobs:
         run: |
           echo CCACHE=ccache >> $GITHUB_ENV
 
-      - name: install choco
-        if: ${{ runner.environment == 'self-hosted' }}
-        # copied from https://chocolatey.org/install
-        run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-          echo "C:\\ProgramData\\chocolatey\\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      # To be removed once we update to WiX 7.
-      - name: Add WiX to PATH (self-hosted)
-        if: ${{ runner.environment == 'self-hosted' }}
-        run: |
-          choco install wixtoolset -y
-          echo "C:\\Program Files (x86)\\WiX Toolset v3.14\\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-
       # Install missing tools in a GitHub-hosted runner.
       - name: Install Winget
-        # TODO: Re-enable this condition once WiX 7 is pre-installed on the self-hosted runners.
-        # if: ${{ runner.environment != 'self-hosted' }}
+        if: ${{ runner.environment != 'self-hosted' }}
         shell: powershell
         run: |
           Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Force
@@ -147,8 +132,7 @@ jobs:
           # Authenticated requests have a higher rate limit.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install WiX
-        # TODO: Re-enable this condition once WiX 7 is pre-installed on the self-hosted runners.
-        # if: ${{ runner.environment != 'self-hosted' }}
+        if: ${{ runner.environment != 'self-hosted' }}
         shell: powershell
         run: |
           winget install --silent --exact WiXToolset.WiXCLI --version 7.0.0.0 --accept-source-agreements
@@ -291,17 +275,7 @@ jobs:
     name: Build libservo and MSRV check
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v6
-        if: github.event_name != 'pull_request_target'
-        with:
-          fetch-depth: 1
-      # This is necessary to checkout the pull request if this run was triggered via a
-      # `pull_request_target` event.
-      - uses: actions/checkout@v6
-        if: github.event_name == 'pull_request_target'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+      - uses: servo/ci-runners/actions/checkout@a05e7e830e3f4d4c71bdc5a38f003f052b72668c
       - name: Setup Python
         uses: ./.github/actions/setup-python
       - name: Determine MSRV
@@ -320,17 +294,7 @@ jobs:
     name: Build and test Servo's C API
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v5
-        if: github.event_name != 'pull_request_target'
-        with:
-          fetch-depth: 1
-      # This is necessary to checkout the pull request if this run was triggered via a
-      # `pull_request_target` event.
-      - uses: actions/checkout@v5
-        if: github.event_name == 'pull_request_target'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+      - uses: servo/ci-runners/actions/checkout@a05e7e830e3f4d4c71bdc5a38f003f052b72668c
       - name: Install cargo-c # required by servo-capi-tests's build.rs
         uses: taiki-e/install-action@v2
         with:

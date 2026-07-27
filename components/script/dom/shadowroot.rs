@@ -8,9 +8,10 @@ use std::collections::hash_map::Entry;
 
 use dom_struct::dom_struct;
 use html5ever::serialize::TraversalScope;
-use js::context::JSContext;
+use js::context::{JSContext, NoGC};
 use js::rust::{HandleValue, MutableHandleValue};
 use script_bindings::cell::{DomRefCell, RefMut};
+use script_bindings::dom::UnrootedDom;
 use script_bindings::error::{ErrorResult, Fallible};
 use script_bindings::reflector::reflect_dom_object_with_cx;
 use servo_arc::Arc;
@@ -179,6 +180,12 @@ impl ShadowRoot {
             document.window(),
             cx,
         )
+    }
+
+    pub(crate) fn host_unrooted<'a>(&self, no_gc: &'a NoGC) -> UnrootedDom<'a, Element> {
+        self.upcast::<DocumentFragment>()
+            .host_unrooted(no_gc)
+            .expect("ShadowRoot always has an element as host")
     }
 
     pub(crate) fn owner_doc(&self) -> &Document {
@@ -588,13 +595,17 @@ impl ShadowRootMethods<crate::DomTypeHolder> for ShadowRoot {
     fn SetAdoptedStyleSheets(&self, cx: &mut JSContext, val: HandleValue) -> ErrorResult {
         let result = DocumentOrShadowRoot::set_adopted_stylesheet_from_jsval(
             cx,
-            self.adopted_stylesheets.borrow_mut().as_mut(),
+            &self.adopted_stylesheets,
             val,
             &StyleSheetListOwner::ShadowRoot(Dom::from_ref(self)),
         );
 
-        // If update is successful, clear the FrozenArray cache.
         if result.is_ok() {
+            if self.author_styles.borrow().stylesheets.dirty() {
+                self.invalidate_stylesheets();
+            }
+
+            // Clear the FrozenArray cache.
             self.adopted_stylesheets_frozen_types.clear();
         }
 

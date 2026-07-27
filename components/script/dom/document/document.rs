@@ -118,7 +118,9 @@ use crate::dom::bindings::inheritance::{Castable, ElementTypeId, HTMLElementType
 use crate::dom::bindings::num::Finite;
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::bindings::reflector::DomGlobal;
-use crate::dom::bindings::root::{Dom, DomRoot, LayoutDom, MutNullableDom, ToLayout, UnrootedDom};
+use crate::dom::bindings::root::{
+    Dom, DomRoot, LayoutDom, MutNullableDom, ToLayout, ToLayoutOptional, UnrootedDom,
+};
 use crate::dom::bindings::str::{DOMString, USVString};
 use crate::dom::bindings::trace::{HashMapTracedValues, NoTrace};
 use crate::dom::bindings::weakref::DOMTracker;
@@ -945,6 +947,12 @@ impl Document {
         self.current_rendering_epoch.get()
     }
 
+    /// Get the [`Selection`] instance for this [`Document`] if there is one or `None`.
+    #[inline]
+    pub(crate) fn selection(&self) -> Option<DomRoot<Selection>> {
+        self.selection.get()
+    }
+
     pub(crate) fn set_activity(&self, cx: &mut JSContext, activity: DocumentActivity) {
         // This function should only be called on documents with a browsing context
         assert!(self.has_browsing_context);
@@ -1166,9 +1174,9 @@ impl Document {
         self.encoding.set(encoding);
     }
 
-    pub(crate) fn content_and_heritage_changed(&self, node: &Node) {
+    pub(crate) fn content_and_heritage_changed(&self, no_gc: &NoGC, node: &Node) {
         if node.is_connected() {
-            node.note_dirty_descendants();
+            node.note_dirty_descendants(no_gc);
         }
 
         // FIXME(emilio): This is very inefficient, ideally the flag above would
@@ -3590,6 +3598,11 @@ impl<'dom> LayoutDom<'dom, Document> {
     pub(crate) fn url_for_layout(self) -> ServoUrl {
         unsafe { self.unsafe_get().url.borrow_for_layout() }.clone()
     }
+
+    #[expect(unsafe_code)]
+    pub(crate) fn selection_for_layout(&self) -> Option<LayoutDom<'dom, Selection>> {
+        unsafe { self.unsafe_get().selection.to_layout() }
+    }
 }
 
 // https://html.spec.whatwg.org/multipage/#is-a-registrable-domain-suffix-of-or-is-equal-to
@@ -4132,15 +4145,18 @@ impl Document {
         self.count_node_list(|n| Document::is_element_in_get_by_name(n, name))
     }
 
-    pub(crate) fn nth_element_by_name(
+    pub(crate) fn nth_element_by_name<'a>(
         &self,
+        no_gc: &'a NoGC,
         index: u32,
         name: &DOMString,
-    ) -> Option<DomRoot<Node>> {
+    ) -> Option<UnrootedDom<'a, Node>> {
         if name.is_empty() {
             return None;
         }
-        self.nth_in_node_list(index, |n| Document::is_element_in_get_by_name(n, name))
+        self.nth_in_node_list(no_gc, index, |n| {
+            Document::is_element_in_get_by_name(n, name)
+        })
     }
 
     // Note that document.getByName does not match on the same conditions
@@ -4166,19 +4182,17 @@ impl Document {
             .count() as u32
     }
 
-    fn nth_in_node_list<F: Fn(&Node) -> bool>(
+    fn nth_in_node_list<'a, F: Fn(&Node) -> bool>(
         &self,
+        no_gc: &'a NoGC,
         index: u32,
         callback: F,
-    ) -> Option<DomRoot<Node>> {
-        let doc = self.GetDocumentElement();
-        let maybe_node = doc.as_deref().map(Castable::upcast::<Node>);
-        maybe_node
-            .iter()
-            .flat_map(|node| node.traverse_preorder(ShadowIncluding::No))
+    ) -> Option<UnrootedDom<'a, Node>> {
+        let doc = self.get_document_element_unrooted(no_gc)?;
+        doc.upcast::<Node>()
+            .traverse_preorder_non_rooting(no_gc, ShadowIncluding::No)
             .filter(|node| callback(node))
             .nth(index as usize)
-            .map(|n| DomRoot::from_ref(&*n))
     }
 
     fn get_html_element(&self) -> Option<DomRoot<HTMLHtmlElement>> {
@@ -4570,7 +4584,10 @@ impl Document {
         self.name_map.get_all(cx.no_gc(), self.upcast(), name)
     }
 
-    pub(crate) fn drain_pending_restyles(&self) -> Vec<(TrustedNodeAddress, PendingRestyle)> {
+    pub(crate) fn drain_pending_restyles(
+        &self,
+        no_gc: &NoGC,
+    ) -> Vec<(TrustedNodeAddress, PendingRestyle)> {
         self.pending_restyles
             .borrow_mut()
             .drain()
@@ -4579,7 +4596,7 @@ impl Document {
                 if !node.get_flag(NodeFlags::IS_CONNECTED) {
                     return None;
                 }
-                node.note_dirty_descendants();
+                node.note_dirty_descendants(no_gc);
                 Some((node.to_trusted_node_address(), restyle.0))
             })
             .collect()
@@ -6664,12 +6681,11 @@ impl DocumentMethods<crate::DomTypeHolder> for Document {
     fn SetAdoptedStyleSheets(&self, cx: &mut JSContext, val: HandleValue) -> ErrorResult {
         let result = DocumentOrShadowRoot::set_adopted_stylesheet_from_jsval(
             cx,
-            self.adopted_stylesheets.borrow_mut().as_mut(),
+            &self.adopted_stylesheets,
             val,
             &StyleSheetListOwner::Document(Dom::from_ref(self)),
         );
 
-        // If update is successful, clear the FrozenArray cache.
         if result.is_ok() {
             self.adopted_stylesheets_frozen_types.clear()
         }
@@ -6850,7 +6866,7 @@ pub(crate) struct SameOriginDescendantNavigablesIterator {
 }
 
 impl SameOriginDescendantNavigablesIterator {
-    pub(crate) fn new(document: DomRoot<Document>) -> Self {
+    pub(crate) fn new(document: &Document) -> Self {
         let iframes: Vec<DomRoot<HTMLIFrameElement>> = document.iframes().iter().collect();
         Self {
             stack: vec![Box::new(iframes.into_iter())],

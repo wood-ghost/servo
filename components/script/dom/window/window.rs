@@ -176,6 +176,7 @@ use crate::dom::reporting::reportingobserver::ReportingObserver;
 use crate::dom::screen::Screen;
 use crate::dom::scrolling_box::{ScrollingBox, ScrollingBoxSource};
 use crate::dom::selection::Selection;
+use crate::dom::serviceworker::cachestorage::CacheStorage;
 use crate::dom::shadowroot::ShadowRoot;
 use crate::dom::storage::Storage;
 #[cfg(feature = "bluetooth")]
@@ -313,6 +314,9 @@ pub(crate) struct Window {
     /// The start of something resembling
     /// <https://html.spec.whatwg.org/multipage/#ongoing-navigation>
     ongoing_navigation: Cell<OngoingNavigation>,
+
+    /// <https://w3c.github.io/ServiceWorker/#global-caches-attribute>
+    caches: MutNullableDom<CacheStorage>,
 
     /// For sending timeline markers. Will be ignored if
     /// no devtools server
@@ -1212,6 +1216,12 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
 
         // Step 7: Invoke WebDriver BiDi user prompt closed with this, "alert", and true.
         // TODO: Implement support for WebDriver BiDi.
+    }
+
+    /// <https://w3c.github.io/ServiceWorker/#global-caches-attribute>
+    fn Caches(&self, cx: &mut JSContext) -> DomRoot<CacheStorage> {
+        self.caches
+            .or_init(|| CacheStorage::new(cx, self.as_global_scope()))
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-confirm>
@@ -2672,7 +2682,7 @@ impl Window {
             }
 
             let stylesheets_changed = document.flush_stylesheets_for_reflow();
-            let pending_restyles = document.drain_pending_restyles();
+            let pending_restyles = document.drain_pending_restyles(cx.no_gc());
             let dirty_root = document
                 .take_dirty_root()
                 .filter(|_| !stylesheets_changed)
@@ -2688,6 +2698,10 @@ impl Window {
         } else {
             None
         };
+
+        if let Some(selection) = document.selection() {
+            selection.set_flags_for_visible_selection(cx.no_gc());
+        }
 
         // If there are any duplicate ids, their targets may need to be updated in the id map before
         // layout runs, so that the map can gather their elements in DOM order.
@@ -3717,7 +3731,7 @@ impl Window {
             }
 
             let nodes = images.entry(id).or_default();
-            if !nodes.iter().any(|n| std::ptr::eq(&*(n.node), &*node)) {
+            if !nodes.iter().any(|n| *n.node == *node) {
                 nodes.push(PendingLayoutImageAncillaryData {
                     node: Dom::from_ref(&*node),
                     destination: image.destination,
@@ -3742,7 +3756,7 @@ impl Window {
             }
 
             let nodes = images.entry((image.id, image.size)).or_default();
-            if !nodes.iter().any(|n| std::ptr::eq(&**n, &*node)) {
+            if !nodes.iter().any(|n| **n == *node) {
                 nodes.push(Dom::from_ref(&*node));
             }
         }
@@ -3804,7 +3818,7 @@ impl Window {
         top_level_document
             .window()
             .consume_last_activation_timestamp();
-        for document in SameOriginDescendantNavigablesIterator::new(top_level_document) {
+        for document in SameOriginDescendantNavigablesIterator::new(&top_level_document) {
             document.window().consume_last_activation_timestamp();
         }
     }
@@ -3870,6 +3884,7 @@ impl Window {
                 unminify_js,
                 Some(font_context),
             ),
+            caches: Default::default(),
             ongoing_navigation: Default::default(),
             script_chan,
             layout: RefCell::new(layout),

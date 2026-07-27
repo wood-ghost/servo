@@ -4,7 +4,7 @@
 
 use dom_struct::dom_struct;
 use euclid::default::Transform3D;
-use js::context::JSContext;
+use js::context::{JSContext, NoGC};
 use js::rust::{CustomAutoRooterGuard, HandleObject};
 use js::typedarray::{Float32Array, Float64Array};
 use rustc_hash::FxHashMap;
@@ -124,7 +124,12 @@ impl DOMMatrixMethods<crate::DomTypeHolder> for DOMMatrix {
         global: &GlobalScope,
         array: CustomAutoRooterGuard<Float32Array>,
     ) -> Fallible<DomRoot<DOMMatrix>> {
-        let vec: Vec<f64> = array.to_vec().iter().map(|&x| x as f64).collect();
+        let vec: Vec<f64> = array
+            .to_vec()
+            .unwrap_or_default()
+            .iter()
+            .map(|&x| x as f64)
+            .collect();
         DOMMatrix::Constructor(
             cx,
             global,
@@ -139,7 +144,7 @@ impl DOMMatrixMethods<crate::DomTypeHolder> for DOMMatrix {
         global: &GlobalScope,
         array: CustomAutoRooterGuard<Float64Array>,
     ) -> Fallible<DomRoot<DOMMatrix>> {
-        let vec: Vec<f64> = array.to_vec();
+        let vec: Vec<f64> = array.to_vec().unwrap_or_default();
         DOMMatrix::Constructor(
             cx,
             global,
@@ -502,7 +507,7 @@ impl Serializable for DOMMatrix {
     type Index = DomMatrixIndex;
     type Data = DomMatrix;
 
-    fn serialize(&self) -> Result<(DomMatrixId, Self::Data), ()> {
+    fn serialize(&self, _no_gc: &NoGC) -> Result<(DomMatrixId, Self::Data), ()> {
         let serialized = if self.parent.is2D() {
             DomMatrix {
                 matrix: Transform3D::new(

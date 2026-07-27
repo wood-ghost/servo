@@ -16,10 +16,10 @@ use http::{HeaderMap, HeaderValue, StatusCode, header};
 use hyper_serde::Serde;
 use hyper_util::client::legacy::Error as HyperError;
 use ipc_channel::ipc::{self, IpcSender};
-use ipc_channel::router::ROUTER;
 use malloc_size_of::malloc_size_of_is_0;
 use malloc_size_of_derive::MallocSizeOf;
 use mime::Mime;
+use parking_lot::RwLock;
 use profile_traits::mem::ReportsChan;
 use rand::{Rng, rng};
 use request::RequestId;
@@ -43,7 +43,7 @@ use crate::fetch::headers::determine_nosniff;
 use crate::filemanager_thread::FileManagerThreadMsg;
 use crate::http_status::HttpStatus;
 use crate::mime_classifier::{ApacheBugFlag, MimeClassifier};
-use crate::request::{PreloadId, Request, RequestBuilder};
+use crate::request::{Request, RequestBuilder};
 use crate::response::{Response, ResponseInit};
 
 pub mod blob_url_store;
@@ -365,7 +365,7 @@ impl FetchMetadata {
     }
 }
 
-impl FetchTaskTarget for IpcSender<FetchResponseMsg> {
+impl FetchTaskTarget for GenericCallback<FetchResponseMsg> {
     fn process_request_body(&mut self, request: &Request) {
         let _ = self.send(FetchResponseMsg::ProcessRequestBody(request.id));
     }
@@ -695,7 +695,7 @@ pub enum WebSocketNetworkEvent {
 #[derive(Debug, Deserialize, Serialize)]
 /// IPC channels to communicate with the script thread about network or DOM events.
 pub enum FetchChannels {
-    ResponseMsg(IpcSender<FetchResponseMsg>),
+    ResponseMsg(GenericCallback<FetchResponseMsg>),
     WebSocket {
         event_sender: IpcSender<WebSocketNetworkEvent>,
         action_receiver: CallbackSetter<WebSocketDomAction>,
@@ -710,7 +710,11 @@ pub enum CoreResourceMsg {
     Fetch(RequestBuilder, FetchChannels),
     Cancel(Vec<RequestId>),
     /// Initiate a fetch in response to processing a redirection
-    FetchRedirect(RequestBuilder, ResponseInit, IpcSender<FetchResponseMsg>),
+    FetchRedirect(
+        RequestBuilder,
+        ResponseInit,
+        GenericCallback<FetchResponseMsg>,
+    ),
     /// Store a cookie for a given originating URL.
     /// If a sender is provided, the caller will block until the cookie is stored.
     SetCookieForUrl(
@@ -782,7 +786,6 @@ pub enum CoreResourceMsg {
     NetworkMediator(IpcSender<CustomResponseMediator>, ImmutableOrigin),
     /// Message forwarded to file manager's handler
     ToFileManager(FileManagerThreadMsg),
-    StorePreloadedResponse(PreloadId, Response),
     TotalSizeOfInFlightKeepAliveRecords(PipelineId, GenericSender<u64>),
     /// Break the load handler loop, send a reply when done cleaning up local resources
     /// and exit
@@ -846,7 +849,7 @@ pub type BoxedFetchCallback = Box<dyn FnMut(FetchResponseMsg) + Send + 'static>;
 /// A thread to handle fetches in a Servo process. This thread is responsible for
 /// listening for new fetch requests as well as updates on those operations and forwarding
 /// them to crossbeam channels.
-struct FetchThread {
+pub struct FetchThread {
     /// A list of active fetches. A fetch is no longer active once the
     /// [`FetchResponseMsg::ProcessResponseEOF`] is received.
     active_fetches: FxHashMap<RequestId, BoxedFetchCallback>,
@@ -856,22 +859,19 @@ struct FetchThread {
     receiver: Receiver<ToFetchThreadMessage>,
     /// An [`IpcSender`] that's sent with every fetch request and leads back to our
     /// router proxy.
-    to_fetch_sender: IpcSender<FetchResponseMsg>,
+    to_fetch_sender: GenericCallback<FetchResponseMsg>,
 }
 
 impl FetchThread {
-    fn spawn() -> (Sender<ToFetchThreadMessage>, JoinHandle<()>) {
+    fn spawn() -> FetchThreadHandle {
         let (sender, receiver) = unbounded();
-        let (to_fetch_sender, from_fetch_sender) = ipc::channel().unwrap();
 
         let sender_clone = sender.clone();
-        ROUTER.add_typed_route(
-            from_fetch_sender,
-            Box::new(move |message| {
-                let message: FetchResponseMsg = message.unwrap();
-                let _ = sender_clone.send(ToFetchThreadMessage::FetchResponse(message));
-            }),
-        );
+        let to_fetch_sender = GenericCallback::new(move |message| {
+            let message: FetchResponseMsg = message.unwrap();
+            let _ = sender_clone.send(ToFetchThreadMessage::FetchResponse(message));
+        })
+        .expect("Couldn't create fetch callback");
         let join_handle = thread::Builder::new()
             .name("FetchThread".to_owned())
             .spawn(move || {
@@ -883,7 +883,10 @@ impl FetchThread {
                 fetch_thread.run();
             })
             .expect("Thread spawning failed");
-        (sender, join_handle)
+        FetchThreadHandle {
+            sender,
+            join_handle: RwLock::new(Some(join_handle)),
+        }
     }
 
     fn run(&mut self) {
@@ -949,59 +952,67 @@ impl FetchThread {
             }
         }
     }
+
+    fn fetch_async(
+        core_resource_thread: &CoreResourceThread,
+        request: RequestBuilder,
+        response_init: Option<ResponseInit>,
+        callback: BoxedFetchCallback,
+    ) {
+        let _ = FETCH_THREAD.get_or_init(FetchThread::spawn).sender.send(
+            ToFetchThreadMessage::StartFetch(
+                request,
+                response_init,
+                callback,
+                core_resource_thread.clone(),
+            ),
+        );
+    }
+
+    fn cancel_async_fetch(request_ids: Vec<RequestId>, core_resource_thread: &CoreResourceThread) {
+        if let Some(fetch_thread) = FETCH_THREAD.get() {
+            let _ = fetch_thread.sender.send(ToFetchThreadMessage::Cancel(
+                request_ids,
+                core_resource_thread.clone(),
+            ));
+        }
+    }
+
+    /// If the `FetchThread` is running, send the exit message and wait for it to exit.
+    pub fn exit() {
+        let Some(fetch_thread) = FETCH_THREAD.get() else {
+            return;
+        };
+        let _ = fetch_thread.sender.send(ToFetchThreadMessage::Exit);
+        if let Some(join_handle) = fetch_thread.join_handle.write().take() {
+            join_handle
+                .join()
+                .expect("Failed to join on the FetchThread join handle.");
+        }
+    }
 }
 
-static FETCH_THREAD: OnceLock<Sender<ToFetchThreadMessage>> = OnceLock::new();
-
-/// Start the fetch thread,
-/// and returns the join handle to the background thread.
-pub fn start_fetch_thread() -> JoinHandle<()> {
-    let (sender, join_handle) = FetchThread::spawn();
-    FETCH_THREAD
-        .set(sender)
-        .expect("Fetch thread should be set only once on start-up");
-    join_handle
+struct FetchThreadHandle {
+    sender: Sender<ToFetchThreadMessage>,
+    join_handle: RwLock<Option<JoinHandle<()>>>,
 }
 
-/// Send the exit message to the background thread,
-/// after which the caller can,
-/// and should,
-/// join on the thread.
-pub fn exit_fetch_thread() {
-    let _ = FETCH_THREAD
-        .get()
-        .expect("Fetch thread should always be initialized on start-up")
-        .send(ToFetchThreadMessage::Exit);
-}
+static FETCH_THREAD: OnceLock<FetchThreadHandle> = OnceLock::new();
 
-/// Instruct the resource thread to make a new fetch request.
+/// Instruct the fetch thread to start a new asynchronous fetch request.
 pub fn fetch_async(
     core_resource_thread: &CoreResourceThread,
     request: RequestBuilder,
     response_init: Option<ResponseInit>,
     callback: BoxedFetchCallback,
 ) {
-    let _ = FETCH_THREAD
-        .get()
-        .expect("Fetch thread should always be initialized on start-up")
-        .send(ToFetchThreadMessage::StartFetch(
-            request,
-            response_init,
-            callback,
-            core_resource_thread.clone(),
-        ));
+    FetchThread::fetch_async(core_resource_thread, request, response_init, callback);
 }
 
 /// Instruct the resource thread to cancel an existing request. Does nothing if the
 /// request has already completed or has not been fetched yet.
 pub fn cancel_async_fetch(request_ids: Vec<RequestId>, core_resource_thread: &CoreResourceThread) {
-    let _ = FETCH_THREAD
-        .get()
-        .expect("Fetch thread should always be initialized on start-up")
-        .send(ToFetchThreadMessage::Cancel(
-            request_ids,
-            core_resource_thread.clone(),
-        ));
+    FetchThread::cancel_async_fetch(request_ids, core_resource_thread);
 }
 
 #[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
