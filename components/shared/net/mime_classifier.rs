@@ -8,6 +8,7 @@
 use vstd::prelude::*;
 // use vstd::thread::*;
 // use vstd::{pervasive::*, prelude::*, *};
+use vstd::std_specs::iter::IteratorSpec;
 
 
 use mime::{self, Mime, Name};
@@ -499,6 +500,8 @@ impl ByteMatcher {
                 }
             }
     {
+        broadcast use vstd::std_specs::iter::group_iter_axioms;
+
         if data.len() < self.pattern.len() {
             return None;
         // } else if data == self.pattern {
@@ -603,6 +606,8 @@ impl MIMEChecker for ByteMatcher {
                 Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
             }
     {
+        broadcast use vstd::std_specs::iter::group_iter_axioms;
+
         if self.pattern.is_empty() {
             // return Err(format!("Zero length pattern for {:?}", self.content_type));
             return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
@@ -615,41 +620,36 @@ impl MIMEChecker for ByteMatcher {
             return Err(MIMEChecker_validate_unequal_pattern_error(&self.content_type));
         }
 
-        let mut i: usize = 0;
-
-        while i < self.pattern.len()
-            invariant
-                i <= self.pattern.len(),
-                self.pattern.len() == self.mask.len(),
-                forall |j: int| #![trigger self.pattern[j]] 0 <= j < i ==> (self.pattern[j] & self.mask[j]) == self.pattern[j]
-            decreases
-                self.pattern.len() - i,
+        if self
+            .pattern
+            .iter()
+            .zip(self.mask.iter())
+            // .any(|(&pattern, &mask)| pattern & mask != pattern)
+            .any(|x: (&u8, &u8)| -> (r: bool)
+                ensures
+                    r == (*x.0 & *x.1 != *x.0), 
+            {
+                let (pattern_p, mask_p) = x;
+                *pattern_p & *mask_p != *pattern_p
+            })
         {
-            if self.pattern[i] & self.mask[i] != self.pattern[i] {
-                return Err(MIMEChecker_validate_premasked_error(
-                    &self.content_type,
-                ));
-            }
-
-            i += 1;
+            // return Err(format!(
+            //     "Pattern not pre-masked for {:?}",
+            //     self.content_type
+            // ));
+            return Err(MIMEChecker_validate_premasked_error(&self.content_type));
         }
 
-        // if self
-        //     .pattern
-        //     .iter()
-        //     .zip(self.mask.iter())
-        //     // .any(|(&pattern, &mask)| pattern & mask != pattern)
-        //     .any(|x| {
-        //         let (pattern_p, mask_p) = x;
-        //         *pattern_p & *mask_p != *pattern_p
-        //     })
-        // {
-        //     // return Err(format!(
-        //     //     "Pattern not pre-masked for {:?}",
-        //     //     self.content_type
-        //     // ));
-        //     return Err(MIMEChecker_validate_premasked_error(&self.content_type));
-        // }
+        proof {
+            assert forall |i: int| #![trigger self.pattern[i]] 0 <= i < self.pattern@.len()
+                implies
+                (self.pattern@[i] & self.mask@[i]) == self.pattern@[i]
+            by {
+                assert(*self.pattern@.as_ref()[i] == self.pattern@[i]);
+                assert(*self.mask@.as_ref()[i] == self.mask@[i]);
+            }
+        }
+
         Ok(())
     }
 }
@@ -920,9 +920,12 @@ impl MIMEChecker for GroupedClassifier {
 impl ByteMatcher {
     // A Windows Icon signature
     #[verifier::external_body]
+    const IMAGE_X_ICON_CURSOR_PATTERN: &'static [u8; 4] = b"\x00\x00\x02\x00";
+    #[verifier::external_body]
     fn image_x_icon() -> ByteMatcher {
         ByteMatcher {
-            pattern: b"\x00\x00\x01\x00",
+            pattern: Self::IMAGE_X_ICON_CURSOR_PATTERN,
+            // pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
             content_type: "image/x-icon".parse().unwrap(),
             leading_ignore: &[],
