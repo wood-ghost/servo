@@ -90,14 +90,21 @@ where
 #[verifier::external_body]
 pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
 
-#[verifier::external_body]
-pub fn u8_slice_to_vec(
-    slice: &[u8],
-) -> (result: Vec<u8>)
-    ensures
-        result@ == slice@,
-{
-    slice.to_vec()
-}
+// #[verifier::external_body]
+// pub fn u8_slice_to_vec(
+//     slice: &[u8],
+// ) -> (result: Vec<u8>)
+//     ensures
+//         result@ == slice@,
+// {
+//     slice.to_vec()
+// }
+
+// pub assume_specification<T> [std::str::parse::<T>] (s: &str) -> (result: T)
+// where
+//     T: std::str::FromStr,
+//     ensures
+//         result@ == s@,
+// ;
 
 } // verus!

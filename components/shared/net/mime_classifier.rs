@@ -56,25 +56,18 @@ pub enum ApacheBugFlag {
 }
 
 impl ApacheBugFlag {
-    #[verifier::external_body]
-    fn mime_equal(a: &Mime, b: Mime) -> (result: bool)
-        ensures
-            result == (Model::mime_identity(a) == Model::mime_identity(&b)),
-    {
-        *a == b
-    }
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
     pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
         ensures
-            result == SpecFlag::from_content_type(mime_type),
+            // result == SpecFlag::from_content_type(mime_type),
     {
         // TODO(36801): also handle charset ISO-8859-1
         if mime_type.is_some_and(|mime_type| -> (r: bool)
             ensures 
-                r == (Spec::is_text_plain(mime_type) || Spec::is_text_plain_utf8(mime_type))
+                // r == (Spec::is_text_plain(mime_type) || Spec::is_text_plain_utf8(mime_type))
+                r ==> (Model::essence_str(mime_type) == "text/plain"@) 
             {
-            // *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
-            Self::mime_equal(mime_type, mime::TEXT_PLAIN) || Self::mime_equal(mime_type, mime::TEXT_PLAIN_UTF_8) 
+            *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
         }) {
             ApacheBugFlag::On
         } else {
@@ -303,20 +296,20 @@ impl MimeClassifier {
         a == b
     }
 
-    #[verifier::external_body] // For type_
-    fn name_equal<'a, 'b>(a: Name<'a>, b: Name<'b>) -> (result: bool)
-        ensures
-            result == (Model::name_text(a) =~= Model::name_text(b)),
-    {
-        a == b
-    }
+    // #[verifier::external_body] // For type_
+    // fn name_equal<'a, 'b>(a: Name<'a>, b: Name<'b>) -> (result: bool)
+    //     ensures
+    //         result == (Model::name_text(a) =~= Model::name_text(b)),
+    // {
+    //     a == b
+    // }
 
     #[verifier::external_body]
     fn suffix_equal<'a, 'b>(a: Option<Name<'a>>, b: Option<Name<'b>>) -> (result: bool)
         ensures
             result == match (a, b) {
                     (Some(a_name), Some(b_name)) =>
-                        Model::name_text(a_name) =~= Model::name_text(b_name),
+                        Model::name_text(a_name) == Model::name_text(b_name),
                     (None, None) => true,
                     _ => false,
                 },
@@ -332,8 +325,7 @@ impl MimeClassifier {
             result == Spec::is_xml(mt),
     {
         !Self::is_image(mt) &&
-            // (mt.suffix() == Some(mime::XML) ||
-            (Self::suffix_equal(mt.suffix(), Some(mime::XML)) ||
+            (mt.suffix() == Some(mime::XML) ||
                 // mt.essence_str() == "text/xml" ||
                 Self::str_equal(mt.essence_str(), "text/xml") ||
                 // mt.essence_str() == "application/xml")
@@ -345,30 +337,29 @@ impl MimeClassifier {
         ensures
             result == Spec::is_html(mt),
     {
-        // mt.essence_str() == "text/html"
-        Self::str_equal(mt.essence_str(), "text/html")
+        mt.essence_str() == "text/html"
+        // Self::str_equal(mt.essence_str(), "text/html")
     }
 
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
     fn is_image(mt: &Mime) -> (result: bool)
         ensures
-            result == Spec::is_image(mt),
+            // result == Spec::is_image(mt),
     {
-        // mt.type_() == mime::IMAGE
-        Self::name_equal(mt.type_(), mime::IMAGE)
+        mt.type_() == mime::IMAGE
     }
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
     fn is_audio_video(mt: &Mime) -> (result: bool)
         ensures
-            result == Spec::is_audio_video(mt),
+            // result == Spec::is_audio_video(mt),
     {
-        // mt.type_() == mime::AUDIO ||
-        Self::name_equal(mt.type_(), mime::AUDIO) ||
-            // mt.type_() == mime::VIDEO ||
-            Self::name_equal(mt.type_(), mime::VIDEO) ||
-            // mt.essence_str() == "application/ogg"
-            Self::str_equal(mt.essence_str(), "application/ogg")
+        mt.type_() == mime::AUDIO ||
+        // Self::name_equal(mt.type_(), mime::AUDIO) ||
+            mt.type_() == mime::VIDEO ||
+            // Self::name_equal(mt.type_(), mime::VIDEO) ||
+            mt.essence_str() == "application/ogg"
+            // Self::str_equal(mt.essence_str(), "application/ogg")
     }
 
     fn is_explicit_unknown(mt: &Mime) -> bool {
@@ -951,21 +942,35 @@ impl MIMEChecker for GroupedClassifier {
 impl ByteMatcher {
     // A Windows Icon signature
     #[verifier::external_body]
+    fn _image_x_icon_constent_type() -> (r: Mime) 
+        ensures
+            Model::essence_str(&r) == "image/x-icon"@
+    {
+        "image/x-icon".parse().unwrap()
+    }
     fn image_x_icon() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
-            content_type: "image/x-icon".parse().unwrap(),
+            // content_type: "image/x-icon".parse().unwrap(),
+            content_type: Self::_image_x_icon_constent_type(),
             leading_ignore: &[],
         }
     }
     // A Windows Cursor signature.
     #[verifier::external_body]
+    fn _image_x_icon_cursor_constent_type() -> (r: Mime) 
+        ensures
+            Model::essence_str(&r) == "image/x-icon"@
+    {
+        "image/x-icon".parse().unwrap()
+    }
     fn image_x_icon_cursor() -> ByteMatcher {
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
             mask: b"\xFF\xFF\xFF\xFF",
-            content_type: "image/x-icon".parse().unwrap(),
+            // content_type: "image/x-icon".parse().unwrap(),
+            content_type: Self::_image_x_icon_cursor_constent_type(),
             leading_ignore: &[],
         }
     }

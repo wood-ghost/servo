@@ -2,9 +2,34 @@ use mime::{self, Mime, Name};
 use vstd::prelude::*;
 
 use super::model::*;
+// use vstd::std_specs::cmp::PartialEqSpecImpl;
 
 
 verus! {
+
+pub assume_specification[ <Mime as core::cmp::PartialEq<Mime>>::eq ](left: &Mime, right: &Mime) -> (result: bool)
+    ensures
+        result == (view(left) == view(right)),
+;
+
+// insensitive is not considered
+pub assume_specification<'a>[ <Name<'a> as core::cmp::PartialEq<Name<'a>>>::eq ](left: &Name<'a>, right: &Name<'a>) -> (result: bool)
+    ensures
+        result == (name_text(*left) == name_text(*right)),
+;
+
+// pub assume_specification<'a, 'b>[ <Name<'a> as core::cmp::PartialEq<Name<'b>>>::eq ](
+//     left: &Name<'a>,
+//     right: &Name<'b>,
+// ) -> (result: bool)
+//     ensures
+//         result
+//             == (
+//                 Model::name_text(*left)
+//                     =~=
+//                 Model::name_text(*right)
+//             ),
+// ;
 
 #[verifier::external_type_specification]
 #[verifier::external_body]
@@ -22,12 +47,14 @@ pub struct ExFromStrError(mime::FromStrError);
 // Constant
 pub(crate) assume_specification [mime::TEXT_PLAIN] -> (result: Mime)
     ensures
-        mime_identity(&result) == text_plain_identity(),
+        essence_str(&result) == "text/plain"@,
+        // mime_identity(&result) == text_plain_identity(),
 ;
 
 pub(crate) assume_specification [mime::TEXT_PLAIN_UTF_8] -> (result: Mime)
     ensures
-        mime_identity(&result) == text_plain_utf8_identity(),
+        essence_str(&result) == "text/plain"@,
+        // mime_identity(&result) == text_plain_utf8_identity(),
 ;
 
 pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mime)
@@ -49,26 +76,26 @@ pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
 // NAME
 pub assume_specification [mime::XML] -> (result: Name<'static>)
     ensures
-        name_identity(&result) == xml_identity(),
-        name_text(result) =~= xml_name()
+        // name_identity(&result) == xml_identity(),
+        name_text(result) == "xml"@,
 ;
 
 pub assume_specification [mime::IMAGE] -> (result: Name<'static>)
     ensures
-        name_identity(&result) == image_identity(),
-        name_text(result) =~= image_name(),
+        // name_identity(&result) == image_identity(),
+        name_text(result) == "image"@,
 ;
 
 pub assume_specification [mime::AUDIO] -> (result: Name<'static>)
     ensures
-        name_identity(&result) == audio_identity(),
-        name_text(result) =~= audio_name(),
+        // name_identity(&result) == audio_identity(),
+        name_text(result) == "audio"@,
 ;
 
 pub assume_specification [mime::VIDEO] -> (result: Name<'static>)
     ensures
-        name_identity(&result) == video_identity(),
-        name_text(result) =~= video_name(),
+        // name_identity(&result) == video_identity(),
+        name_text(result) == "video"@,
 ;
 
 pub assume_specification [mime::APPLICATION] -> (result: Name<'static>)
@@ -101,7 +128,7 @@ pub assume_specification<'a>
     [Mime::essence_str]
     (mt: &'a Mime) -> (result: &'a str)
     ensures
-        result@ =~= essence_str(mt),
+        result@ == essence_str(mt),
 ;
 pub assume_specification<'a>
     [Mime::suffix]
