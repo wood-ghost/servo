@@ -1,0 +1,1174 @@
+    Checking servo-net-traits v0.4.0 (/home/yizhiy/Desktop/servo/components/shared/net)
+error: `core::option::impl&%0::is_some_and` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+  --> components/shared/net/mime_classifier.rs:46:12
+   |
+46 |           if mime_type.is_some_and(|mime_type| {
+   |  ____________^
+47 | |             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+48 | |         }) {
+   | |__________^
+   |
+   = help: The following declaration may resolve this error:
+           pub assume_specification<T, impl [const] FnOnce(T) -> bool + [const] Destruct> [std::option::Option::<T>::is_some_and] (_0: std::option::Option<T>, _1: impl [const] FnOnce(T) -> bool + [const] Destruct) -> bool
+           where
+           impl [const] FnOnce(T) -> bool + [const] Destruct: std::ops::FnOnce(T,) -> bool + std::marker::Destruct,;
+
+error: `mime::TEXT_PLAIN` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:47:27
+    |
+ 47 |             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+    |                           ^^^^^^^^^^^^^^^^
+...
+353 |         *mt == mime::TEXT_PLAIN || mt.essence_str() == "text/vtt"
+    |                ----------------
+...
+594 |             mime::TEXT_PLAIN
+    |             ----------------
+...
+611 |             mime::TEXT_PLAIN
+    |             ----------------
+
+error: `mime::TEXT_PLAIN_UTF_8` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+  --> components/shared/net/mime_classifier.rs:47:61
+   |
+47 |             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+   |                                                             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use type `net_traits::LoadContext` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> components/shared/net/mime_classifier.rs:91:9
+    |
+ 91 |         context: LoadContext,
+    |         ^^^^^^^^^^^^^^^^^^^^
+...
+107 |         match context {
+    |               -------
+108 |             LoadContext::Browsing => match *supplied_type {
+    |             ---------------------
+...
+151 |             LoadContext::Image => {
+    |             ------------------
+...
+159 |             LoadContext::AudioVideo => {
+    |             -----------------------
+...
+167 |             LoadContext::Plugin => {
+    |             -------------------
+...
+177 |             LoadContext::Style => {
+    |             ------------------
+...
+190 |             LoadContext::Script => {
+    |             -------------------
+...
+200 |             LoadContext::Font => {
+    |             -----------------
+...
+208 |             LoadContext::TextTrack => {
+    |             ----------------------
+...
+215 |             LoadContext::CacheManifest => {
+    |             --------------------------
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExLoadContext(crate::LoadContext);
+
+error: `mime::APPLICATION_OCTET_STREAM` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:99:24
+    |
+ 99 |             .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+173 |                     None => mime::APPLICATION_OCTET_STREAM,
+    |                             ------------------------------
+...
+184 |                         mime::APPLICATION_OCTET_STREAM
+    |                         ------------------------------
+...
+607 |             mime::APPLICATION_OCTET_STREAM
+    |             ------------------------------
+
+error: `mime::TEXT_CSS` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:186:25
+    |
+186 |                         mime::TEXT_CSS
+    |                         ^^^^^^^^^^^^^^
+
+error: `mime::TEXT_JAVASCRIPT` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:196:29
+    |
+196 |                     None => mime::TEXT_JAVASCRIPT,
+    |                             ^^^^^^^^^^^^^^^^^^^^^
+
+error: `mime::FromStrError` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute)
+   --> components/shared/net/mime_classifier.rs:213:17
+    |
+213 |                 "text/vtt".parse().unwrap()
+    |                 ------------------^^^^^^^^^
+...
+220 |                 "text/cache-manifest".parse().unwrap()
+    |                 --------------------------------------
+...
+567 |             Some("video/mp4".parse().unwrap())
+    |                  ----------------------------
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExFromStrError(mime::FromStrError);
+
+error: `core::str::impl&%0::parse` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:213:17
+    |
+213 |                 "text/vtt".parse().unwrap()
+    |                 ^^^^^^^^^^^^^^^^^^
+...
+220 |                 "text/cache-manifest".parse().unwrap()
+    |                 -----------------------------
+...
+567 |             Some("video/mp4".parse().unwrap())
+    |                  -------------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<F> [core::str::<impl str>::parse] (_0: &str) -> std::result::Result<F, <F as std::str::FromStr>::Err>
+            where
+            F: std::str::FromStr,;
+
+error: `core::option::impl&%0::or_else` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:245:9
+    |
+245 | /////         sniffed
+246 | |||||             .or_else(|| self.plaintext_classifier.classify(data))
+    | |||||_________________________________________________________________-
+247 | ||||              .or_else(|| self.image_classifier.classify(data))
+    | ||||______________________________________________________________-
+248 | |||               .or_else(|| self.audio_video_classifier.classify(data))
+    | |||_____________________________________________________________________-
+249 | ||                .or_else(|| self.archive_classifier.classify(data))
+    | ||__________________________________________________________________-
+250 | |                 .or_else(|| self.binary_or_plaintext.classify(data))
+    | |____________________________________________________________________^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<T, F> [std::option::Option::<T>::or_else] (_0: std::option::Option<T>, _1: F) -> std::option::Option<T>
+            where
+            F: std::ops::FnOnce() -> std::option::Option<T> + std::marker::Destruct,
+            T: std::marker::Destruct,;
+
+error: `mime::Name` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute)
+   --> components/shared/net/mime_classifier.rs:265:14
+    |
+265 |             (mt.suffix() == Some(mime::XML) ||
+    |              -----------^^^^---------------
+...
+290 |         mt.type_() == mime::IMAGE
+    |         -------------------------
+...
+295 |         mt.type_() == mime::AUDIO ||
+    |         -------------------------
+296 |             mt.type_() == mime::VIDEO ||
+    |             -------------------------
+...
+301 |         mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
+    |         ----------                          ------------
+302 |             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |             -------------------------------    ------------
+303 |             mt.type_() == mime::STAR && mt.subtype() == mime::STAR
+    |             ------------------------    --------------------------
+...
+308 |         (mt.type_() == mime::APPLICATION &&
+    |          -------------------------------
+309 |             (["ecmascript", "javascript", "x-ecmascript", "x-javascript"]
+310 |                 .contains(&mt.subtype().as_str()))) ||
+    |                            ------------
+311 |             (mt.type_() == mime::TEXT &&
+    |              ------------------------
+...
+326 |                 .contains(&mt.subtype().as_str())))
+    |                            ------------
+...
+331 |         mt.suffix() == Some(mime::JSON) ||
+    |         -------------------------------
+...
+338 |         mt.type_() == mime::FONT ||
+    |         ------------------------
+339 |             (mt.type_() == mime::APPLICATION &&
+    |              -------------------------------
+...
+349 |                 .contains(&mt.subtype().as_str())))
+    |                            ------------
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExName<'a>(mime::Name<'a>);
+
+error: `mime::impl&%4::suffix` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:265:14
+    |
+265 |             (mt.suffix() == Some(mime::XML) ||
+    |              ^^^^^^^^^^^
+...
+331 |         mt.suffix() == Some(mime::JSON) ||
+    |         -----------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [headers::Mime::suffix] (_0: &headers::Mime) -> std::option::Option<mime::Name<'_>>;
+
+error: `mime::XML` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:265:34
+    |
+265 |             (mt.suffix() == Some(mime::XML) ||
+    |                                  ^^^^^^^^^
+
+error: `mime::impl&%4::essence_str` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:266:17
+    |
+266 |                 mt.essence_str() == "text/xml" ||
+    |                 ^^^^^^^^^^^^^^^^
+267 |                 mt.essence_str() == "application/xml")
+    |                 ----------------
+...
+272 |         mt.essence_str() == "text/html"
+    |         ----------------
+...
+297 |             mt.essence_str() == "application/ogg"
+    |             ----------------
+...
+332 |             mt.essence_str() == "application/json" ||
+    |             ----------------
+333 |             mt.essence_str() == "text/json"
+    |             ----------------
+...
+353 |         *mt == mime::TEXT_PLAIN || mt.essence_str() == "text/vtt"
+    |                                    ----------------
+...
+357 |         mt.essence_str() == "text/css"
+    |         ----------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [headers::Mime::essence_str] (_0: &headers::Mime) -> &str;
+
+error: `mime::impl&%4::type_` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:290:9
+    |
+290 |         mt.type_() == mime::IMAGE
+    |         ^^^^^^^^^^
+...
+295 |         mt.type_() == mime::AUDIO ||
+    |         ----------
+296 |             mt.type_() == mime::VIDEO ||
+    |             ----------
+...
+301 |         mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
+    |         ----------
+302 |             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |             ----------
+303 |             mt.type_() == mime::STAR && mt.subtype() == mime::STAR
+    |             ----------
+...
+308 |         (mt.type_() == mime::APPLICATION &&
+    |          ----------
+...
+311 |             (mt.type_() == mime::TEXT &&
+    |              ----------
+...
+338 |         mt.type_() == mime::FONT ||
+    |         ----------
+339 |             (mt.type_() == mime::APPLICATION &&
+    |              ----------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [headers::Mime::type_] (_0: &headers::Mime) -> mime::Name<'_>;
+
+error: `mime::IMAGE` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:290:23
+    |
+290 |         mt.type_() == mime::IMAGE
+    |                       ^^^^^^^^^^^
+
+error: `mime::AUDIO` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:295:23
+    |
+295 |         mt.type_() == mime::AUDIO ||
+    |                       ^^^^^^^^^^^
+
+error: `mime::VIDEO` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:296:27
+    |
+296 |             mt.type_() == mime::VIDEO ||
+    |                           ^^^^^^^^^^^
+
+error: `mime::impl&%16::as_str` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:301:9
+    |
+301 |         mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
+    |         ^^^^^^^^^^^^^^^^^^^                 ---------------------
+302 |             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |                                                ---------------------
+...
+310 |                 .contains(&mt.subtype().as_str()))) ||
+    |                            ---------------------
+...
+326 |                 .contains(&mt.subtype().as_str())))
+    |                            ---------------------
+...
+349 |                 .contains(&mt.subtype().as_str())))
+    |                            ---------------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<'a> [mime::Name::<'a>::as_str] (_0: &mime::Name<'a>) -> &'a str;
+
+error: `mime::impl&%4::subtype` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:301:45
+    |
+301 |         mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
+    |                                             ^^^^^^^^^^^^
+302 |             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |                                                ------------
+303 |             mt.type_() == mime::STAR && mt.subtype() == mime::STAR
+    |                                         ------------
+...
+310 |                 .contains(&mt.subtype().as_str()))) ||
+    |                            ------------
+...
+326 |                 .contains(&mt.subtype().as_str())))
+    |                            ------------
+...
+349 |                 .contains(&mt.subtype().as_str())))
+    |                            ------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [headers::Mime::subtype] (_0: &headers::Mime) -> mime::Name<'_>;
+
+error: `mime::APPLICATION` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:302:27
+    |
+302 |             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |                           ^^^^^^^^^^^^^^^^^
+...
+308 |         (mt.type_() == mime::APPLICATION &&
+    |                        -----------------
+...
+339 |             (mt.type_() == mime::APPLICATION &&
+    |                            -----------------
+
+error: `mime::STAR` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:303:27
+    |
+303 |             mt.type_() == mime::STAR && mt.subtype() == mime::STAR
+    |                           ^^^^^^^^^^                    ----------
+
+error: `core::slice::impl&%0::contains` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:309:13
+    |
+309 | /             (["ecmascript", "javascript", "x-ecmascript", "x-javascript"]
+310 | |                 .contains(&mt.subtype().as_str()))) ||
+    | |__________________________________________________^
+311 |               (mt.type_() == mime::TEXT &&
+312 | /                 ([
+313 | |                     "ecmascript",
+314 | |                     "javascript",
+315 | |                     "javascript1.0",
+...   |
+326 | |                 .contains(&mt.subtype().as_str())))
+    | |__________________________________________________-
+...
+340 | /                 ([
+341 | |                     "font-cff",
+342 | |                     "font-off",
+343 | |                     "font-sfnt",
+...   |
+349 | |                 .contains(&mt.subtype().as_str())))
+    | |__________________________________________________-
+...
+414 |                   .position(|x| !self.leading_ignore.contains(x))
+    |                                  -------------------------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<T> [core::slice::<impl [T]>::contains] (_0: &[T], _1: &T) -> bool
+            where
+            T: std::cmp::PartialEq,;
+
+error: `mime::TEXT` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:311:28
+    |
+311 |             (mt.type_() == mime::TEXT &&
+    |                            ^^^^^^^^^^
+
+error: `mime::JSON` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:331:29
+    |
+331 |         mt.suffix() == Some(mime::JSON) ||
+    |                             ^^^^^^^^^^
+
+error: `mime::FONT` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+   --> components/shared/net/mime_classifier.rs:338:23
+    |
+338 |         mt.type_() == mime::FONT ||
+    |                       ^^^^^^^^^^
+
+error: `core::slice::iter::impl&%171::position` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:412:13
+    |
+412 | /             data[..data.len() - self.pattern.len() + 1]
+413 | |                 .iter()
+414 | |                 .position(|x| !self.leading_ignore.contains(x))
+    | |_______________________________________________________________^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<'a, T, P> [<std::slice::Iter<'a, T> as std::iter::Iterator>::position] (_0: &std::slice::Iter<'a, T>, _1: P) -> std::option::Option<usize>
+            where
+            P: std::ops::FnMut(<std::slice::Iter<'a, T> as std::iter::Iterator>::Item,) + std::ops::FnOnce(<std::slice::Iter<'a, T> as std::iter::Iterator>::Item,) -> bool,
+            std::slice::Iter<'a, T>: std::marker::Sized,;
+
+error: `core::iter::adapters::zip::Zip` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:416:24
+    |
+416 |                               if data[start..]
+    |          ________________________^
+    |         |________________________|
+    |  ______||________________________|
+417 | |      ||                         .iter()
+418 | |      ||                         .zip(self.pattern.iter())
+    | |      ||_________________________________________________-
+419 | |      |                          .zip(self.mask.iter())
+    | |      |_______________________________________________-
+...   |
+423 | |                                     (*data_p & *mask_p) == *pattern_p
+424 | |                                 })
+    | |__________________________________^
+...
+466 |                   if self
+    |          ____________-
+    |         |____________|
+    |         |____________|
+    |         |____________|
+467 |         |             .pattern
+468 |         |             .iter()
+469 |         |             .zip(self.mask.iter())
+    |         |__________________________________-
+    |         |__________________________________|
+    |         |__________________________________|
+    |
+...
+473 |         |                 *pattern_p & *mask_p != *pattern_p
+474 |         |             })
+    |         |______________-
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::reject_recursive_types(A)]
+            #[verifier::reject_recursive_types(B)]
+            #[verifier::external_type_specification]
+            pub struct ExZip<A, B>(std::iter::Zip<A, B>);
+
+error: `core::iter::adapters::zip::impl&%1%default%zip` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:416:24
+    |
+416 |                       if data[start..]
+    |  ________________________^
+417 | |                         .iter()
+418 | |                         .zip(self.pattern.iter())
+419 | |                         .zip(self.mask.iter())
+    | |______________________________________________^
+
+error: `core::slice::iter::impl&%171%default%zip` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:416:24
+    |
+416 |                       if data[start..]
+    |  ________________________^
+417 | |                         .iter()
+418 | |                         .zip(self.pattern.iter())
+    | |_________________________________________________^
+...
+466 |           if self
+    |  ____________-
+467 | |             .pattern
+468 | |             .iter()
+469 | |             .zip(self.mask.iter())
+    | |__________________________________-
+
+error: `core::slice::impl&%0::starts_with` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:546:13
+    |
+546 |         if !data[4..].starts_with(&ftyp) {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+552 |         data[8..].starts_with(&mp4) ||
+    |         ---------------------------
+...
+560 |                 .any(|chunk| chunk.starts_with(&mp4))
+    |                              -----------------------
+...
+590 |         if data.starts_with(&[0xFFu8, 0xFEu8]) ||
+    |            -----------------------------------
+591 |             data.starts_with(&[0xFEu8, 0xFFu8]) ||
+    |             -----------------------------------
+592 |             data.starts_with(&[0xEFu8, 0xBBu8, 0xBFu8])
+    |             -------------------------------------------
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<T> [core::slice::<impl [T]>::starts_with] (_0: &[T], _1: &[T]) -> bool
+            where
+            T: std::cmp::PartialEq,;
+
+error: `core::slice::iter::Chunks` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:555:13
+    |
+555 | /  /             data[16..box_size]
+556 | |  |             // Step 11. Increment bytes-read by 4.
+557 | |  |                 .chunks(4)
+    | |  |__________________________-
+...   |
+560 | |                    .any(|chunk| chunk.starts_with(&mp4))
+    | |________________________________________________________^
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::reject_recursive_types(T)]
+            #[verifier::external_type_specification]
+            pub struct ExChunks<'a, T>(std::slice::Chunks<'a, T>);
+
+error: `core::slice::impl&%0::chunks` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:555:13
+    |
+555 | /             data[16..box_size]
+556 | |             // Step 11. Increment bytes-read by 4.
+557 | |                 .chunks(4)
+    | |__________________________^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<T> [core::slice::<impl [T]>::chunks] (_0: &[T], _1: usize) -> std::slice::Chunks<'_, T>;
+
+error: `core::slice::iter::impl&%171::find_map` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+   --> components/shared/net/mime_classifier.rs:735:9
+    |
+735 | /         self.byte_matchers
+736 | |             .iter()
+737 | |             .find_map(|matcher| matcher.classify(data))
+    | |_______________________________________________________^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification<'a, T, B, F> [<std::slice::Iter<'a, T> as std::iter::Iterator>::find_map] (_0: &std::slice::Iter<'a, T>, _1: F) -> std::option::Option<B>
+            where
+            F: std::ops::FnMut(<std::slice::Iter<'a, T> as std::iter::Iterator>::Item,) + std::ops::FnOnce(<std::slice::Iter<'a, T> as std::iter::Iterator>::Item,) -> std::option::Option<B>,
+            std::slice::Iter<'a, T>: std::marker::Sized,;
+
+error: `mime::Mime` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute)
+   --> components/shared/net/mime_classifier.rs:44:30
+    |
+ 44 |          pub fn from_content_type(mime_type: Option<&Mime>) -> ApacheBugFlag {
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+ 45 |              // TODO(36801): also handle charset ISO-8859-1
+ 46 |              if mime_type.is_some_and(|mime_type| {
+    |     ____________---------_____________-
+    |  __|____________|
+    | |  |
+ 47 | |  |             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+    | |  |             ------------------------------    ------------------------------------
+ 48 | |  |         }) {
+    | |__|_________--
+    |    |_________|
+    |
+...
+ 94 |              supplied_type: &Option<Mime>,
+    |              ----------------------------
+ 95 |              data: &'a [u8],
+ 96 |          ) -> Mime {
+    |     __________----_-
+ 97 |              let supplied_type_or_octet_stream = supplied_type
+    |     _____________-----------------------------___-------------
+    |     _____________________________________________|
+    |     _____________________________________________|
+    |     _____________________________________________|
+    |     _____________________________________________|
+    |     _____________________________________________|
+    |    |
+ 98 |    |             .clone()
+    |    |____________________-
+    |    |____________________|
+    |    |____________________|
+    |
+ 99 |    |             .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+    |    |________________________-------------------------------
+    |    |______________________________________________________|
+    |    |______________________________________________________|
+    |
+...
+102 |    |         if Self::is_xml(&supplied_type_or_octet_stream) ||
+    |    |                          -----------------------------
+103 |    |             Self::is_html(&supplied_type_or_octet_stream)
+    |    |                            -----------------------------
+104 |    |         {
+105 |    |             return supplied_type_or_octet_stream;
+    |    |                    -----------------------------
+106 |    |         }
+107 |    /         match context {
+108 |                  LoadContext::Browsing => match *supplied_type {
+    |     ______________________________________-      -------------
+...      |
+112 |    |                 None => self.sniff_unknown_type(no_sniff_flag, data),
+    |    |                 ----    --------------------------------------------
+113 |                      Some(ref supplied_type) => {
+    |     _________________-----------------------____-
+114 |                          if MimeClassifier::is_explicit_unknown(supplied_type) {
+    |                                                                 -------------
+115 |                              return self.sniff_unknown_type(no_sniff_flag, data);
+    |                                     --------------------------------------------
+...
+120 |                              return supplied_type.clone();
+    |                                     ---------------------
+...
+125 |                              return self.sniff_text_or_data(data);
+    |                                     -----------------------------
+126 |                          }
+127 |                          assert(MimeClassifier::get_media_type(supplied_type) != Some(MediaType::Html));
+    |                                                                -------------
+128 |                          assert(MimeClassifier::get_media_type(supplied_type) != Some(MediaType::Xml));
+    |                                                                -------------
+129 |                          match MimeClassifier::get_media_type(supplied_type) {
+    |     _____________________-                                    -------------
+    |     _____________________|
+    |     _____________________|
+    |    |
+...      |
+133 |                              Some(MediaType::Image) => {
+    |     ___________________________________________________-
+134 |                                  // Step 6. If matched-type is not undefined, the computed MIME type is matched-type.
+135 |                                  self.image_classifier.classify(data)
+    |                                  ------------------------------------
+136 |    |                         },
+    |    |_________________________-
+...
+140 |                              Some(MediaType::AudioVideo) => {
+    |     ________________________________________________________-
+141 |                                  // Step 8. If matched-type is not undefined, the computed MIME type is matched-type.
+142 |                                  self.audio_video_classifier.classify(data)
+    |                                  ------------------------------------------
+143 |    |                         },
+    |    |_________________________-
+144 |                              // Some(MediaType::Html) | Some(MediaType::Xml) => unreachable!(),
+145 |    |                         _ => None,
+    |    |                              ----
+146 |    |                     }
+    |    |_____________________-
+147 |                          // Step 9. The computed MIME type is the supplied MIME type.
+148 |    |                     .unwrap_or(supplied_type.clone())
+    |    |________________________________----------------------
+    |    |_____________________________________________________|
+    |
+149 |    |                 },
+    |    |_________________-
+150 |    |             },
+    |    |_____________-
+151 |                  LoadContext::Image => {
+    |     ___________________________________-
+152 |                      // Section 8.2 Sniffing an image context
+153 |                      match MimeClassifier::maybe_get_media_type(supplied_type) {
+    |     _________________-                                          -------------
+    |     _________________|
+    |     _________________|
+    |    |
+154 |    |                     Some(MediaType::Xml) => None,
+    |    |                                             ----
+155 |    |                     _ => self.image_classifier.classify(data),
+    |    |                          ------------------------------------
+156 |    |                 }
+    |    |_________________-
+157 |    |                 .unwrap_or(supplied_type_or_octet_stream)
+    |    |____________________________------------------------------
+    |    |_________________________________________________________|
+    |
+158 |    |             },
+    |    |_____________-
+159 |                  LoadContext::AudioVideo => {
+    |     ________________________________________-
+160 |    |                 // Section 8.3 Sniffing an image context
+161 |                      match MimeClassifier::maybe_get_media_type(supplied_type) {
+    |     _________________-                                          -------------
+    |     _________________|
+    |     _________________|
+    |    |
+162 |    |                     Some(MediaType::Xml) => None,
+    |    |                                             ----
+163 |    |                     _ => self.audio_video_classifier.classify(data),
+    |    |                          ------------------------------------------
+164 |    |                 }
+    |    |_________________-
+165 |    |                 .unwrap_or(supplied_type_or_octet_stream)
+    |    |____________________________------------------------------
+    |    |_________________________________________________________|
+    |
+166 |    |             },
+    |    |_____________-
+167 |                  LoadContext::Plugin => {
+    |     ____________________________________-
+...      |
+172 |                      match *supplied_type {
+    |     _________________-      -------------
+173 |                          None => mime::APPLICATION_OCTET_STREAM,
+    |                          ----    ------------------------------
+174 |                          _ => supplied_type_or_octet_stream,
+    |                          -    -----------------------------
+175 |    |                 }
+    |    |_________________-
+176 |    |             },
+    |    |_____________-
+177 |                  LoadContext::Style => {
+    |     ___________________________________-
+...      |
+182 |                      supplied_type.clone().unwrap_or_else(|| {
+    |     _________________---------------------________________-__-
+    |     _________________|____________________________________|
+    |     _________________|____________________________________|
+    |     _________________|____________________________________|
+    |     _________________|
+    |     _________________|
+    |     _________________|
+    |    |
+183 |                          if no_sniff_flag == NoSniffFlag::On {
+    |     _____________________-___________________________________-
+    |     _____________________|
+    |    |
+184 |    |                         mime::APPLICATION_OCTET_STREAM
+    |    |                         ------------------------------
+185 |    |                     } else {
+    |    |_____________________-______-
+    |    |_____________________|
+    |    |
+186 |    |                         mime::TEXT_CSS
+    |    |                         --------------
+187 |    |                     }
+    |    |_____________________-
+    |    |_____________________|
+    |
+188 |    |                 })
+    |    |_________________--
+    |    |_________________||
+    |    |_________________||
+    |    |_________________|
+    |    |_________________|
+    |    |_________________|
+    |    |_________________|
+    |
+189 |    |             },
+    |    |_____________-
+190 |                  LoadContext::Script => {
+    |     ____________________________________-
+...      |
+195 |                      match *supplied_type {
+    |     _________________-      -------------
+196 |                          None => mime::TEXT_JAVASCRIPT,
+    |                          ----    ---------------------
+197 |                          _ => supplied_type_or_octet_stream,
+    |                          -    -----------------------------
+198 |    |                 }
+    |    |_________________-
+199 |    |             },
+    |    |_____________-
+200 |                  LoadContext::Font => {
+    |     __________________________________-
+201 |    |                 // 8.7 Sniffing in a font context
+202 |                      match MimeClassifier::maybe_get_media_type(supplied_type) {
+    |     _________________-                                          -------------
+    |     _________________|
+    |     _________________|
+    |    |
+203 |    |                     Some(MediaType::Xml) => None,
+    |    |                                             ----
+204 |    |                     _ => self.font_classifier.classify(data),
+    |    |                          -----------------------------------
+205 |    |                 }
+    |    |_________________-
+206 |    |                 .unwrap_or(supplied_type_or_octet_stream)
+    |    |____________________________------------------------------
+    |    |_________________________________________________________|
+    |
+207 |    |             },
+    |    |_____________-
+208 |                  LoadContext::TextTrack => {
+    |     _______________________________________-
+...      |
+213 |    |                 "text/vtt".parse().unwrap()
+    |    |                 ---------------------------
+214 |    |             },
+    |    |_____________-
+215 |                  LoadContext::CacheManifest => {
+    |     ___________________________________________-
+...      |
+220 |    |                 "text/cache-manifest".parse().unwrap()
+    |    |                 --------------------------------------
+221 |    |             },
+    |    |_____________-
+222 |    |         }
+    |    |_________-
+223 |    |     }
+    |    |_____-
+...
+237 |          fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: &[u8]) -> Mime {
+    |     ______________________________________________________________________________----_-
+238 |    |         let should_sniff_scriptable = no_sniff_flag == NoSniffFlag::Off;
+239 |              let sniffed = if should_sniff_scriptable {
+    |     _____________-------___-__________________________-
+    |     _______________________|
+    |     _______________________|
+    |    |
+240 |    |             self.scriptable_classifier.classify(data)
+    |    |             -----------------------------------------
+241 |    |         } else {
+    |    |_________-______-
+    |    |_________|
+    |    |
+242 |    |             None
+    |    |             ----
+243 |    |         };
+    |    |_________-
+    |    |_________|
+    |    |_________|
+    |
+244 |
+245 |              sniffed
+    |     _________-------
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |    |
+246 |    |             .or_else(|| self.plaintext_classifier.classify(data))
+    |    |______________________--------------------------------------------
+    |    |_________________________________________________________________|
+    |    |_________________________________________________________________|
+    |
+247 |    |             .or_else(|| self.image_classifier.classify(data))
+    |    |______________________----------------------------------------
+    |    |_____________________________________________________________|
+    |    |_____________________________________________________________|
+    |
+248 |    |             .or_else(|| self.audio_video_classifier.classify(data))
+    |    |______________________----------------------------------------------
+    |    |___________________________________________________________________|
+    |    |___________________________________________________________________|
+    |
+249 |    |             .or_else(|| self.archive_classifier.classify(data))
+    |    |______________________------------------------------------------
+    |    |_______________________________________________________________|
+    |    |_______________________________________________________________|
+    |
+250 |    |             .or_else(|| self.binary_or_plaintext.classify(data))
+    |    |______________________-------------------------------------------
+    |    |________________________________________________________________|
+    |    |________________________________________________________________|
+    |
+251 |    |             .expect("BinaryOrPlaintextClassifier always succeeds")
+    |    |__________________________________________________________________-
+    |    |__________________________________________________________________|
+    |
+252 |    |     }
+    |    |_____-
+253 |
+254 |          fn sniff_text_or_data<'a>(&'a self, data: &'a [u8]) -> Mime {
+    |     ____________________________________________________________----_-
+255 |    /         self.binary_or_plaintext
+256 |    |             .classify(data)
+    |    |___________________________-
+257 |    |             .expect("BinaryOrPlaintextClassifier always succeeds")
+    |    |__________________________________________________________________-
+    |    |__________________________________________________________________|
+    |
+258 |    |     }
+    |    |_____-
+...
+263 |          fn is_xml(mt: &Mime) -> bool {
+    |                    ---------
+264 |              !Self::is_image(mt) &&
+    |                              --
+265 |                  (mt.suffix() == Some(mime::XML) ||
+    |                   --
+266 |                      mt.essence_str() == "text/xml" ||
+    |                      --
+267 |                      mt.essence_str() == "application/xml")
+    |                      --
+...
+271 |          fn is_html(mt: &Mime) -> bool {
+    |                     ---------
+272 |              mt.essence_str() == "text/html"
+    |              --
+...
+289 |          fn is_image(mt: &Mime) -> bool {
+    |                      ---------
+290 |              mt.type_() == mime::IMAGE
+    |              --
+...
+294 |          fn is_audio_video(mt: &Mime) -> bool {
+    |                            ---------
+295 |              mt.type_() == mime::AUDIO ||
+    |              --
+296 |                  mt.type_() == mime::VIDEO ||
+    |                  --
+297 |                  mt.essence_str() == "application/ogg"
+    |                  --
+...
+300 |          fn is_explicit_unknown(mt: &Mime) -> bool {
+    |                                 ---------
+301 |              mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
+    |              --                                  --
+302 |                  mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
+    |                  --                                 --
+303 |                  mt.type_() == mime::STAR && mt.subtype() == mime::STAR
+    |                  --                          --
+...
+307 |          pub fn is_javascript(mt: &Mime) -> bool {
+    |                               ---------
+308 |              (mt.type_() == mime::APPLICATION &&
+    |               --
+309 |                  (["ecmascript", "javascript", "x-ecmascript", "x-javascript"]
+310 |                      .contains(&mt.subtype().as_str()))) ||
+    |                                 --
+311 |                  (mt.type_() == mime::TEXT &&
+    |                   --
+...
+326 |                      .contains(&mt.subtype().as_str())))
+    |                                 --
+...
+330 |          pub fn is_json(mt: &Mime) -> bool {
+    |                         ---------
+331 |              mt.suffix() == Some(mime::JSON) ||
+    |              --
+332 |                  mt.essence_str() == "application/json" ||
+    |                  --
+333 |                  mt.essence_str() == "text/json"
+    |                  --
+...
+337 |          fn is_font(mt: &Mime) -> bool {
+    |                     ---------
+338 |              mt.type_() == mime::FONT ||
+    |              --
+339 |                  (mt.type_() == mime::APPLICATION &&
+    |                   --
+...
+349 |                      .contains(&mt.subtype().as_str())))
+    |                                 --
+...
+352 |          fn is_text(mt: &Mime) -> bool {
+    |                     ---------
+353 |              *mt == mime::TEXT_PLAIN || mt.essence_str() == "text/vtt"
+    |              -----------------------    --
+...
+356 |          pub fn is_css(mt: &Mime) -> bool {
+    |                        ---------
+357 |              mt.essence_str() == "text/css"
+    |              --
+...
+360 |          pub fn get_media_type(mime: &Mime) -> Option<MediaType> {
+    |                                -----------
+361 |              if MimeClassifier::is_xml(mime) {
+    |                                        ----
+362 |                  Some(MediaType::Xml)
+363 |              } else if MimeClassifier::is_html(mime) {
+    |                                                ----
+364 |                  Some(MediaType::Html)
+365 |              } else if MimeClassifier::is_image(mime) {
+    |                                                 ----
+366 |                  Some(MediaType::Image)
+367 |              } else if MimeClassifier::is_audio_video(mime) {
+    |                                                       ----
+368 |                  Some(MediaType::AudioVideo)
+369 |              } else if MimeClassifier::is_javascript(mime) {
+    |                                                      ----
+370 |                  Some(MediaType::JavaScript)
+371 |              } else if MimeClassifier::is_font(mime) {
+    |                                                ----
+372 |                  Some(MediaType::Font)
+373 |              } else if MimeClassifier::is_json(mime) {
+    |                                                ----
+374 |                  Some(MediaType::Json)
+375 |              } else if MimeClassifier::is_text(mime) {
+    |                                                ----
+376 |                  Some(MediaType::Text)
+377 |              } else if MimeClassifier::is_css(mime) {
+    |                                               ----
+...
+384 |          fn maybe_get_media_type(supplied_type: &Option<Mime>) -> Option<MediaType> {
+    |                                  ----------------------------
+385 |              supplied_type
+    |     _________-------------
+    |     _________|
+    |     _________|
+    |    |
+386 |    |             .as_ref()
+    |    |_____________________-
+    |    |_____________________|
+    |
+387 |    |             .and_then(MimeClassifier::get_media_type)
+    |    |_____________________________________________________-
+...
+393 |          fn classify(&self, data: &[u8]) -> Option<Mime>;
+    |                                             ------------
+...
+398 |    / struct ByteMatcher {
+399 |    |     pattern: &'static [u8],
+400 |    |     mask: &'static [u8],
+401 |    |     leading_ignore: &'static [u8],
+402 |    |     content_type: Mime,
+403 |    | }
+    |    |_-
+...
+436 |      fn MIMEChecker_validate_empty_pattern_error(mt: &Mime) -> (result: String) {
+    |                                                  ---------
+...
+440 |      fn MIMEChecker_validate_unequal_pattern_error(mt: &Mime) -> (result: String) {
+    |                                                    ---------
+...
+444 |      fn MIMEChecker_validate_premasked_error(mt: &Mime) -> (result: String) {
+    |                                              ---------
+...
+449 |          fn classify(&self, data: &[u8]) -> Option<Mime> {
+    |     ________________________________________------------_-
+450 |    |         // self.matches(data).map(|_| self.content_type.clone())
+451 |    |         self.matches(data).map(|x| self.content_type.clone())
+    |    |         -----------------------------------------------------
+452 |    |     }
+    |    |_____-
+...
+457 |                  return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
+    |                                                                       -----------------
+...
+464 |                  return Err(MIMEChecker_validate_unequal_pattern_error(&self.content_type));
+    |                                                                         -----------------
+...
+480 |                  return Err(MIMEChecker_validate_premasked_error(&self.content_type));
+    |                                                                   -----------------
+...
+504 |          fn classify(&self, data: &[u8]) -> Option<Mime> {
+    |     ________________________________________------------_-
+505 |              self.matcher.matches(data).and_then(|j| {
+    |     _________-___________________________________-___-
+    |     _________|___________________________________|
+    |     _________|___________________________________|
+    |     _________|___________________________________|
+    |     _________|
+    |     _________|
+    |     _________|
+    |    |
+506 |    |             // if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
+507 |                  if j < data.len() && (equal_b_space_or_g(data[j])) {
+    |     _____________-__________________________________________________-
+    |     _____________|
+    |    |
+508 |    |                 Some(self.matcher.content_type.clone())
+    |    |                 ---------------------------------------
+509 |    |             } else {
+    |    |_____________-______-
+    |    |_____________|
+    |    |
+510 |    |                 None
+    |    |                 ----
+511 |    |             }
+    |    |_____________-
+    |    |_____________|
+    |
+512 |    |         })
+    |    |_________--
+    |    |_________||
+    |    |_________||
+    |    |_________|
+    |    |_________|
+    |    |_________|
+    |    |_________|
+    |
+513 |    |     }
+    |    |_____-
+...
+565 |          fn classify(&self, data: &[u8]) -> Option<Mime> {
+    |     ________________________________________------------_-
+566 |              if self.matches(data) {
+    |     _________-_____________________-
+    |     _________|
+    |    |
+567 |    |             Some("video/mp4".parse().unwrap())
+    |    |             ----------------------------------
+568 |    |         } else {
+    |    |_________-______-
+    |    |_________|
+    |    |
+569 |    |             None
+    |    |             ----
+570 |    |         }
+    |    |_________-
+    |    |_________|
+    |
+571 |    |     }
+    |    |_____-
+...
+582 |          fn classify_impl(&self, data: &[u8]) -> Mime {
+    |     _____________________________________________----_-
+...      |
+590 |    /         if data.starts_with(&[0xFFu8, 0xFEu8]) ||
+591 |                  data.starts_with(&[0xFEu8, 0xFFu8]) ||
+592 |                  data.starts_with(&[0xEFu8, 0xBBu8, 0xBFu8])
+593 |    /         {
+594 |    |             mime::TEXT_PLAIN
+    |    |             ----------------
+...      |
+600 |    |         } else if data.iter().any(|xp| {
+    |    |_________-______-
+    |    |_________|
+    |    |
+601 |    |             *xp <= 0x08u8 ||
+602 |    |                 *xp == 0x0Bu8 ||
+603 |    |                 (0x0Eu8..=0x1Au8).contains(xp) ||
+604 |    |                 (0x1Cu8..=0x1Fu8).contains(xp)
+605 |              }) {
+    |     ____________-
+606 |                  // Step 5. The computed MIME type is "application/octet-stream".
+607 |                  mime::APPLICATION_OCTET_STREAM
+    |                  ------------------------------
+608 |    |         } else {
+    |    |_________-______-
+    |    |_________|
+    |    |
+609 |    |             // Step 4. If the resource header contains no binary data bytes,
+610 |    |             // the computed MIME type is "text/plain".
+611 |    |             mime::TEXT_PLAIN
+    |    |             ----------------
+612 |    |         }
+    |    |_________-
+    |    |_________|
+    |    |_________|
+    |
+613 |    |     }
+    |    |_____-
+...
+616 |          fn classify(&self, data: &[u8]) -> Option<Mime> {
+    |     ________________________________________------------_-
+617 |    |         Some(self.classify_impl(data))
+    |    |         ------------------------------
+618 |    |     }
+    |    |_____-
+...
+734 |          fn classify(&self, data: &[u8]) -> Option<Mime> {
+    |     ________________________________________------------_-
+735 |    /         self.byte_matchers
+736 |    |             .iter()
+737 |    |             .find_map(|matcher| matcher.classify(data))
+    |    |_______________________---------------------------------
+    |    |_______________________________________________________|
+    |    |_______________________________________________________|
+    |
+738 |    |     }
+    |    |_____-
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExMime(headers::Mime);
+
+error: could not compile `servo-net-traits` (lib) due to 35 previous errors

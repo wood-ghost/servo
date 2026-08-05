@@ -50,5 +50,42 @@ pub open spec fn match_result(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
 }
 
 
+// proofs
+pub proof fn match_return_some(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, start: int)
+    requires
+        // pattern.len() > 0,
+        pattern.len() == mask.len(),
+        // pattern.len() <= data.len(),
+        !(data =~= pattern),
+        start >= 0,
+        start + pattern.len() <= data.len(),
+
+        !ignored.contains(data[start]),
+
+        forall |j: int| #![trigger data[j]] 0 <= j < start  ==> ignored.contains(data[j]),
+
+        forall |p: int| #![trigger pattern.as_ref()[p]] 0 <= p < pattern.len() ==>
+            (*data.subrange(start, data.len() as int).as_ref()[p] & *mask.as_ref()[p]) == *pattern.as_ref()[p],
+    ensures
+        match_result(data, pattern, mask, ignored, start + pattern.len())
+{
+    assert forall |p: int| #![trigger data[start + p]]
+        0 <= p < pattern.len()
+        implies
+        (data[start + p] & mask[p]) == pattern[p]
+    by {
+        assert(*pattern.as_ref()[p] == pattern[p]);
+    }
+    assert(pattern_matching_at(data, pattern, mask, ignored, start));
+}
+
+pub proof fn match_return_none(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, start: int)
+    requires
+        exists |p: int| #![trigger pattern[p]]
+            0 <= p < pattern.len()
+            && (data[start + p] & mask[p]) != pattern[p],
+    ensures
+        !pattern_matching_at(data, pattern, mask, ignored, start)
+{}
 
 } // verus!

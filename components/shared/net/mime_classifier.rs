@@ -8,7 +8,7 @@
 use vstd::prelude::*;
 // use vstd::thread::*;
 // use vstd::{pervasive::*, prelude::*, *};
-use vstd::std_specs::iter::IteratorSpec;
+use vstd::std_specs::iter::{IteratorSpec, zip_seq};
 
 
 use mime::{self, Mime, Name};
@@ -21,7 +21,7 @@ use crate::mime_classifier_specs::{
     flag as SpecFlag,
     classifier as SpecClassifier,
     byte_matcher as SpecByteMatcher,
-    // std_api as SpecStd,
+    std_api as SpecStd,
 };
 
 verus! {
@@ -500,8 +500,6 @@ impl ByteMatcher {
                 }
             }
     {
-        broadcast use vstd::std_specs::iter::group_iter_axioms;
-
         if data.len() < self.pattern.len() {
             return None;
         // } else if data == self.pattern {
@@ -524,29 +522,38 @@ impl ByteMatcher {
                     max_start + 1 - start,
             {
                 if !self.leading_ignore.contains(&data[start]) {
-                    let mut i: usize = 0;
-                    while i < self.pattern.len()
-                        invariant
-                            i <= self.pattern.len(),
-                            self.pattern.len() == self.mask.len(),
-                            start + self.pattern.len() <= data.len(),
-                            !(data@ =~= self.pattern@),
-                            SpecByteMatcher::is_first_not_ignored_idx(data@,self.leading_ignore@.to_set(),start as int),
-                            forall |p: int| #![trigger data@[start as int + p]] 0 <= p < i as int 
-                                ==> (data@[start as int + p] & self.mask@[p]) == self.pattern@[p],
-                        decreases
-                            self.pattern.len() - i,
-                    {
-                        if (data[start + i] & self.mask[i]) != self.pattern[i] {
-                            return None;
-                        }
-                        i += 1;
+                    proof {
+                        assert(start < data.len());
+                        assert(start + self.pattern.len() <= data.len());
+                        assert(!self.leading_ignore@.to_set().contains(data@[start as int]));
+
+                        assert(
+                            SpecByteMatcher::is_first_not_ignored_idx(data@, self.leading_ignore@.to_set(), start as int)
+                        );
                     }
-                    assert(SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), (start + self.pattern.len()) as int)) 
-                    by {
-                        assert(SpecByteMatcher::pattern_matching_at(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int));
-                    };
-                    return Some(start + self.pattern.len());
+                    if data[start..]
+                        .iter()
+                        .zip(self.pattern.iter())
+                        .zip(self.mask.iter())
+                        // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
+                        .all(|x: ((&u8, &u8), &u8)| -> (r: bool) 
+                            ensures
+                                r == ((*x.0.0 & *x.1) == *x.0.1),
+                        {
+                            let ((data_p, pattern_p), mask_p) = x;
+                            (*data_p & *mask_p) == *pattern_p
+                        })
+                    {
+                        proof {
+                            SpecByteMatcher::match_return_some(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int);
+                        }
+                        return Some(start + self.pattern.len());
+                    } else {
+                        proof {
+                            SpecByteMatcher::match_return_none(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int);
+                        }
+                        return None;
+                    }
                 }
                 start += 1;
             }
@@ -554,17 +561,43 @@ impl ByteMatcher {
         }
         // TODO: keep the original code 
         // } else {
+
+
         //     data[..data.len() - self.pattern.len() + 1]
         //         .iter()
-        //         .position(|x| !self.leading_ignore.contains(x))
-        
-        //         .and_then(|start| {
+        //         .position(|x: u8| -> (r: bool)
+        //             ensures r == !self.leading_ignore@.to_set().contains(x),
+        //             { 
+        //                 !self.leading_ignore.contains(&x) 
+        //             },
+        //         )
+        //         .and_then(|start: usize| -> (result: Option<usize>)
+        //             requires 
+        //                 start < data.len() - self.pattern.len() + 1,
+        //                 // SpecByteMatcher::is_first_not_ignored_idx(data@, self.leading_ignore@.to_set(), start as int),
+        //                 !self.leading_ignore@.to_set().contains(
+        //                     data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[start as int],
+        //                 ),
+
+        //                 forall |j: int| 
+        //                     #![trigger self.leading_ignore@.to_set().contains(data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[j])]
+        //                     0 <= j < start as int ==> 
+        //                     self.leading_ignore@.to_set().contains(data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[j]),
+        //             ensures
+        //                 match result {
+        //                     Some(r) => SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int),
+        //                     None => !SpecByteMatcher::pattern_matching_success(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()), 
+        //                 },
+        //         {
         //             if data[start..]
         //                 .iter()
         //                 .zip(self.pattern.iter())
         //                 .zip(self.mask.iter())
         //                 // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
-        //                 .all(|x| {
+        //                 .all(|x: ((&u8, &u8), &u8)| -> (r: bool) 
+        //                     ensures
+        //                         r == ((*x.0.0 & *x.1) == *x.0.1),
+        //                 {
         //                     let ((data_p, pattern_p), mask_p) = x;
         //                     (*data_p & *mask_p) == *pattern_p
         //                 })
@@ -593,7 +626,7 @@ fn MIMEChecker_validate_premasked_error(mt: &Mime) -> (result: String) {
 }
 
 impl MIMEChecker for ByteMatcher {
-    #[verifier::external_body] //TODO:
+    #[verifier::external_body] 
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         // self.matches(data).map(|_| self.content_type.clone())
         self.matches(data).map(|x| self.content_type.clone())
@@ -606,8 +639,6 @@ impl MIMEChecker for ByteMatcher {
                 Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
             }
     {
-        broadcast use vstd::std_specs::iter::group_iter_axioms;
-
         if self.pattern.is_empty() {
             // return Err(format!("Zero length pattern for {:?}", self.content_type));
             return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
@@ -900,7 +931,7 @@ impl GroupedClassifier {
     }
 }
 impl MIMEChecker for GroupedClassifier {
-    #[verifier::external_body]
+    #[verifier::external_body] //TODO:
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         self.byte_matchers
             .iter()
@@ -920,12 +951,9 @@ impl MIMEChecker for GroupedClassifier {
 impl ByteMatcher {
     // A Windows Icon signature
     #[verifier::external_body]
-    const IMAGE_X_ICON_CURSOR_PATTERN: &'static [u8; 4] = b"\x00\x00\x02\x00";
-    #[verifier::external_body]
     fn image_x_icon() -> ByteMatcher {
         ByteMatcher {
-            pattern: Self::IMAGE_X_ICON_CURSOR_PATTERN,
-            // pattern: b"\x00\x00\x01\x00",
+            pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
             content_type: "image/x-icon".parse().unwrap(),
             leading_ignore: &[],

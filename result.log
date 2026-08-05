@@ -1,0 +1,275 @@
+    Checking servo-net-traits v0.4.0 (/home/yizhiy/Desktop/servo/components/shared/net)
+note: verifying module mime_classifier
+
+error: postcondition not satisfied
+  --> /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/convert.rs:19:13
+   |
+19 |               Self::obeys_from_spec() ==> ret == Self::from_spec(v),
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+   |
+  ::: components/shared/net/mime_classifier.rs:75:9
+   |
+75 | /         if boolean {
+76 | |             NoSniffFlag::On
+77 | |         } else {
+78 | |             NoSniffFlag::Off
+79 | |         }
+   | |_________- at the end of the function body
+
+note: diagnostics via expansion
+      
+      obeys_from_spec() ==>
+          %return == from_spec(old(boolean))
+          |   %return is On ==>
+          |       from_spec(old(boolean)) is On ✘
+          |   %return is Off ==>
+          |       from_spec(old(boolean)) is Off ✘
+          +---
+      
+  --> /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/convert.rs:19:48
+   |
+19 |             Self::obeys_from_spec() ==> ret == Self::from_spec(v),
+   |                                                ^^^^^^^^^^^^^^^^^^
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:534:9
+    |
+449 |             self.pattern.len() > 0,
+    |             ---------------------- failed precondition
+...
+534 |         self.matches(data).map(|x| self.content_type.clone())
+    |         ^^^^^^^^^^^^^^^^^^
+
+note: diagnostics via expansion
+      
+      self.pattern.len%returns_clause_autospec() > 0 ✘
+      self.pattern.len%returns_clause_autospec() == self.mask.len%returns_clause_autospec() ✘
+      
+   --> components/shared/net/mime_classifier.rs:449:13
+    |
+449 |             self.pattern.len() > 0,
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+450 |             self.pattern.len() == self.mask.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:598:9
+    |
+449 |             self.pattern.len() > 0,
+    |             ---------------------- failed precondition
+...
+598 |         self.matcher.matches(data).and_then(|j| {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: diagnostics via expansion
+      
+      tmp%.pattern.len%returns_clause_autospec() > 0 ✘
+      tmp%.pattern.len%returns_clause_autospec() == tmp%.mask.len%returns_clause_autospec() ✘
+      
+   --> components/shared/net/mime_classifier.rs:449:13
+    |
+449 |             self.pattern.len() > 0,
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+450 |             self.pattern.len() == self.mask.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: postcondition not satisfied
+  --> components/shared/net/mime_classifier.rs:54:13
+   |
+54 |               result == SpecApacheBugFlag::from_content_type(mime_type),
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+55 | /     {
+56 | |         // TODO(36801): also handle charset ISO-8859-1
+57 | |         if mime_type.is_some_and(|mime_type| {
+58 | |             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
+...  |
+64 | |     }
+   | |_____- at the end of the function body
+
+note: diagnostics via expansion
+      
+      result == from_content_type(old(mime_type))
+      |   result is On ==>
+      |       from_content_type(old(mime_type)) is On ✘
+      |   result is Off ==>
+      |       from_content_type(old(mime_type)) is Off ✘
+      +---
+      
+  --> components/shared/net/mime_classifier.rs:54:23
+   |
+54 |             result == SpecApacheBugFlag::from_content_type(mime_type),
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:262:9
+    |
+262 | /         sniffed
+263 | |             .or_else(|| self.plaintext_classifier.classify(data))
+264 | |             .or_else(|| self.image_classifier.classify(data))
+265 | |             .or_else(|| self.audio_video_classifier.classify(data))
+266 | |             .or_else(|| self.archive_classifier.classify(data))
+267 | |             .or_else(|| self.binary_or_plaintext.classify(data))
+268 | |             .expect("BinaryOrPlaintextClassifier always succeeds")
+    | |__________________________________________________________________^
+    |
+   ::: /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/option.rs:195:9
+    |
+195 |           option is Some,
+    |           -------------- failed precondition
+
+note: diagnostics via expansion
+      
+      tmp% is Some 
+      
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:272:9
+    |
+272 | /         self.binary_or_plaintext
+273 | |             .classify(data)
+274 | |             .expect("BinaryOrPlaintextClassifier always succeeds")
+    | |__________________________________________________________________^
+    |
+   ::: /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/option.rs:195:9
+    |
+195 |           option is Some,
+    |           -------------- failed precondition
+
+error: postcondition not satisfied
+   --> components/shared/net/mime_classifier.rs:326:13
+    |
+326 |               result == SpecMimeClassifier::is_image(mt),
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+327 | /     {
+328 | |         mt.type_() == mime::IMAGE
+329 | |     }
+    | |_____- at the end of the function body
+
+note: diagnostics via expansion
+      
+      result == is_image(old(mt))
+      |   result ==>
+      |       is_image(old(mt)) ✘
+      |       |   is_image(old(mt)) 
+      |       |       function is uninterpreted
+      |       +---
+      |   is_image(old(mt)) ==>
+      |       result ✘
+      +---
+      
+   --> components/shared/net/mime_classifier.rs:326:13
+    |
+326 |             result == SpecMimeClassifier::is_image(mt),
+    |             ^^^^^^    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: postcondition not satisfied
+   --> components/shared/net/mime_classifier.rs:282:13
+    |
+282 |               result == SpecMimeClassifier::is_xml(mt),
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+283 | /     {
+284 | |         !Self::is_image(mt) &&
+285 | |             (mt.suffix() == Some(mime::XML) ||
+286 | |                 mt.essence_str() == "text/xml" ||
+287 | |                 mt.essence_str() == "application/xml")
+288 | |     }
+    | |_____- at the end of the function body
+
+note: diagnostics via expansion
+      
+      result == is_xml(old(mt))
+      |   result ==>
+      |       is_xml(old(mt)) ✘
+      |       |   !(is_image(old(mt))) ✘
+      |       |       function is uninterpreted
+      |       |   !(has_xml_suffix(old(mt)) || essence_is_text_xml(old(mt))) ==>
+      |       |       essence_is_application_xml(old(mt)) ✘
+      |       |       |   essence_str(old(mt)) == "application/xml".view() 
+      |       |       |       datatype is opaque here
+      |       |       +---
+      |       +---
+      |   is_xml(old(mt)) ==>
+      |       result ✘
+      +---
+      
+   --> components/shared/net/mime_classifier_specs.rs:293:10
+    |
+293 |         !SpecMime::is_image(mt) && (
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+...
+296 |                 || SpecMime::essence_is_application_xml(mt))
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: components/shared/net/mime_classifier.rs:282:13
+    |
+282 |             result == SpecMimeClassifier::is_xml(mt),
+    |             ^^^^^^    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: postcondition not satisfied
+   --> components/shared/net/mime_classifier.rs:334:13
+    |
+334 |               result == SpecMimeClassifier::is_audio_video(mt),
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+335 | /     {
+336 | |         mt.type_() == mime::AUDIO ||
+337 | |             mt.type_() == mime::VIDEO ||
+338 | |             mt.essence_str() == "application/ogg"
+339 | |     }
+    | |_____- at the end of the function body
+
+note: diagnostics via expansion
+      
+      result == is_audio_video(old(mt))
+      |   result ==>
+      |       is_audio_video(old(mt)) ✘
+      |       |   !(is_audio(old(mt)) || is_video(old(mt))) ==>
+      |       |       essence_is_application_ogg(old(mt))
+      |       |       |   essence_str(old(mt)) == "application/ogg".view() 
+      |       |       |       datatype is opaque here
+      |       |       +---
+      |       +---
+      |   is_audio_video(old(mt)) ==>
+      |       result ✘
+      +---
+      
+   --> components/shared/net/mime_classifier.rs:334:13
+    |
+334 |             result == SpecMimeClassifier::is_audio_video(mt),
+    |             ^^^^^^    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: function body check: not all errors may have been reported; rerun with a higher value for --multiple-errors to find other potential errors in this function
+   --> components/shared/net/mime_classifier.rs:617:5
+    |
+617 |     pub fn matches(&self, data: &[u8]) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:639:13
+    |
+639 |         if !data[4..].starts_with(&ftyp) {
+    |             ^^^^^^^^^
+    |
+   ::: /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/core.rs:57:13
+    |
+ 57 |             self.index_req(&index);
+    |             ---------------------- failed precondition
+
+error: precondition not satisfied
+   --> components/shared/net/mime_classifier.rs:645:9
+    |
+645 |         data[8..].starts_with(&mp4) ||
+    |         ^^^^^^^^^
+    |
+   ::: /home/yizhiy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vstd-0.0.0-2026-07-12-0122/std_specs/core.rs:57:13
+    |
+ 57 |             self.index_req(&index);
+    |             ---------------------- failed precondition
+
+note: diagnostics via expansion
+      
+      data.index_req(tmp%) 
+          trait function (note: expand-errors is currently limited in its support for resolving generic trait functions)
+      
+
+verification results:: 29 verified, 10 errors (partial verification with `--verify-*`)
+error: could not compile `servo-net-traits` (lib) due to 11 previous errors
