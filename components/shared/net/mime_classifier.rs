@@ -9,6 +9,7 @@ use vstd::prelude::*;
 // use vstd::thread::*;
 // use vstd::{pervasive::*, prelude::*, *};
 use vstd::std_specs::iter::{IteratorSpec, zip_seq};
+use vstd::assert_seqs_equal;
 
 
 use mime::{self, Mime, Name};
@@ -22,6 +23,7 @@ use crate::mime_classifier_specs::{
     classifier as SpecClassifier,
     byte_matcher as SpecByteMatcher,
     std_api as SpecStd,
+    mime_api as SpecMime,
 };
 
 verus! {
@@ -288,35 +290,6 @@ impl MimeClassifier {
             .expect("BinaryOrPlaintextClassifier always succeeds")
     }
     
-    #[verifier::external_body]
-    fn str_equal(a: &str, b: &str) -> (result: bool)
-        ensures
-            result == (a@ =~= b@),
-    {
-        a == b
-    }
-
-    // #[verifier::external_body] // For type_
-    // fn name_equal<'a, 'b>(a: Name<'a>, b: Name<'b>) -> (result: bool)
-    //     ensures
-    //         result == (Model::name_text(a) =~= Model::name_text(b)),
-    // {
-    //     a == b
-    // }
-
-    #[verifier::external_body]
-    fn suffix_equal<'a, 'b>(a: Option<Name<'a>>, b: Option<Name<'b>>) -> (result: bool)
-        ensures
-            result == match (a, b) {
-                    (Some(a_name), Some(b_name)) =>
-                        Model::name_text(a_name) == Model::name_text(b_name),
-                    (None, None) => true,
-                    _ => false,
-                },
-    {
-        a == b
-    }
-
     /// <https://mimesniff.spec.whatwg.org/#xml-mime-type>
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
@@ -324,12 +297,12 @@ impl MimeClassifier {
         ensures
             result == Spec::is_xml(mt),
     {
+        broadcast use SpecMime::group_name_partial_eq_axioms;
+        
         !Self::is_image(mt) &&
             (mt.suffix() == Some(mime::XML) ||
-                // mt.essence_str() == "text/xml" ||
-                Self::str_equal(mt.essence_str(), "text/xml") ||
-                // mt.essence_str() == "application/xml")
-                Self::str_equal(mt.essence_str(), "application/xml"))
+                mt.essence_str() == "text/xml" ||
+                mt.essence_str() == "application/xml")
     }
 
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
@@ -338,13 +311,12 @@ impl MimeClassifier {
             result == Spec::is_html(mt),
     {
         mt.essence_str() == "text/html"
-        // Self::str_equal(mt.essence_str(), "text/html")
     }
 
     /// <https://mimesniff.spec.whatwg.org/#image-mime-type>
     fn is_image(mt: &Mime) -> (result: bool)
         ensures
-            // result == Spec::is_image(mt),
+            result == Spec::is_image(mt),
     {
         mt.type_() == mime::IMAGE
     }
@@ -468,13 +440,6 @@ struct ByteMatcher {
 }
 
 impl ByteMatcher {
-    #[verifier::external_body]
-    fn byte_slice_equal(a: &[u8], b: &[u8],) -> (result: bool)
-        ensures
-            result == (a@ =~= b@),
-    {
-        a == b
-    }
     fn matches(&self, data: &[u8]) -> (result: Option<usize>)
         requires
             self.pattern.len() > 0,
@@ -493,8 +458,7 @@ impl ByteMatcher {
     {
         if data.len() < self.pattern.len() {
             return None;
-        // } else if data == self.pattern {
-        } else if Self::byte_slice_equal(data, self.pattern) {
+        } else if data == self.pattern {
             return Some(self.pattern.len());
         } else {
             let max_start = data.len() - self.pattern.len();
@@ -948,7 +912,9 @@ impl ByteMatcher {
     {
         "image/x-icon".parse().unwrap()
     }
-    fn image_x_icon() -> ByteMatcher {
+    fn image_x_icon() -> (r: ByteMatcher) 
+        ensures Spec::is_image_x_icon(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+    {
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -965,7 +931,9 @@ impl ByteMatcher {
     {
         "image/x-icon".parse().unwrap()
     }
-    fn image_x_icon_cursor() -> ByteMatcher {
+    fn image_x_icon_cursor() -> (r: ByteMatcher )
+        ensures Spec::is_image_x_icon_cursor(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+    {
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -975,8 +943,15 @@ impl ByteMatcher {
         }
     }
     // The string "BM", a BMP signature.
-    #[verifier::external_body]
-    fn image_bmp() -> ByteMatcher {
+    // #[verifier::external_body]
+    fn image_bmp() -> (r: ByteMatcher) 
+        ensures Spec::is_image_bmp(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+    {
+        // proof { Spec::lemma_image_bmp_essence_str(mime::IMAGE_BMP); }
+        proof {
+            broadcast use Spec::lemma_image_bmp_essence_str;
+        }
+
         ByteMatcher {
             pattern: b"BM",
             mask: b"\xFF\xFF",

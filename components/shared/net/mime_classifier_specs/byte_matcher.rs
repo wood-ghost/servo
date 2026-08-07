@@ -1,5 +1,7 @@
 use mime::Mime;
 use vstd::prelude::*;
+// use crate::mime_classifier::ByteMatcher;
+
 verus! {
 
 pub open spec fn validate_ok(pattern: Seq<u8>, mask:Seq<u8>) -> bool {
@@ -87,18 +89,5 @@ pub proof fn match_return_none(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
     ensures
         !pattern_matching_at(data, pattern, mask, ignored, start)
 {}
-
-
-// ----------------------------
-// check hard coded byte matchers
-// ----------------------------
-
-// image/vnd.microsoft.icon
-// https://datatracker.ietf.org/doc/html/draft-ietf-websec-mime-sniff-00#:~:text=%7C%20FF%20FF%20FF%20FF%20%7C%2000%2000%2001%2000%20%7C%20image%2Fvnd%2E%20%7C%20Safe%20%7C%20%7C%20%7C%20%7C%20microsoft%2Eicon%20%7C%20%7C%20%7C%20Comment%3A%20A%20Windows%20Icon%20signature%2E%20%7C
-// pub(crate) open spec is_image_x_icon(bm: ByteMatcher) -> bool {
-//     &&& bm.pattern == b"\x00\x00\x01\x00"@
-//     &&& bm.mask == b"\xFF\xFF\xFF\xFF"@
-// }
-
 
 } // verus!
