@@ -5,6 +5,50 @@ use vstd::assert_seqs_equal;
 use super::model::*;
 pub(crate) use super::model::essence_str;
 
+macro_rules! define_mime_essence_lemmas {
+    (
+        $group_name:ident {
+            $(
+                $lemma_name:ident => ($type_:literal, $subtype:literal)
+            ),* $(,)?
+        }
+    ) => {
+        verus! {
+            $(
+                pub(crate) broadcast proof fn $lemma_name(mt: &Mime)
+                    requires
+                        view(mt).type_ =~= ($type_)@,
+                        view(mt).subtype =~= ($subtype)@,
+                    ensures
+                        #[trigger] essence_str(mt) =~=
+                            (concat!($type_, "/", $subtype))@,
+                {
+                    reveal_strlit($type_);
+                    reveal_strlit("/");
+                    reveal_strlit($subtype);
+                    reveal_strlit(concat!($type_, "/", $subtype));
+
+                    assert_seqs_equal!(
+                        (
+                            view(mt).type_
+                                + "/"@
+                                + view(mt).subtype
+                        ) == (concat!($type_, "/", $subtype))@
+                    );
+                }
+            )*
+
+            pub(crate) broadcast group $group_name {
+                $(
+                    $lemma_name,
+                )*
+            }
+        }
+    };
+}
+
+
+
 verus! {
 
 pub(crate) open spec fn essence_is_text_xml(mt: &Mime) -> bool {
@@ -93,28 +137,32 @@ pub(crate) open spec fn is_image_bmp(pattern: Seq<u8>, mask: Seq<u8>, content_ty
     &&& essence_str(content_type) =~= "image/bmp"@
 }
 
-pub broadcast proof fn lemma_essence_str_from_view(mt: &Mime)
-    ensures
-        #[trigger] essence_str(mt) =~=
-            view(mt).type_ + "/"@ + view(mt).subtype,
-{
-}
+define_mime_essence_lemmas! {
+    mime_essence_str_lemmas {
+        lemma_image_bmp_essence_str =>
+            ("image", "bmp"),
 
-pub(crate) broadcast proof fn lemma_image_bmp_essence_str(mt: &Mime)
-    requires
-        view(mt).type_ =~= "image"@,
-        view(mt).subtype =~= "bmp"@,
-    ensures
-        #[trigger] essence_str(mt) =~= "image/bmp"@,
-{
-    reveal_strlit("image");
-    reveal_strlit("/");
-    reveal_strlit("bmp");
-    reveal_strlit("image/bmp");
+        lemma_image_png_essence_str =>
+            ("image", "png"),
 
-    assert_seqs_equal!(
-        (view(mt).type_ + "/"@ + view(mt).subtype) == "image/bmp"@
-    );
+        lemma_image_gif_essence_str =>
+            ("image", "gif"),
+
+        lemma_image_jpeg_essence_str =>
+            ("image", "jpeg"),
+
+        lemma_text_html_essence_str =>
+            ("text", "html"),
+
+        lemma_text_plain_essence_str =>
+            ("text", "plain"),
+
+        lemma_application_xml_essence_str =>
+            ("application", "xml"),
+
+        lemma_application_pdf_essence_str =>
+            ("application", "pdf"),
+    }
 }
 
 } // verus!

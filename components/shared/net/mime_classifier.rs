@@ -949,7 +949,8 @@ impl ByteMatcher {
     {
         // proof { Spec::lemma_image_bmp_essence_str(mime::IMAGE_BMP); }
         proof {
-            broadcast use Spec::lemma_image_bmp_essence_str;
+            // broadcast use Spec::lemma_image_bmp_essence_str;
+            broadcast use Spec::mime_essence_str_lemmas;
         }
 
         ByteMatcher {
