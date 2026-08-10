@@ -1,12 +1,131 @@
 use mime::{self, Mime, Name};
 use vstd::prelude::*;
 
-use super::model::*;
+// use super::model::*;
 use vstd::std_specs::cmp::PartialEqSpec;
 
+use core::str::FromStr;
 
 verus! {
 
+// abstract Mime
+pub struct MimeView {
+    pub type_: Seq<char>,
+    pub subtype: Seq<char>,
+    pub suffix: Option<Seq<char>>,
+    // pub essence: Seq<char>,
+    pub params: Map<Seq<char>, Seq<char>>,
+}
+
+pub uninterp spec fn view(mt: &Mime) -> MimeView;
+
+// Name
+pub uninterp spec fn name_identity<'a>(name: &Name<'a>,) -> Seq<char>;
+
+pub open spec fn image_name() -> Seq<char> { "image"@ }
+pub open spec fn audio_name() -> Seq<char> { "audio"@ }
+pub open spec fn video_name() -> Seq<char> { "video"@ }
+pub open spec fn xml_name() -> Seq<char> { "xml"@ }
+pub open spec fn application_name() -> Seq<char> { "application"@ }
+pub open spec fn star_name() -> Seq<char> { "*"@ }
+pub open spec fn text_name() -> Seq<char> { "text"@ }
+pub open spec fn json_name() -> Seq<char> { "json"@ }
+pub open spec fn font_name() -> Seq<char> { "font"@ }
+
+// ----------------
+// Constant
+// -----------------
+// The Rust Mime type https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#43
+// pub struct Mime {
+//     source: Source,
+//     slash: usize,
+//     plus: Option<usize>,
+//     params: ParamSource,
+// }
+
+
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#757
+// TEXT_XML, "text/xml", 4;
+pub open spec fn text_xml_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "xml"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+
+
+pub uninterp spec fn application_octet_stream_identity() -> MimeView;
+pub uninterp spec fn text_css() -> MimeView;
+pub uninterp spec fn text_javascript() -> MimeView;
+
+// Mime
+// pub uninterp spec fn mime_identity(mt: &Mime) -> MimeView;
+
+// https://docs.rs/mime/latest/mime/struct.Mime.html#method.essence_str
+pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
+    view(mt).type_ + "/"@ + view(mt).subtype
+}
+
+pub open spec fn suffix(mt: &Mime) -> Option<Seq<char>> {
+    view(mt).suffix
+}
+pub open spec fn subtype(mt: &Mime) -> Seq<char> {
+    view(mt).subtype
+}
+
+// --------------------
+// str::parse for Mime 
+// --------------------
+#[verifier::external_trait_specification]
+#[verifier::external_trait_extension(FromStrSpec via FromStrSpecImpl)]
+pub trait ExFromStr: Sized {
+    type ExternalTraitSpecificationFor: FromStr;
+    type Err;
+
+    spec fn from_str_ensures(i: Seq<char>, r: Result<Self, Self::Err>) -> bool;
+
+    fn from_str(s: &str) -> (r: Result<Self, Self::Err>)
+        ensures
+            Self::from_str_ensures(s@, r)
+    ;
+}
+
+pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
+    result: Result<F, <F as FromStr>::Err>
+)
+    ensures
+        call_ensures( <F as FromStr>::from_str, (s,), result),
+;
+
+impl FromStrSpecImpl for Mime {
+    open spec fn from_str_ensures(
+        input: Seq<char>,
+        result: Result<Mime, <Mime as FromStr>::Err>,
+    ) -> bool {
+        &&& (result is Ok ==> {
+            essence_str(&result->Ok_0) == input
+        })
+        // hardcode
+        &&& result is Ok
+        // &&& (input == "image/x-icon"@) ==> result is Ok
+        // &&& (input == "image/webp"@) ==> result is Ok
+        // &&& (input == "video/webm"@) ==> result is Ok
+        // &&& (input == "audio/basic"@) ==> result is Ok
+        // &&& (input == "audio/aiff"@) ==> result is Ok
+        // &&& (input == "audio/mpeg"@) ==> result is Ok
+        // &&& (input == "application/ogg"@) ==> result is Ok
+        // &&& (input == "audio/midi"@) ==> result is Ok
+        // &&& (input == "video/avi"@) ==> result is Ok
+        // &&& (input == "audio/wave"@) ==> result is Ok
+    } 
+}
+
+// --------------------
+// PartialEq for Mime 
+// --------------------
 pub assume_specification[ <Mime as core::cmp::PartialEq<Mime>>::eq ](left: &Mime, right: &Mime) -> (result: bool)
     ensures
         result == (view(left) == view(right)),
@@ -52,52 +171,116 @@ pub struct ExName<'a>(Name<'a>);
 pub struct ExFromStrError(mime::FromStrError);
 
 
+// ----------------
 // Constant
+// -----------------
+// The Rust Mime type https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#43
+// pub struct Mime {
+//     source: Source,
+//     slash: usize,
+//     plus: Option<usize>,
+//     params: ParamSource,
+// }
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
+// TEXT_PLAIN, "text/plain", 4;
 pub(crate) assume_specification [mime::TEXT_PLAIN] -> (result: Mime)
     ensures
-        essence_str(&result) == "text/plain"@,
-        mime_identity(&result) == text_plain_identity(),
+        view(&result) == (MimeView {
+            type_: "text"@,
+            subtype: "plain"@,
+            suffix: None,
+            params: Map::empty(),
+        })
 ;
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#751
+// TEXT_PLAIN_UTF_8, "text/plain; charset=utf-8", 4, None, 10;
 pub(crate) assume_specification [mime::TEXT_PLAIN_UTF_8] -> (result: Mime)
     ensures
-        essence_str(&result) == "text/plain"@, //TODO:
-        mime_identity(&result) == text_plain_utf8_identity(),
+        view(&result) == (MimeView {
+            type_: "text"@,
+            subtype: "plain"@,
+            suffix: None,
+            params: Map::empty().insert("charset"@, "utf-8"@),
+        })
 ;
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#752
+// TEXT_HTML, "text/html", 4;
 pub(crate) assume_specification [mime::TEXT_HTML] -> (result: Mime)
     ensures
-        // essence_str(&result) == "text/html"@,
-        mime_identity(&result) == text_html_identity(),
+        view(&result) == (MimeView {
+            type_: "text"@,
+            subtype: "html"@,
+            suffix: None,
+            params: Map::empty(),
+        })
 ;
 
 pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mime)
     ensures
-        mime_identity(&result) == application_octet_stream_identity(),
+        view(&result) == application_octet_stream_identity(),
 ;
 
 pub(crate) assume_specification [mime::TEXT_CSS] -> (result: Mime)
     ensures
-        mime_identity(&result) == text_css(),
+        view(&result) == text_css(),
 ;
 
 pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
     ensures
-        mime_identity(&result) == text_javascript(),
+        view(&result) == text_javascript(),
+;
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#766
+// IMAGE_JPEG, "image/jpeg", 5;
+pub(crate) assume_specification [mime::IMAGE_JPEG] -> (result: Mime)
+    ensures
+        view(&result) == (MimeView {
+            type_: "image"@,
+            subtype: "jpeg"@,
+            suffix: None,
+            params: Map::empty(),
+        }),
+;
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#767
+// IMAGE_GIF, "image/gif", 5;
+pub(crate) assume_specification [mime::IMAGE_GIF] -> (result: Mime)
+    ensures
+        view(&result) == (MimeView {
+            type_: "image"@,
+            subtype: "gif"@,
+            suffix: None,
+            params: Map::empty(),
+        }),
+;
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#768
+// IMAGE_PNG, "image/png", 5;
+pub(crate) assume_specification [mime::IMAGE_PNG] -> (result: Mime)
+    ensures
+        view(&result) == (MimeView {
+            type_: "image"@,
+            subtype: "png"@,
+            suffix: None,
+            params: Map::empty(),
+        }),
 ;
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#769
 // IMAGE_BMP, "image/bmp", 5;
 pub(crate) assume_specification [mime::IMAGE_BMP] -> (result: Mime)
     ensures
-        // essence_str(&result) == "image/bmp"@, //TODO:
         view(&result) == (MimeView {
-        type_: "image"@,
-        subtype: "bmp"@,
-        suffix: None,
-        params: Map::empty(),
-    }),
+            type_: "image"@,
+            subtype: "bmp"@,
+            suffix: None,
+            params: Map::empty(),
+        }),
 ;
+
 
 // NAME
 pub assume_specification [mime::XML] -> (result: Name<'static>)
@@ -150,15 +333,11 @@ pub assume_specification [mime::FONT] -> (result: Name<'static>)
 ;
 
 // Mime
-pub assume_specification<'a>
-    [Mime::essence_str]
-    (mt: &'a Mime) -> (result: &'a str)
+pub assume_specification<'a> [Mime::essence_str](mt: &'a Mime) -> (result: &'a str)
     ensures
         result@ == essence_str(mt),
 ;
-pub assume_specification<'a>
-    [Mime::suffix]
-    (mt: &'a Mime) -> (result: Option<Name<'a>>)
+pub assume_specification<'a> [Mime::suffix] (mt: &'a Mime) -> (result: Option<Name<'a>>)
     ensures
         match result {
             // Some(name) => suffix_name(mt) == Some(name_text(name)),
@@ -166,21 +345,15 @@ pub assume_specification<'a>
             None => suffix(mt).is_none(),
         },
 ;
-pub assume_specification<'a>
-    [Mime::type_]
-    (mt: &'a Mime) -> (result: Name<'a>)
+pub assume_specification<'a> [Mime::type_] (mt: &'a Mime) -> (result: Name<'a>)
     ensures
         name_identity(&result) == view(mt).type_,
 ;
-pub assume_specification<'a>
-    [Mime::subtype]
-    (mt: &'a Mime) -> (result: Name<'a>)
+pub assume_specification<'a> [Mime::subtype] (mt: &'a Mime) -> (result: Name<'a>)
     ensures
         name_identity(&result) == view(mt).subtype,
 ;
-pub assume_specification<'a>
-    [Name::<'a>::as_str]
-    (name: &Name<'a>) -> (result: &'a str)
+pub assume_specification<'a> [Name::<'a>::as_str] (name: &Name<'a>) -> (result: &'a str)
     ensures
         result@ == name_identity(name),
 ;

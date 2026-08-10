@@ -17,7 +17,7 @@ use mime::{self, Mime, Name};
 use crate::LoadContext;
 
 use crate::mime_classifier_specs::{
-    model as Model,
+    // model as Model,
     predicates as Spec,
     flag as SpecFlag,
     classifier as SpecClassifier,
@@ -27,6 +27,8 @@ use crate::mime_classifier_specs::{
 };
 
 verus! {
+
+broadcast use Spec::mime_essence_str_lemmas;
 
 pub struct MimeClassifier {
     image_classifier: GroupedClassifier,
@@ -61,13 +63,15 @@ impl ApacheBugFlag {
     /// <https://mimesniff.spec.whatwg.org/#supplied-mime-type-detection-algorithm>
     pub fn from_content_type(mime_type: Option<&Mime>) -> (result: ApacheBugFlag)
         ensures
-            // result == SpecFlag::from_content_type(mime_type),
+            (result == ApacheBugFlag::On) ==> match mime_type {
+                Some(mt) => Spec::is_text_plain(mt),
+                None => false,
+            },
     {
         // TODO(36801): also handle charset ISO-8859-1
         if mime_type.is_some_and(|mime_type| -> (r: bool)
             ensures 
-                // r == (Spec::is_text_plain(mime_type) || Spec::is_text_plain_utf8(mime_type))
-                r ==> (Model::essence_str(mime_type) == "text/plain"@) 
+                r ==> Spec::is_text_plain(mime_type)
             {
             *mime_type == mime::TEXT_PLAIN || *mime_type == mime::TEXT_PLAIN_UTF_8
         }) {
@@ -432,11 +436,20 @@ trait MIMEChecker {
     fn validate(&self) -> Result<(), String>;
 }
 
+#[cfg(not(verus_only))]
 struct ByteMatcher {
     pattern: &'static [u8],
     mask: &'static [u8],
     leading_ignore: &'static [u8],
     content_type: Mime,
+}
+
+#[cfg(verus_only)]
+pub(crate) struct ByteMatcher {
+    pub(crate) pattern: &'static [u8],
+    pub(crate) mask: &'static [u8],
+    pub(crate) content_type: Mime,
+    pub(crate) leading_ignore: &'static [u8],
 }
 
 impl ByteMatcher {
@@ -887,7 +900,13 @@ impl GroupedClassifier {
 }
 impl MIMEChecker for GroupedClassifier {
     #[verifier::external_body] //TODO:
-    fn classify(&self, data: &[u8]) -> Option<Mime> {
+    fn classify(&self, data: &[u8]) -> (r: Option<Mime>)
+        ensures
+            // match r {
+            //     Some(mt) => SpecClassifier::classify_result(data@, self.byte_matchers@, mt),
+            //     None => !SpecClassifier::classify_success(data@, self.byte_matchers@),
+            // }
+    {
         self.byte_matchers
             .iter()
             .find_map(|matcher| matcher.classify(data))
@@ -905,54 +924,31 @@ impl MIMEChecker for GroupedClassifier {
 // TODO: These should be configured and not hard coded
 impl ByteMatcher {
     // A Windows Icon signature
-    #[verifier::external_body]
-    fn _image_x_icon_constent_type() -> (r: Mime) 
-        ensures
-            Model::essence_str(&r) == "image/x-icon"@
-    {
-        "image/x-icon".parse().unwrap()
-    }
     fn image_x_icon() -> (r: ByteMatcher) 
-        ensures Spec::is_image_x_icon(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+        ensures Spec::is_image_x_icon(&r)
     {
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
-            // content_type: "image/x-icon".parse().unwrap(),
-            content_type: Self::_image_x_icon_constent_type(),
+            content_type: "image/x-icon".parse().unwrap(),
             leading_ignore: &[],
         }
     }
     // A Windows Cursor signature.
-    #[verifier::external_body]
-    fn _image_x_icon_cursor_constent_type() -> (r: Mime) 
-        ensures
-            Model::essence_str(&r) == "image/x-icon"@
-    {
-        "image/x-icon".parse().unwrap()
-    }
-    fn image_x_icon_cursor() -> (r: ByteMatcher )
-        ensures Spec::is_image_x_icon_cursor(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+    fn image_x_icon_cursor() -> (r: ByteMatcher)
+        ensures Spec::is_image_x_icon_cursor(&r)
     {
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
             mask: b"\xFF\xFF\xFF\xFF",
-            // content_type: "image/x-icon".parse().unwrap(),
-            content_type: Self::_image_x_icon_cursor_constent_type(),
+            content_type: "image/x-icon".parse().unwrap(),
             leading_ignore: &[],
         }
     }
     // The string "BM", a BMP signature.
-    // #[verifier::external_body]
     fn image_bmp() -> (r: ByteMatcher) 
-        ensures Spec::is_image_bmp(r.pattern@, r.mask@, &r.content_type, r.leading_ignore@)
+        ensures Spec::is_image_bmp(&r)
     {
-        // proof { Spec::lemma_image_bmp_essence_str(mime::IMAGE_BMP); }
-        proof {
-            // broadcast use Spec::lemma_image_bmp_essence_str;
-            broadcast use Spec::mime_essence_str_lemmas;
-        }
-
         ByteMatcher {
             pattern: b"BM",
             mask: b"\xFF\xFF",
@@ -961,8 +957,9 @@ impl ByteMatcher {
         }
     }
     // The string "GIF89a", a GIF signature.
-    #[verifier::external_body]
-    fn image_gif89a() -> ByteMatcher {
+    fn image_gif89a() -> (r: ByteMatcher)
+        ensures Spec::is_image_gif89a(&r)
+    {
         ByteMatcher {
             pattern: b"GIF89a",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -971,8 +968,9 @@ impl ByteMatcher {
         }
     }
     // The string "GIF87a", a GIF signature.
-    #[verifier::external_body]
-    fn image_gif87a() -> ByteMatcher {
+    fn image_gif87a() -> (r: ByteMatcher) 
+        ensures Spec::is_image_gif87a(&r)
+    {
         ByteMatcher {
             pattern: b"GIF87a",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -981,8 +979,9 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "WEBPVP".
-    #[verifier::external_body]
-    fn image_webp() -> ByteMatcher {
+    fn image_webp() -> (r: ByteMatcher)
+        ensures Spec::is_image_webp(&r)
+    {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WEBPVP",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -992,8 +991,9 @@ impl ByteMatcher {
     }
     // An error-checking byte followed by the string "PNG" followed by CR LF SUB LF, the PNG
     // signature.
-    #[verifier::external_body]
-    fn image_png() -> ByteMatcher {
+    fn image_png() -> (r: ByteMatcher) 
+        ensures Spec::is_image_png(&r)
+    {
         ByteMatcher {
             pattern: b"\x89PNG\r\n\x1A\n",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1002,8 +1002,9 @@ impl ByteMatcher {
         }
     }
     // The JPEG Start of Image marker followed by the indicator byte of another marker.
-    #[verifier::external_body]
-    fn image_jpeg() -> ByteMatcher {
+    fn image_jpeg() -> (r: ByteMatcher) 
+        ensures Spec::is_image_jpeg(&r)
+    {
         ByteMatcher {
             pattern: b"\xFF\xD8\xFF",
             mask: b"\xFF\xFF\xFF",
@@ -1012,8 +1013,9 @@ impl ByteMatcher {
         }
     }
     // The WebM signature. [TODO: Use more bytes?]
-    #[verifier::external_body]
-    fn video_webm() -> ByteMatcher {
+    fn video_webm() -> (r: ByteMatcher) 
+        ensures Spec::is_video_webm(&r)
+    {
         ByteMatcher {
             pattern: b"\x1A\x45\xDF\xA3",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1022,8 +1024,9 @@ impl ByteMatcher {
         }
     }
     // The string ".snd", the basic audio signature.
-    #[verifier::external_body]
-    fn audio_basic() -> ByteMatcher {
+    fn audio_basic() -> (r: ByteMatcher) 
+        ensures Spec::is_audio_basic(&r)
+    {
         ByteMatcher {
             pattern: b".snd",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1032,8 +1035,9 @@ impl ByteMatcher {
         }
     }
     // The string "FORM" followed by four bytes followed by the string "AIFF", the AIFF signature.
-    #[verifier::external_body]
-    fn audio_aiff() -> ByteMatcher {
+    fn audio_aiff() -> (r: ByteMatcher) 
+        ensures Spec::is_audio_aiff(&r)
+    {
         ByteMatcher {
             pattern: b"FORM\x00\x00\x00\x00AIFF",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1042,8 +1046,9 @@ impl ByteMatcher {
         }
     }
     // The string "ID3", the ID3v2-tagged MP3 signature.
-    #[verifier::external_body]
-    fn audio_mpeg() -> ByteMatcher {
+    fn audio_mpeg() -> (r: ByteMatcher) 
+        ensures Spec::is_audio_mpeg(&r)
+    {
         ByteMatcher {
             pattern: b"ID3",
             mask: b"\xFF\xFF\xFF",
@@ -1052,8 +1057,9 @@ impl ByteMatcher {
         }
     }
     // The string "OggS" followed by NUL, the Ogg container signature.
-    #[verifier::external_body]
-    fn application_ogg() -> ByteMatcher {
+    fn application_ogg() -> (r: ByteMatcher)
+        ensures Spec::is_application_ogg(&r)
+    {
         ByteMatcher {
             pattern: b"OggS\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1063,8 +1069,9 @@ impl ByteMatcher {
     }
     // The string "MThd" followed by four bytes representing the number 6 in 32 bits (big-endian),
     // the MIDI signature.
-    #[verifier::external_body]
-    fn audio_midi() -> ByteMatcher {
+    fn audio_midi() -> (r: ByteMatcher) 
+        ensures Spec::is_audio_midi(&r)
+    {
         ByteMatcher {
             pattern: b"MThd\x00\x00\x00\x06",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1073,8 +1080,9 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "AVI ", the AVI signature.
-    #[verifier::external_body]
-    fn video_avi() -> ByteMatcher {
+    fn video_avi() -> (r: ByteMatcher) 
+        ensures Spec::is_video_avi(&r)
+    {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00AVI ",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1083,8 +1091,9 @@ impl ByteMatcher {
         }
     }
     // The string "RIFF" followed by four bytes followed by the string "WAVE", the WAVE signature.
-    #[verifier::external_body]
-    fn audio_wave() -> ByteMatcher {
+    fn audio_wave() -> (r: ByteMatcher) 
+        ensures Spec::is_audio_wave(&r)
+    {
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WAVE",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
