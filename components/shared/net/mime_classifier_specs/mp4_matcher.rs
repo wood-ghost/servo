@@ -1,0 +1,76 @@
+use mime::Mime;
+use vstd::prelude::*;
+use crate::mime_classifier::{
+    Mp4Matcher,
+};
+use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
+use crate::mime_classifier_specs::mime_api::{
+    video_mp4_identity,
+    MimeView,
+};
+
+verus! {
+
+// https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4
+// To determine whether a byte sequence matches the signature for MP4, use the following steps:
+pub open spec fn matches_mp4_signature(seq: Seq<u8>) -> bool {
+    // 1. Let sequence be the byte sequence to be matched, where sequence[s] is byte s 
+    //   in sequence and sequence[0] is the first byte in sequence.
+    // 2. Let length be the number of bytes in sequence.
+    // 3. If length is less than 12, return false.
+    if seq.len() < 12 {
+        false
+    } else {
+        // 4. Let box-size be the four bytes from sequence[0] to sequence[3], 
+        //   interpreted as a 32-bit unsigned big-endian integer.
+        // let box_size: int = u32_from_bytes(seq.subrange(0, 4)) as int;
+        let box_size: int = (seq[0] as int) * 0x1000000
+            + (seq[1] as int) * 0x10000
+            + (seq[2] as int) * 0x100
+            + seq[3] as int;
+        // 5. If length is less than box-size or if box-size modulo 4 is not equal to 0, 
+        //   return false. 
+        if seq.len() < box_size || (box_size % 4) != 0 {
+            false
+        }
+        // 6. If the four bytes from sequence[4] to sequence[7] are not equal to 
+        //   0x66 0x74 0x79 0x70 ("ftyp"), return false. 
+        else if seq[4] != 0x66 || seq[5] != 0x74 || seq[6] != 0x79 || seq[7] != 0x70 {
+            false
+        }
+        // 7. If the three bytes from sequence[8] to sequence[10] are equal to 
+        //   0x6D 0x70 0x34 ("mp4"), return true. 
+        else if seq[8] == 0x6D && seq[9] == 0x70 && seq[10] == 0x34 {
+            true
+        }
+        // 8. Let bytes-read be 16. 
+        // 9. While bytes-read is less than box-size, continuously 
+        //   loop through these steps: 
+        // 9.1 If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2] 
+        //     are equal to 0x6D 0x70 0x34 ("mp4"), return true. 
+        // 9.2 Increment bytes-read by 4. 
+        else {
+            exists |bytes_read: int| 16 <= bytes_read < box_size
+                && bytes_read % 4 == 0
+                && #[trigger] seq[bytes_read] == 0x6D
+                && seq[bytes_read + 1] == 0x70
+                && seq[bytes_read + 2] == 0x34
+        }
+    }
+}
+
+
+impl MIMECheckerSpec for Mp4Matcher {
+    open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
+        if matches_mp4_signature(data) {
+            Some(video_mp4_identity())
+        } else {
+            None
+        }
+    }
+
+    open spec fn validate_spec(&self) -> bool {
+        true
+    }
+}
+} // verus!

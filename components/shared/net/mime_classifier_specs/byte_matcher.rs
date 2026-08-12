@@ -1,6 +1,14 @@
 use mime::Mime;
 use vstd::prelude::*;
-// use crate::mime_classifier::ByteMatcher;
+use crate::mime_classifier::{
+    ByteMatcher,
+    TagTerminatedByteMatcher,
+};
+use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
+use crate::mime_classifier_specs::mime_api::{
+    view,
+    MimeView,
+};
 
 verus! {
 
@@ -44,7 +52,7 @@ pub open spec fn is_first_not_ignored_idx(input: Seq<u8>, ignored: Set<u8>, s: i
     &&& s < input.len() ==> !ignored.contains(input[s])
 }
 
-pub open spec fn match_result(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, r: int) -> bool {
+pub open spec fn is_match_result(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, r: int) -> bool {
     exists |s: int| {
         &&& pattern_matching_at(input, pattern, mask, ignored, s)
         &&& r == s + pattern.len()
@@ -69,7 +77,7 @@ pub proof fn match_return_some(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
         forall |p: int| #![trigger pattern.as_ref()[p]] 0 <= p < pattern.len() ==>
             (*data.subrange(start, data.len() as int).as_ref()[p] & *mask.as_ref()[p]) == *pattern.as_ref()[p],
     ensures
-        match_result(data, pattern, mask, ignored, start + pattern.len())
+        is_match_result(data, pattern, mask, ignored, start + pattern.len())
 {
     assert forall |p: int| #![trigger data[start + p]]
         0 <= p < pattern.len()
@@ -89,5 +97,54 @@ pub proof fn match_return_none(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
     ensures
         !pattern_matching_at(data, pattern, mask, ignored, start)
 {}
+
+// impl
+impl MIMECheckerSpec for ByteMatcher {
+    open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
+        if data == self.pattern@
+            || pattern_matching_success(data,
+                self.pattern@,
+                self.mask@,
+                self.leading_ignore@.to_set(),
+            )
+        {
+            Some(view(&self.content_type))
+        } else {
+            None
+        }
+    }
+
+    open spec fn validate_spec(&self) -> bool {
+        validate_ok(self.pattern@, self.mask@)
+    }
+}
+
+impl MIMECheckerSpec for TagTerminatedByteMatcher {
+    open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
+        if exists |r: int| #![trigger data[r]]
+            0 <= r < data.len()
+                && (data[r] == b' ' || data[r] == b'>')
+                && (
+                    ((data == self.matcher.pattern@)
+                        && r == self.matcher.pattern@.len())
+                    || is_match_result(
+                        data,
+                        self.matcher.pattern@,
+                        self.matcher.mask@,
+                        self.matcher.leading_ignore@.to_set(),
+                        r,
+                    )
+                )
+        {
+            Some(view(&self.matcher.content_type))
+        } else {
+            None
+        }
+    }
+
+    open spec fn validate_spec(&self) -> bool {
+        self.matcher.validate_spec()
+    }
+}
 
 } // verus!

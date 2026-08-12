@@ -33,7 +33,7 @@ pub open spec fn json_name() -> Seq<char> { "json"@ }
 pub open spec fn font_name() -> Seq<char> { "font"@ }
 
 // ----------------
-// Constant
+// Constant Identity
 // -----------------
 // The Rust Mime type https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#43
 // pub struct Mime {
@@ -43,7 +43,37 @@ pub open spec fn font_name() -> Seq<char> { "font"@ }
 //     params: ParamSource,
 // }
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
+// TEXT_PLAIN, "text/plain", 4;
+pub open spec fn text_plain_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "plain"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#751
+// TEXT_PLAIN_UTF_8, "text/plain; charset=utf-8", 4, None, 10;
+pub open spec fn text_plain_utf_8_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "plain"@,
+        suffix: None,
+        params: Map::empty().insert("charset"@, "utf-8"@),
+    }
+}
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#752
+// TEXT_HTML, "text/html", 4;
+pub open spec fn text_html_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "html"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#757
 // TEXT_XML, "text/xml", 4;
@@ -56,10 +86,72 @@ pub open spec fn text_xml_identity() -> MimeView {
     }
 }
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#766
+// IMAGE_JPEG, "image/jpeg", 5;
+pub open spec fn image_jpeg_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "jpeg"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#767
+// IMAGE_GIF, "image/gif", 5;
+pub open spec fn image_gif_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "gif"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#768
+// IMAGE_PNG, "image/png", 5;
+pub open spec fn image_png_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "png"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#769
+// IMAGE_BMP, "image/bmp", 5;
+pub open spec fn image_bmp_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "bmp"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 
-pub uninterp spec fn application_octet_stream_identity() -> MimeView;
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#779
+// APPLICATION_OCTET_STREAM, "application/octet-stream", 11;
+pub open spec fn application_octet_stream_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "octet-stream"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+
+
+// TODO: check it
+pub open spec fn video_mp4_identity() -> MimeView {
+    MimeView {
+        type_: "video"@,
+        subtype: "mp4"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+
 pub uninterp spec fn text_css() -> MimeView;
 pub uninterp spec fn text_javascript() -> MimeView;
+
 
 // Mime
 // pub uninterp spec fn mime_identity(mt: &Mime) -> MimeView;
@@ -174,48 +266,19 @@ pub struct ExFromStrError(mime::FromStrError);
 // ----------------
 // Constant
 // -----------------
-// The Rust Mime type https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#43
-// pub struct Mime {
-//     source: Source,
-//     slash: usize,
-//     plus: Option<usize>,
-//     params: ParamSource,
-// }
-
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
-// TEXT_PLAIN, "text/plain", 4;
 pub(crate) assume_specification [mime::TEXT_PLAIN] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "text"@,
-            subtype: "plain"@,
-            suffix: None,
-            params: Map::empty(),
-        })
+        view(&result) == text_plain_identity(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#751
-// TEXT_PLAIN_UTF_8, "text/plain; charset=utf-8", 4, None, 10;
 pub(crate) assume_specification [mime::TEXT_PLAIN_UTF_8] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "text"@,
-            subtype: "plain"@,
-            suffix: None,
-            params: Map::empty().insert("charset"@, "utf-8"@),
-        })
+        view(&result) == text_plain_utf_8_identity(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#752
-// TEXT_HTML, "text/html", 4;
 pub(crate) assume_specification [mime::TEXT_HTML] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "text"@,
-            subtype: "html"@,
-            suffix: None,
-            params: Map::empty(),
-        })
+        view(&result) == text_html_identity(),
 ;
 
 pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mime)
@@ -233,52 +296,24 @@ pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
         view(&result) == text_javascript(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#766
-// IMAGE_JPEG, "image/jpeg", 5;
 pub(crate) assume_specification [mime::IMAGE_JPEG] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "image"@,
-            subtype: "jpeg"@,
-            suffix: None,
-            params: Map::empty(),
-        }),
+        view(&result) == image_jpeg_identity(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#767
-// IMAGE_GIF, "image/gif", 5;
 pub(crate) assume_specification [mime::IMAGE_GIF] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "image"@,
-            subtype: "gif"@,
-            suffix: None,
-            params: Map::empty(),
-        }),
+        view(&result) == image_gif_identity(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#768
-// IMAGE_PNG, "image/png", 5;
 pub(crate) assume_specification [mime::IMAGE_PNG] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "image"@,
-            subtype: "png"@,
-            suffix: None,
-            params: Map::empty(),
-        }),
+        view(&result) == image_png_identity(),
 ;
 
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#769
-// IMAGE_BMP, "image/bmp", 5;
 pub(crate) assume_specification [mime::IMAGE_BMP] -> (result: Mime)
     ensures
-        view(&result) == (MimeView {
-            type_: "image"@,
-            subtype: "bmp"@,
-            suffix: None,
-            params: Map::empty(),
-        }),
+        view(&result) == image_bmp_identity(),
 ;
 
 

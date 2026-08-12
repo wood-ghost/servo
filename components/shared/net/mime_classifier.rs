@@ -24,20 +24,23 @@ use crate::mime_classifier_specs::{
     byte_matcher as SpecByteMatcher,
     std_api as SpecStd,
     mime_api as SpecMime,
+    mp4_matcher as SpecMP4Matcher,
 };
+
+use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
 
 verus! {
 
 broadcast use Spec::mime_essence_str_lemmas;
 
 pub struct MimeClassifier {
-    image_classifier: GroupedClassifier,
-    audio_video_classifier: GroupedClassifier,
-    scriptable_classifier: GroupedClassifier,
-    plaintext_classifier: GroupedClassifier,
-    archive_classifier: GroupedClassifier,
-    binary_or_plaintext: BinaryOrPlaintextClassifier,
-    font_classifier: GroupedClassifier,
+    pub(crate) image_classifier: GroupedClassifier,
+    pub(crate) audio_video_classifier: GroupedClassifier,
+    pub(crate) scriptable_classifier: GroupedClassifier,
+    pub(crate) plaintext_classifier: GroupedClassifier,
+    pub(crate) archive_classifier: GroupedClassifier,
+    pub(crate) binary_or_plaintext: BinaryOrPlaintextClassifier,
+    pub(crate) font_classifier: GroupedClassifier,
 }
 
 #[derive(PartialEq)]
@@ -257,7 +260,13 @@ impl MimeClassifier {
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> (r: Result<(), String>) 
+        ensures
+            r.is_ok() == SpecClassifier::mime_classifier_validate_spec(self)
+    {
+        proof {
+            SpecClassifier::lemma_mime_classifier_validate_spec(self);
+        }
         self.image_classifier.validate()?;
         self.audio_video_classifier.validate()?;
         self.scriptable_classifier.validate()?;
@@ -328,14 +337,11 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
     fn is_audio_video(mt: &Mime) -> (result: bool)
         ensures
-            // result == Spec::is_audio_video(mt),
+            result == Spec::is_audio_video(mt),
     {
         mt.type_() == mime::AUDIO ||
-        // Self::name_equal(mt.type_(), mime::AUDIO) ||
             mt.type_() == mime::VIDEO ||
-            // Self::name_equal(mt.type_(), mime::VIDEO) ||
             mt.essence_str() == "application/ogg"
-            // Self::str_equal(mt.essence_str(), "application/ogg")
     }
 
     fn is_explicit_unknown(mt: &Mime) -> bool {
@@ -430,10 +436,16 @@ impl MimeClassifier {
 }
 
 // Interface used for composite types
-trait MIMEChecker {
-    fn classify(&self, data: &[u8]) -> Option<Mime>;
+pub(crate) trait MIMEChecker: MIMECheckerSpec {
+    fn classify(&self, data: &[u8]) -> Option<Mime>
+        requires
+            self.validate_spec(),
+    ;
     /// Validate the MIME checker configuration
-    fn validate(&self) -> Result<(), String>;
+    fn validate(&self) -> (r: Result<(), String>)
+        ensures
+            r.is_ok() == self.validate_spec()
+    ;
 }
 
 #[cfg(not(verus_only))]
@@ -460,11 +472,11 @@ impl ByteMatcher {
         ensures
             match result {
                 Some(r) => {
-                   ||| (data@ =~= self.pattern@) && (r as int == self.pattern@.len())
-                   ||| SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int)
+                   ||| (data@ == self.pattern@) && (r as int == self.pattern@.len())
+                   ||| SpecByteMatcher::is_match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int)
                 } 
                 None => {
-                    &&& !(data@ =~= self.pattern@) 
+                    &&& !(data@ == self.pattern@) 
                     &&& !SpecByteMatcher::pattern_matching_success(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set())
                 }
             }
@@ -602,10 +614,12 @@ impl MIMEChecker for ByteMatcher {
 
     fn validate(&self) -> (result: Result<(), String>)
         ensures
-            match result {
-                Ok(()) => SpecByteMatcher::validate_ok(self.pattern@, self.mask@), 
-                Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
-            }
+            // result.is_ok() == SpecByteMatcher::validate_ok(self.pattern@, self.mask@),
+            result.is_ok() == self.validate_spec(),
+            // match result {
+            //     Ok(()) => SpecByteMatcher::validate_ok(self.pattern@, self.mask@), 
+            //     Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
+            // }
     {
         if self.pattern.is_empty() {
             // return Err(format!("Zero length pattern for {:?}", self.content_type));
@@ -653,24 +667,27 @@ impl MIMEChecker for ByteMatcher {
     }
 }
 
+#[cfg(not(verus_only))]
 struct TagTerminatedByteMatcher {
     matcher: ByteMatcher,
 }
-
-#[verifier::external_body]
-fn equal_b_space_or_g (d: u8) -> (result: bool) 
-    ensures
-        result == (d == 0x20u8 || d == 0x3eu8)
-{
-    d == b' ' || d == b'>'
+#[cfg(verus_only)]
+pub(crate) struct TagTerminatedByteMatcher {
+    pub(crate) matcher: ByteMatcher,
 }
 
 impl MIMEChecker for TagTerminatedByteMatcher {
-    #[verifier::external_body] //TODO:
+    // #[verifier::external_body] //TODO:
     fn classify(&self, data: &[u8]) -> Option<Mime> {
+        proof {
+            assert(self.matcher.pattern@.len() > 0);
+            assert(
+                self.matcher.pattern@.len() == self.matcher.mask@.len()
+            );
+        }
+
         self.matcher.matches(data).and_then(|j| {
-            // if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
-            if j < data.len() && (equal_b_space_or_g(data[j])) {
+            if j < data.len() && (data[j] == b' ' || data[j] == b'>') {
                 Some(self.matcher.content_type.clone())
             } else {
                 None
@@ -678,7 +695,10 @@ impl MIMEChecker for TagTerminatedByteMatcher {
         })
     }
 
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> (result: Result<(), String>) 
+        ensures
+            result.is_ok() == self.validate_spec()
+    {
         self.matcher.validate()
     }
 }
@@ -688,7 +708,10 @@ pub struct Mp4Matcher;
 impl Mp4Matcher {
     /// <https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4>
     #[verifier::external_body] //TODO:
-    pub fn matches(&self, data: &[u8]) -> bool {
+    pub fn matches(&self, data: &[u8]) -> (result: bool) 
+        ensures
+            result == SpecMP4Matcher::matches_mp4_signature(data@),
+    {
         // Step 1. Let sequence be the byte sequence to be matched,
         // where sequence[s] is byte s in sequence and sequence[0] is the first byte in sequence.
         // Step 2. Let length be the number of bytes in sequence.
@@ -743,11 +766,17 @@ impl MIMEChecker for Mp4Matcher {
     }
 }
 
+#[cfg(not(verus_only))]
 struct BinaryOrPlaintextClassifier;
+#[cfg(verus_only)]
+pub(crate) struct BinaryOrPlaintextClassifier;
 
 impl BinaryOrPlaintextClassifier {
     /// <https://mimesniff.spec.whatwg.org/#rules-for-text-or-binary>
-    fn classify_impl(&self, data: &[u8]) -> Mime {
+    fn classify_impl(&self, data: &[u8]) -> (result: Mime) 
+        ensures
+            self.classify_spec(data@) == Some(SpecMime::view(&result)),
+    {
         // Step 1. Let length be the number of bytes in the resource header.
         // Step 2. If length is greater than or equal to 2 and
         // the first 2 bytes of the resource header are equal to 0xFE 0xFF (UTF-16BE BOM)
@@ -760,28 +789,74 @@ impl BinaryOrPlaintextClassifier {
             data.starts_with(&[0xEFu8, 0xBBu8, 0xBFu8])
         {
             mime::TEXT_PLAIN
+        // TODO: recover the original code
         // } else if data.iter().any(|&x| {
             // x <= 0x08u8 ||
                 // x == 0x0Bu8 ||
                 // (0x0Eu8..=0x1Au8).contains(&x) ||
                 // (0x1Cu8..=0x1Fu8).contains(&x)
-        } else if data.iter().any(|xp| {
-            *xp <= 0x08u8 ||
-                *xp == 0x0Bu8 ||
-                (0x0Eu8..=0x1Au8).contains(xp) ||
-                (0x1Cu8..=0x1Fu8).contains(xp)
-        }) {
-            // Step 5. The computed MIME type is "application/octet-stream".
-            mime::APPLICATION_OCTET_STREAM
+        // } else if data.iter().any(|xp: &u8| -> (r: bool) 
+        //     ensures
+        //         r == SpecClassifier::is_binary_data_byte(*xp)
+        // {
+        //     *xp <= 0x08u8 ||
+        //         *xp == 0x0Bu8 ||
+        //         (0x0Eu8..=0x1Au8).contains(xp) ||
+        //         (0x1Cu8..=0x1Fu8).contains(xp)
+        // }) {
         } else {
+            // Step 5. The computed MIME type is "application/octet-stream".
+            // mime::APPLICATION_OCTET_STREAM
+        // } else {
             // Step 4. If the resource header contains no binary data bytes,
             // the computed MIME type is "text/plain".
+            // mime::TEXT_PLAIN
+            let mut i: usize = 0;
+
+            while i < data.len()
+                invariant
+                    i <= data.len(),
+                    !(data.len() >= 2 && ((data@[0] == 0xFFu8 && data@[1] == 0xFEu8)
+                        || (data@[0] == 0xFEu8 && data@[1] == 0xFFu8)
+                    )),
+                    !(data.len() >= 3
+                        && data@[0] == 0xEFu8
+                        && data@[1] == 0xBBu8
+                        && data@[2] == 0xBFu8
+                    ),
+                    forall|j: int| #![trigger data@[j]]
+                        0 <= j < i as int ==>
+                            !SpecClassifier::is_binary_data_byte(data@[j]),
+                decreases
+                    data.len() - i,
+            {
+                let x = data[i];
+
+                let is_binary =
+                    x <= 0x08u8 ||
+                    x == 0x0Bu8 ||
+                    (0x0Eu8 <= x && x <= 0x1Au8) ||
+                    (0x1Cu8 <= x && x <= 0x1Fu8);
+
+                if is_binary {
+                    return mime::APPLICATION_OCTET_STREAM;
+                }
+
+                i += 1;
+            }
+
             mime::TEXT_PLAIN
         }
     }
 }
 impl MIMEChecker for BinaryOrPlaintextClassifier {
-    fn classify(&self, data: &[u8]) -> Option<Mime> {
+    fn classify(&self, data: &[u8]) -> (result: Option<Mime>) 
+        ensures
+            match result {
+                Some(mt) => self.classify_spec(data@) == Some(SpecMime::view(&mt)),
+                None => self.classify_spec(data@) == None,
+            }
+    {
         Some(self.classify_impl(data))
     }
 
@@ -789,13 +864,14 @@ impl MIMEChecker for BinaryOrPlaintextClassifier {
         Ok(())
     }
 }
+
 #[cfg(not(verus_only))]
 struct GroupedClassifier {
     byte_matchers: Vec<Box<dyn MIMEChecker + Send + Sync>>,
 }
 
 #[cfg(verus_only)]
-trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {}
+pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {}
 
 #[cfg(verus_only)]
 impl<T> ThreadSafeMIMEChecker for T
@@ -804,8 +880,8 @@ where
 {}
 
 #[cfg(verus_only)]
-struct GroupedClassifier {
-    byte_matchers: Vec<Box<dyn ThreadSafeMIMEChecker>>,
+pub(crate) struct GroupedClassifier {
+    pub(crate) byte_matchers: Vec<Box<dyn ThreadSafeMIMEChecker>>,
 }
 
 
@@ -913,7 +989,11 @@ impl MIMEChecker for GroupedClassifier {
     }
 
     fn validate(&self) -> Result<(), String> {
-        for byte_matcher in &self.byte_matchers {
+        for byte_matcher in iter: &self.byte_matchers 
+            invariant
+                forall |j: int| 0 <= j < iter.index() ==>
+                    #[trigger] self.byte_matchers@[j].validate_spec(),
+        {
             byte_matcher.validate()?
         }
         Ok(())
@@ -1102,7 +1182,6 @@ impl ByteMatcher {
         }
     }
     // doctype terminated with Tag terminating (TT) Byte
-    #[verifier::external_body]
     fn text_html_doctype() -> TagTerminatedByteMatcher {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {

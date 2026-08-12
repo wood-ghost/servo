@@ -237,33 +237,50 @@ pub(crate) open spec fn is_audio_wave(bm: &ByteMatcher) -> bool {
     &&& essence_str(&bm.content_type) == "audio/wave"@
 }
 
-
+// https://mimesniff.spec.whatwg.org/#identifying-a-resource-with-an-unknown-mime-type
+//
+// | Byte Pattern            | Pattern Mask            | Leading Bytes Ignored | Computed MIME Type |
+// |------------------------------------------------|------------------------------------------------|-----------------------|--------------------|
+// | 3C 21 44 4F 43 54 59 50 45 20 48 54 4D 4C TT | FF FF DF DF DF DF DF DF DF FF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+// | 3C 48 54 4D 4C TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+// | 3C 48 45 41 44 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+// | 3C 53 43 52 49 50 54 TT | FF DF DF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+// | 3C 49 46 52 41 4D 45 TT | FF DF DF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+// | 3C 48 31 TT             | FF DF FF FF             | Whitespace bytes      | `text/html`        |
+// | 3C 44 49 56 TT          | FF DF DF DF FF          | Whitespace bytes      | `text/html`        |
+// | 3C 46 4F 4E 54 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+// | 3C 54 41 42 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+// | 3C 41 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+// | 3C 53 54 59 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+// | 3C 54 49 54 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+// | 3C 42 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+// | 3C 42 4F 44 59 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+// | 3C 42 52 TT             | FF DF DF FF             | Whitespace bytes      | `text/html`        |
+// | 3C 50 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+// | 3C 21 2D 2D TT          | FF FF FF FF FF          | Whitespace bytes      | `text/html`        |
+// | 3C 3F 78 6D 6C          | FF FF FF FF FF          | Whitespace bytes      | `text/xml`         |
+// | 25 50 44 46 2D          | FF FF FF FF FF          | None                  | `application/pdf`  |
 
 
 define_mime_essence_lemmas! {
     mime_essence_str_lemmas {
         lemma_image_bmp_essence_str => ("image", "bmp"),
 
-        lemma_image_png_essence_str =>
-            ("image", "png"),
+        lemma_image_png_essence_str => ("image", "png"),
 
-        lemma_image_gif_essence_str =>
-            ("image", "gif"),
+        lemma_image_gif_essence_str => ("image", "gif"),
 
-        lemma_image_jpeg_essence_str =>
-            ("image", "jpeg"),
+        lemma_image_jpeg_essence_str => ("image", "jpeg"),
 
-        lemma_text_html_essence_str =>
-            ("text", "html"),
+        lemma_text_html_essence_str => ("text", "html"),
 
-        lemma_text_plain_essence_str =>
-            ("text", "plain"),
+        lemma_text_plain_essence_str => ("text", "plain"),
 
-        lemma_application_xml_essence_str =>
-            ("application", "xml"),
+        lemma_application_xml_essence_str => ("application", "xml"),
 
-        lemma_application_pdf_essence_str =>
-            ("application", "pdf"),
+        lemma_application_pdf_essence_str => ("application", "pdf"),
+
+        lemma_application_octet_stream_essence_str => ("application", "octet-stream"),
     }
 }
 

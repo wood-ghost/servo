@@ -54,15 +54,15 @@ pub assume_specification<'a, T>
         chunk_size > 0,
 ;
 
-pub assume_specification<T>
-    [<[T]>::starts_with]
-    (
-        slice: &[T],
-        prefix: &[T],
-    ) -> (result: bool)
-where
-    T: std::cmp::PartialEq,
-;
+// pub assume_specification<T>
+//     [<[T]>::starts_with]
+//     (
+//         slice: &[T],
+//         prefix: &[T],
+//     ) -> (result: bool)
+// where
+//     T: std::cmp::PartialEq,
+// ;
 
 #[verifier::allow(undeclared_external_trait)]
 pub assume_specification<T, F>
