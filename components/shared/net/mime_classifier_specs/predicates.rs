@@ -46,16 +46,16 @@ macro_rules! define_mime_essence_lemmas {
 
 verus! {
 
-pub(crate) open spec fn essence_is_text_xml(mt: &Mime) -> bool {
+pub open spec fn essence_is_text_xml(mt: &Mime) -> bool {
     essence_str(mt) =~= "text/xml"@
 }
 
-pub(crate) open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
+pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
     // view(mt).essence =~= "application/ogg"@
     essence_str(mt) == "application/ogg"@
 }
 
-pub(crate) uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
+pub uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
 pub open spec fn is_text_plain(mt: &Mime) -> bool {
     essence_str(mt) == "text/plain"@
 }
@@ -72,7 +72,7 @@ pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
     suffix(mt) == Some(xml_name())
 }
 
-pub(crate) open spec fn is_xml(mt: &Mime) -> bool {
+pub open spec fn is_xml(mt: &Mime) -> bool {
     !is_image(mt) && (
         has_xml_suffix(mt)
             || essence_is_text_xml(mt)
@@ -80,11 +80,11 @@ pub(crate) open spec fn is_xml(mt: &Mime) -> bool {
     )
 } 
 
-pub(crate) open spec fn is_html(mt: &Mime) -> bool {
+pub open spec fn is_html(mt: &Mime) -> bool {
     essence_str(mt) == "text/html"@
 }
 
-pub(crate) open spec fn is_audio_video(mt: &Mime) -> bool {
+pub open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
 }
 
@@ -276,11 +276,19 @@ define_mime_essence_lemmas! {
 
         lemma_text_plain_essence_str => ("text", "plain"),
 
+        lemma_text_xml_essence_str => ("text", "xml"),
+
         lemma_application_xml_essence_str => ("application", "xml"),
 
         lemma_application_pdf_essence_str => ("application", "pdf"),
 
         lemma_application_octet_stream_essence_str => ("application", "octet-stream"),
+
+        lemma_unknown_unknown_essence_str => ("unknown", "unknown"),
+
+        lemma_application_unknown_essence_str => ("application", "unknown"),
+
+        lemma_star_star_essence_str => ("*", "*"),
     }
 }
 

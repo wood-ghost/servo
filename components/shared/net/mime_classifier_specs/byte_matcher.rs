@@ -147,4 +147,9 @@ impl MIMECheckerSpec for TagTerminatedByteMatcher {
     }
 }
 
+pub(crate) open spec fn ttbm_match_success(j: int, data: Seq<u8>) -> bool {
+    &&& j < data.len()
+    &&& (data[j] == b' ' || data[j] == b'>')
+}
+
 } // verus!

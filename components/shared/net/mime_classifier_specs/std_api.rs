@@ -4,21 +4,21 @@ verus! {
 
 
 
-#[verifier::allow(undeclared_external_trait)]
-pub assume_specification<T, F>
-    [Option::<T>::or_else]
-    (option: Option<T>, op: F) -> (result: Option<T>)
-where
-    F: FnOnce() -> Option<T> + std::marker::Destruct,
-    T: std::marker::Destruct,
-    requires
-        option.is_some() || call_requires(op, ()),
-    ensures
-        match option {
-            Some(value) => result == Some(value),
-            None => call_ensures(op, (), result),
-        },
-;
+// #[verifier::allow(undeclared_external_trait)]
+// pub assume_specification<T, F>
+//     [Option::<T>::or_else]
+//     (option: Option<T>, op: F) -> (result: Option<T>)
+// where
+//     F: FnOnce() -> Option<T> + std::marker::Destruct,
+//     T: std::marker::Destruct,
+//     requires
+//         option.is_some() || call_requires(op, ()),
+//     ensures
+//         match option {
+//             Some(value) => result == Some(value),
+//             None => call_ensures(op, (), result),
+//         },
+// ;
 
 pub assume_specification<T>
     [<[T]>::contains]

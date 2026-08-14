@@ -18,6 +18,12 @@ pub struct MimeView {
 }
 
 pub uninterp spec fn view(mt: &Mime) -> MimeView;
+pub(crate) open spec fn option_view(value: &Option<Mime>) -> Option<MimeView> {
+    match value {
+        Some(mt) => Some(view(mt)),
+        None => None,
+    }
+}
 
 // Name
 pub uninterp spec fn name_identity<'a>(name: &Name<'a>,) -> Seq<char>;
@@ -139,16 +145,7 @@ pub open spec fn application_octet_stream_identity() -> MimeView {
 }
 
 
-// TODO: check it
-pub open spec fn video_mp4_identity() -> MimeView {
-    MimeView {
-        type_: "video"@,
-        subtype: "mp4"@,
-        suffix: None,
-        params: Map::empty(),
-    }
-}
-
+pub uninterp spec fn video_mp4_identity() -> MimeView;
 pub uninterp spec fn text_css() -> MimeView;
 pub uninterp spec fn text_javascript() -> MimeView;
 
@@ -212,6 +209,7 @@ impl FromStrSpecImpl for Mime {
         // &&& (input == "audio/midi"@) ==> result is Ok
         // &&& (input == "video/avi"@) ==> result is Ok
         // &&& (input == "audio/wave"@) ==> result is Ok
+        &&& input == "video/mp4"@ ==> view(&result->Ok_0) == video_mp4_identity()
     } 
 }
 
@@ -262,6 +260,10 @@ pub struct ExName<'a>(Name<'a>);
 #[verifier::external_body]
 pub struct ExFromStrError(mime::FromStrError);
 
+pub assume_specification[ <Mime as Clone>::clone ](mt: &Mime) -> (result: Mime)
+    ensures
+        view(&result) == view(mt),
+;
 
 // ----------------
 // Constant
