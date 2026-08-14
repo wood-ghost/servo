@@ -559,3 +559,15 @@ fn test_sniff_mp4_video_apache_flag_on() {
         ApacheBugFlag::On,
     );
 }
+
+#[test]
+fn test_sniff_truncated_utf16be_bom() {
+    test_sniff_with_flags(
+        &PathBuf::from("unknown/truncated_utf16be_bom"),
+        mime::APPLICATION_OCTET_STREAM,
+        // mime::TEXT_PLAIN,
+        None,
+        NoSniffFlag::Off,
+        ApacheBugFlag::Off,
+    );
+}
