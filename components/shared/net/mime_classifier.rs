@@ -31,7 +31,10 @@ use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
 
 verus! {
 
-broadcast use Spec::mime_essence_str_lemmas;
+broadcast use {
+    Spec::mime_essence_str_lemmas,
+    SpecFlag::group_flag_partial_eq_axioms,
+};
 
 pub struct MimeClassifier {
     pub(crate) image_classifier: GroupedClassifier,
@@ -157,27 +160,12 @@ impl MimeClassifier {
             Self::is_html(&supplied_type_or_octet_stream)
         {
             proof {
-                assert(*supplied_type is Some) by {
-                if *supplied_type is None {
-                    assert(
-                        SpecMime::view(&supplied_type_or_octet_stream)
-                            == SpecMime::application_octet_stream_identity()
-                    );
+                reveal_strlit("application/octet-stream");
+                reveal_strlit("text/xml");
+                reveal_strlit("application/xml");
+                reveal_strlit("text/html");
 
-                    SpecClassifier::lemma_application_octet_stream_not_xml_or_html(
-                        &supplied_type_or_octet_stream
-                    );
-
-                    assert(false);
-                }
-            }
-
-            let supplied_mime_type = (*supplied_type)->Some_0;
-
-            assert(
-                SpecMime::view(&supplied_type_or_octet_stream)
-                    == SpecMime::view(&supplied_mime_type)
-            );
+                let supplied_mime_type = (*supplied_type)->Some_0;
 
                 let initial =
                     SpecClassifier::MimeClassifierAutomaton::take_step::initialize(
@@ -188,131 +176,16 @@ impl MimeClassifier {
                         data@,
                     );
 
-                let final_state =
-                    SpecClassifier::MimeClassifierAutomaton::take_step::step1(
-                        initial,
-                    );
-
-                assert(initial.supplied_type is Some);
-
-                assert(
-                    SpecMime::view(&(initial.supplied_type->Some_0))
-                        == SpecMime::view(&supplied_mime_type)
-                );
-
-                assert(
-                    final_state.computed_mime_type
-                        == Some(SpecMime::view(&supplied_mime_type))
-                );
-
-                assert(
-                    final_state.computed_mime_type
-                        == Some(SpecMime::view(&supplied_type_or_octet_stream))
-                );
-
-                assert(
-                    final_state.computed_mime_type
-                        == Some(SpecMime::view(&supplied_type_or_octet_stream))
-                );
-
-
-                assert(
-                    SpecClassifier::MimeClassifierAutomaton::State::step1(
-                        initial,
-                        final_state,
-                    )
-                );
-
-                SpecClassifier::MimeClassifierAutomaton::show::step1(
-                    initial,
-                    final_state,
-                );
-
-                let trace = seq![initial, final_state];
-
-                assert forall |i: int|
-                    0 <= i && i + 1 < trace.len()
-                    implies
-                        #[trigger]
-                        SpecClassifier::MimeClassifierAutomaton::State::next(
-                            trace[i],
-                            trace[i + 1],
-                        )
-                by {
-                    assert(i == 0);
-                }
-
-                let initial =
-                    SpecClassifier::MimeClassifierAutomaton::take_step::initialize(
-                        self,
-                        *supplied_type,
-                        no_sniff_flag,
-                        apache_bug_flag,
-                        data@,
-                    );
 
                 let final_state =
                     SpecClassifier::MimeClassifierAutomaton::take_step::step1(initial);
 
-                assert(
-                    SpecClassifier::MimeClassifierAutomaton::State::step1(
-                        initial,
-                        final_state,
-                    )
-                );
-
                 SpecClassifier::MimeClassifierAutomaton::show::step1(
                     initial,
                     final_state,
                 );
 
-                assert(
-                    SpecClassifier::MimeClassifierAutomaton::State::next(
-                        initial,
-                        final_state,
-                    )
-                );
-
-                assert(
-                    final_state.computed_mime_type
-                        == Some(SpecMime::view(&supplied_type_or_octet_stream))
-                );
-                assert(final_state.invariant());
-                assert(
-                    final_state.state
-                        == SpecClassifier::MimeTypeSniffState::Final
-                );
-
                 let trace = seq![initial, final_state];
-
-                assert(trace.len() == 2);
-                assert(trace.first() == initial);
-                assert(trace.last() == final_state);
-
-                assert forall |i: int|
-                    0 <= i && i + 1 < trace.len()
-                    implies
-                        #[trigger]
-                        SpecClassifier::MimeClassifierAutomaton::State::next(
-                            trace[i],
-                            trace[i + 1],
-                        )
-                by {
-                    assert(i == 0);
-                    assert(trace[i] == initial);
-                    assert(trace[i + 1] == final_state);
-                }
-
-                assert(
-                    SpecClassifier::mime_type_sniffing_trace(
-                        self,
-                        *supplied_type,
-                        no_sniff_flag,
-                        apache_bug_flag,
-                        data@,
-                        trace,
-                    )
-                );
 
                 SpecClassifier::lemma_mime_classify_browsing_result_from_trace(
                     self,
@@ -326,6 +199,9 @@ impl MimeClassifier {
             }
             return supplied_type_or_octet_stream;
         }
+
+        let supplied_type_input = supplied_type;
+
         match context {
             LoadContext::Browsing => match *supplied_type {
                 // Step 2. If the supplied MIME type is undefined or if the supplied MIME type’s essence is "unknown/unknown",
@@ -333,182 +209,82 @@ impl MimeClassifier {
                 // an unknown MIME type with the sniff-scriptable flag equal to the inverse of the no-sniff flag and abort these steps.
                 // None => self.sniff_unknown_type(no_sniff_flag, data),
                 None => {
-                    let result = self.sniff_unknown_type(no_sniff_flag, data);
-
                     proof {
-                        let state0 =
-                            SpecClassifier::MimeClassifierAutomaton::take_step::initialize(
-                                self,
-                                *supplied_type,
-                                no_sniff_flag,
-                                apache_bug_flag,
-                                data@
-                            );
-
-                        let state1 =
-                            SpecClassifier::MimeClassifierAutomaton::take_step::step1(
-                                state0
-                            );
-
-                        assert(
-                            state1.state
-                                == SpecClassifier::MimeTypeSniffState::State1
-                        );
-
-                        let state2 =
-                            SpecClassifier::MimeClassifierAutomaton::take_step::step2(
-                                state1
-                            );
-
-                        assert(
-                            SpecClassifier::MimeClassifierAutomaton::State::step1(
-                                state0,
-                                state1
-                            )
-                        );
-
-                        SpecClassifier::MimeClassifierAutomaton::show::step1(
-                            state0,
-                            state1
-                        );
-
-                        assert(
-                            SpecClassifier::MimeClassifierAutomaton::State::next(
-                                state0,
-                                state1
-                            )
-                        );
-
-                        assert(
-                            SpecClassifier::MimeClassifierAutomaton::State::step2(
-                                state1,
-                                state2
-                            )
-                        );
-
-                        SpecClassifier::MimeClassifierAutomaton::show::step2(
-                            state1,
-                            state2
-                        );
-
-                        assert(
-                            SpecClassifier::MimeClassifierAutomaton::State::next(
-                                state1,
-                                state2
-                            )
-                        );
-
-                       SpecClassifier::lemma_model_sniff_unknown_type(
-                            state1.classifier,
-                            state1.no_sniff_flag,
-                            state1.data
-                        );
-
-                        assert(
-                            state2.computed_mime_type
-                                == Some(
-                                    SpecClassifier::sniff_unknown_type_spec(
-                                        state1.classifier,
-                                        state1.no_sniff_flag,
-                                        state1.data
-                                    )
-                                )
-                        );
-
-                        assert(
-                            SpecClassifier::sniff_unknown_type_spec(
-                                state1.classifier,
-                                state1.no_sniff_flag,
-                                state1.data
-                            ) == SpecClassifier::sniff_unknown_type_spec(
-                                self,
-                                no_sniff_flag,
-                                data@
-                            )
-                        );
-
-                        assert(
-                            SpecMime::view(&result)
-                                == SpecClassifier::sniff_unknown_type_spec(
-                                    self,
-                                    no_sniff_flag,
-                                    data@
-                                )
-                        );
-
-                        assert(
-                            state2.computed_mime_type
-                                == Some(SpecMime::view(&result))
-                        ); 
-
-                        assert(
-                            state2.state
-                                == SpecClassifier::MimeTypeSniffState::Final
-                        );
-
-                        let trace = seq![state0, state1, state2];
-
-                        assert(trace.len() == 3);
-                        assert(trace.first() == state0);
-                        assert(trace.last() == state2);
-
-                        assert forall |i: int|
-                            0 <= i && i + 1 < trace.len()
-                            implies
-                                #[trigger]
-                                SpecClassifier::MimeClassifierAutomaton::State::next(
-                                    trace[i],
-                                    trace[i + 1]
-                                )
-                        by {
-                            if i == 0 {
-                                assert(trace[i] == state0);
-                                assert(trace[i + 1] == state1);
-                            } else {
-                                assert(i == 1);
-                                assert(trace[i] == state1);
-                                assert(trace[i + 1] == state2);
-                            }
-                        }
-
-                        assert(
-                            SpecClassifier::mime_type_sniffing_trace(
-                                self,
-                                *supplied_type,
-                                no_sniff_flag,
-                                apache_bug_flag,
-                                data@,
-                                trace
-                            )
-                        );
-
-                        SpecClassifier::lemma_mime_classify_browsing_result_from_trace(
+                        SpecClassifier::lemma_mime_classify_browsing_none_result(
                             self,
                             no_sniff_flag,
                             apache_bug_flag,
-                            supplied_type,
+                            supplied_type_input,
                             data@,
-                            SpecMime::view(&result),
-                            trace
                         );
                     }
 
-                    result
+                    self.sniff_unknown_type(no_sniff_flag, data)
                 }
                 Some(ref supplied_type) => {
                     if MimeClassifier::is_explicit_unknown(supplied_type) {
+
+                        proof {
+                            SpecClassifier::lemma_mime_classify_browsing_explicit_unknown_result(
+                                self,
+                                no_sniff_flag,
+                                apache_bug_flag,
+                                supplied_type_input,
+                                supplied_type,
+                                data@
+                            );
+                        }
+
                         return self.sniff_unknown_type(no_sniff_flag, data);
                     }
                     // Step 3. If the no-sniff flag is set, the computed MIME type is the supplied MIME type.
                     // Abort these steps.
                     if no_sniff_flag == NoSniffFlag::On {
+
+                        proof {
+                            SpecClassifier::lemma_mime_classify_browsing_no_sniff_result(
+                                self,
+                                no_sniff_flag,
+                                apache_bug_flag,
+                                supplied_type_input,
+                                supplied_type,
+                                data@,
+                            );
+                        }
+
                         return supplied_type.clone();
                     }
                     // Step 4. If the check-for-apache-bug flag is set,
                     // execute the rules for distinguishing if a resource is text or binary and abort these steps.
                     if apache_bug_flag == ApacheBugFlag::On {
+
+                        proof {
+                            SpecClassifier::lemma_mime_classify_browsing_apache_bug_result(
+                                self,
+                                no_sniff_flag,
+                                apache_bug_flag,
+                                supplied_type_input,
+                                supplied_type,
+                                data@,
+                            );
+                        }
+
                         return self.sniff_text_or_data(data);
                     }
+
+                    
+
+                    proof {
+                        SpecClassifier::lemma_mime_classify_browsing_after_step4_trace(
+                            self,
+                            // supplied_type_input,
+                            supplied_type,
+                            no_sniff_flag,
+                            apache_bug_flag,
+                            data@
+                        );
+                    }
+
                     match MimeClassifier::get_media_type(supplied_type) {
                         // Step 5. If the supplied MIME type is an image MIME type supported by the user agent,
                         // let matched-type be the result of executing the image type pattern matching algorithm with
@@ -649,6 +425,34 @@ impl MimeClassifier {
             None
         };
 
+        proof {
+            assert(
+                should_sniff_scriptable
+                    == (no_sniff_flag == NoSniffFlag::Off)
+            );
+
+            if should_sniff_scriptable {
+                assert(no_sniff_flag == NoSniffFlag::Off);
+                assert(
+                    SpecMime::option_view(&sniffed)
+                        == self.scriptable_classifier.classify_spec(data@)
+                );
+            } else {
+                assert(no_sniff_flag != NoSniffFlag::Off);
+                assert(sniffed.is_none());
+                assert(SpecMime::option_view(&sniffed) == None);
+            }
+
+            assert(
+                SpecMime::option_view(&sniffed)
+                    == if no_sniff_flag == NoSniffFlag::Off {
+                        self.scriptable_classifier.classify_spec(data@)
+                    } else {
+                        None
+                    }
+            );
+        } 
+
         sniffed
             .or_else(
                 || -> (r: Option<Mime>)
@@ -682,16 +486,20 @@ impl MimeClassifier {
                 || -> (r: Option<Mime>)
                     ensures 
                         r.is_some(),
-                        SpecMime::option_view(&r)
-                            == self.binary_or_plaintext.classify_spec(data@),
+                        SpecMime::option_view(&r) 
+                            == Some(SpecClassifier::bin_or_plain_classify_spec(data@))
+                            // == self.binary_or_plaintext.classify_spec(data@),
                 { self.binary_or_plaintext.classify(data) }
             )
             .expect("BinaryOrPlaintextClassifier always succeeds")
     }
 
-    fn sniff_text_or_data<'a>(&'a self, data: &'a [u8]) -> Mime 
+    #[verifier::external_body] //TODO:
+    fn sniff_text_or_data<'a>(&'a self, data: &'a [u8]) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
+        ensures
+            SpecMime::view(&result) == SpecClassifier::sniff_text_or_data_spec(self, data@),
     {   
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
@@ -742,7 +550,11 @@ impl MimeClassifier {
             mt.essence_str() == "application/ogg"
     }
 
-    fn is_explicit_unknown(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    fn is_explicit_unknown(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_explicit_unknown(mt),
+    {
         mt.type_().as_str() == "unknown" && mt.subtype().as_str() == "unknown" ||
             mt.type_() == mime::APPLICATION && mt.subtype().as_str() == "unknown" ||
             mt.type_() == mime::STAR && mt.subtype() == mime::STAR
@@ -802,7 +614,17 @@ impl MimeClassifier {
         mt.essence_str() == "text/css"
     }
 
-    pub fn get_media_type(mime: &Mime) -> Option<MediaType> {
+    #[verifier::external_body] //TODO:
+    pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
+        ensures
+        !Spec::is_xml(mime) && !Spec::is_html(mime) ==> (
+            (result == Some(MediaType::Image))
+                == Spec::is_image(mime)
+            &&
+            (result == Some(MediaType::AudioVideo))
+                == Spec::is_audio_video(mime)
+        ),
+    {
         if MimeClassifier::is_xml(mime) {
             Some(MediaType::Xml)
         } else if MimeClassifier::is_html(mime) {

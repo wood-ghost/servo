@@ -47,7 +47,7 @@ macro_rules! define_mime_essence_lemmas {
 verus! {
 
 pub open spec fn essence_is_text_xml(mt: &Mime) -> bool {
-    essence_str(mt) =~= "text/xml"@
+    essence_str(mt) == "text/xml"@
 }
 
 pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
@@ -60,7 +60,7 @@ pub open spec fn is_text_plain(mt: &Mime) -> bool {
     essence_str(mt) == "text/plain"@
 }
 pub open spec fn is_image(mt: &Mime) -> bool {
-    view(mt).type_ =~= image_name()
+    view(mt).type_ == image_name()
 }
 pub open spec fn is_audio(mt: &Mime) -> bool {
     view(mt).type_ == audio_name()
@@ -88,6 +88,11 @@ pub open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
 }
 
+pub open spec fn is_explicit_unknown(mt: &Mime) -> bool {
+    ||| essence_str(mt) == "application/unknown"@
+    ||| essence_str(mt) == "unknown/unknown"@
+    ||| essence_str(mt) == "*/*"@
+}
 // ----------------------------
 // check hard coded byte matchers
 // ----------------------------
@@ -276,7 +281,7 @@ define_mime_essence_lemmas! {
 
         lemma_text_plain_essence_str => ("text", "plain"),
 
-        lemma_text_xml_essence_str => ("text", "xml"),
+        // lemma_text_xml_essence_str => ("text", "xml"),
 
         lemma_application_xml_essence_str => ("application", "xml"),
 

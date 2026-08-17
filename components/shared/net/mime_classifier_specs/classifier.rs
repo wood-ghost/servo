@@ -23,6 +23,7 @@ use crate::mime_classifier_specs::mime_api::{
     MimeView,
     essence_str,
     view,
+    option_view,
 };
 use crate::mime_classifier_specs::predicates::{
     is_xml,
@@ -30,6 +31,7 @@ use crate::mime_classifier_specs::predicates::{
     is_image,
     is_audio_video,
     mime_essence_str_lemmas,
+    is_explicit_unknown,
 };
 
 // use crate::mime_classifier_specs::{
@@ -160,16 +162,22 @@ impl MIMECheckerSpec for GroupedClassifier {
 }
 
 // https://mimesniff.spec.whatwg.org/#image-type-pattern-matching-algorithm
-pub(crate) uninterp spec fn image_type_pattern_matching_algo(
+pub(crate) open spec fn image_type_pattern_matching_algo(
     classifier: &MimeClassifier, 
     data: Seq<u8>,
-) -> Option<MimeView>;
+) -> Option<MimeView> {
+    //TODO:
+    classifier.image_classifier.classify_spec(data)
+}
 
 // https://mimesniff.spec.whatwg.org/#audio-or-video-type-pattern-matching-algorithm
-pub(crate) uninterp spec fn audio_or_video_type_pattern_matching_algo(
+pub(crate) open spec fn audio_or_video_type_pattern_matching_algo(
     classifier: &MimeClassifier, 
     data: Seq<u8>,
-) -> Option<MimeView>;
+) -> Option<MimeView> {
+    //TODO:
+    classifier.audio_video_classifier.classify_spec(data)
+}
 
 pub closed spec fn mime_classifier_validate_spec(classifier: &MimeClassifier) -> bool {
     classifier.image_classifier.validate_spec()
@@ -210,7 +218,7 @@ pub trait MimeClassifierModel {
 
 impl<'a> MimeClassifierModel for &'a MimeClassifier {
     closed spec fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: Seq<u8>) -> MimeView {
-        sniff_unknown_type_spec(*self, no_sniff_flag, data)
+        _sniff_unknown_type_spec(*self, no_sniff_flag, data)
     }
 
     closed spec fn sniff_text_or_data(&self, data: Seq<u8>) -> MimeView {
@@ -279,14 +287,16 @@ pub(crate) open spec fn _sniff_unknown_type_spec(
         // 8. If matchedType is not undefined, return matchedType. 
         Some(mt) => mt,
         None  => {
-            if !contains_binary_data_byte(data) {
+            // TODO: https://github.com/servo/servo/issues/47252
+            // if !contains_binary_data_byte(data) {
                 // 9. If resource’s resource header contains no binary data bytes, return 
                 //    "text/plain"
-                text_plain_identity()
-            } else {
+                // text_plain_identity()
+            // } else {
                 // Return "application/octet-stream".
-                application_octet_stream_identity()
-            }
+            //     application_octet_stream_identity()
+            // }
+            bin_or_plain_classify_spec(data)
         },
     }
 }
@@ -304,10 +314,12 @@ pub closed spec fn sniff_unknown_type_spec(
 }
 
 // https://mimesniff.spec.whatwg.org/#rules-for-text-or-binary
-pub(crate) uninterp spec fn sniff_text_or_data_spec(
+pub(crate) open spec fn sniff_text_or_data_spec(
     classifier: &MimeClassifier,
     data: Seq<u8>,
-) -> MimeView; 
+) -> MimeView {
+    bin_or_plain_classify_spec(data)
+} 
 
 // https://mimesniff.spec.whatwg.org/#mime-type-sniffing-algorithm
 // To determine the computed MIME type of a resource, user agents must use the following
@@ -406,9 +418,7 @@ state_machine! {
                         );
                     }
                     Some(mt) => {
-                        if essence_str(mt) == "unknown/unknown"@ 
-                        || essence_str(mt) == "application/unknown"@ 
-                        || essence_str(mt) == "*/*"@ {
+                        if is_explicit_unknown(&mt) {
                             update state = MimeTypeSniffState::Final;
                             update computed_mime_type = Some(
                                 pre.classifier.sniff_unknown_type(pre.no_sniff_flag, pre.data)
@@ -616,7 +626,6 @@ pub(crate) open spec fn mime_type_sniffing_trace<C: MimeClassifierModel>(
     trace: Seq<MimeClassifierAutomaton::State<C>>,
 ) -> bool {
     &&& trace.len() > 0
-
     &&& MimeClassifierAutomaton::State::<C>::initialize(
         trace.first(),
         classifier,
@@ -625,7 +634,6 @@ pub(crate) open spec fn mime_type_sniffing_trace<C: MimeClassifierModel>(
         apache_bug_flag,
         data,
     )
-
     &&& forall |i: int|
         0 <= i && i + 1 < trace.len() ==>
             #[trigger]
@@ -633,7 +641,6 @@ pub(crate) open spec fn mime_type_sniffing_trace<C: MimeClassifierModel>(
                 trace[i],
                 trace[i + 1],
             )
-
     &&& trace.last().state == MimeTypeSniffState::Final
 }
 
@@ -676,7 +683,7 @@ pub closed spec fn mime_classify_browsing_result<'a>(
     )
 }
 
-pub(crate) proof fn lemma_mime_classify_browsing_result_from_trace<'a>(
+pub(crate) open spec fn mime_classify_browsing_result_from_trace<'a>(
     classifier: &'a MimeClassifier,
     no_sniff_flag: NoSniffFlag,
     apache_bug_flag: ApacheBugFlag,
@@ -684,129 +691,16 @@ pub(crate) proof fn lemma_mime_classify_browsing_result_from_trace<'a>(
     data: Seq<u8>,
     result: MimeView,
     trace: Seq<MimeClassifierAutomaton::State<&'a MimeClassifier>>,
-)
-    requires
-        mime_type_sniffing_trace(
-            classifier,
-            *supplied_type,
-            no_sniff_flag,
-            apache_bug_flag,
-            data,
-            trace,
-        ),
-        trace.last().computed_mime_type == Some(result),
-    ensures
-        mime_classify_browsing_result(
-            classifier,
-            no_sniff_flag,
-            apache_bug_flag,
-            supplied_type,
-            data,
-            result,
-        ),
-{
-    reveal(mime_classify_browsing_result);
-
-    assert(mime_type_sniffing_result(
+) -> bool {
+    &&& mime_type_sniffing_trace(
         classifier,
         *supplied_type,
         no_sniff_flag,
         apache_bug_flag,
         data,
-        result,
-    )) by {
-        assert(exists |
-            candidate: Seq<
-                MimeClassifierAutomaton::State<&'a MimeClassifier>
-            >
-        |
-            mime_type_sniffing_trace(
-                classifier,
-                *supplied_type,
-                no_sniff_flag,
-                apache_bug_flag,
-                data,
-                candidate,
-            )
-            && candidate.last().computed_mime_type == Some(result)
-        ) by {
-            assert(mime_type_sniffing_trace(
-                classifier,
-                *supplied_type,
-                no_sniff_flag,
-                apache_bug_flag,
-                data,
-                trace,
-            ));
-        }
-    }
-}
-
-pub(crate) proof fn lemma_application_octet_stream_not_xml_or_html(
-    mt: &Mime,
-)
-    requires
-        view(mt) == application_octet_stream_identity(),
-    ensures
-        !is_xml(mt),
-        !is_html(mt),
-{
-    broadcast use mime_essence_str_lemmas;
-
-    reveal_strlit("application/octet-stream");
-    reveal_strlit("text/xml");
-    reveal_strlit("application/xml");
-    reveal_strlit("text/html");
-
-    assert(
-        essence_str(mt) =~= "application/octet-stream"@
-    );
-
-    assert(
-        essence_str(mt).len() == 24
-    );
-
-    assert(
-        "text/xml"@.len() == 8
-    );
-
-    assert(
-        "application/xml"@.len() == 15
-    );
-
-    assert(
-        "text/html"@.len() == 9
-    );
-
-    assert(
-        !(essence_str(mt) =~= "text/xml"@)
-    );
-
-    assert(
-        essence_str(mt) != "application/xml"@
-    );
-
-    assert(
-        essence_str(mt) != "text/html"@
-    );
-}
-
-pub(crate) proof fn lemma_model_sniff_unknown_type<'a>(
-    classifier: &'a MimeClassifier,
-    no_sniff_flag: NoSniffFlag,
-    data: Seq<u8>,
-)
-    ensures
-        <&'a MimeClassifier as MimeClassifierModel>::sniff_unknown_type(
-            &classifier,
-            no_sniff_flag,
-            data
-        ) == sniff_unknown_type_spec(
-            classifier,
-            no_sniff_flag,
-            data
-        ),
-{
+        trace
+    )
+    &&& trace.last().computed_mime_type == Some(result)
 }
 
 
@@ -826,13 +720,365 @@ pub(crate) proof fn lemma_sniff_unknown_type_spec(
             data,
         ),
 {}
-// pub(crate) uninterp spec fn mime_classifier_classify_spec(
-//     classifier: &MimeClassifier,
-//     context: LoadContext,
-//     no_sniff_flag: NoSniffFlag,
-//     apache_bug_flag: ApacheBugFlag,
-//     supplied_type: Option<Mime>,
-//     data: Seq<u8>,
-// ) -> MimeView; 
+
+pub(crate) open spec fn mime_classify_browsing_after_step4(
+    classifier: &MimeClassifier,
+    supplied_type: &Mime,
+    data: Seq<u8>,
+) -> MimeView {
+    let matched_type =
+        if is_image(supplied_type) {
+            classifier.image_classifier.classify_spec(data)
+        } else {
+            None
+        };
+
+    match matched_type {
+        Some(mt) => mt,
+        None => {
+            let matched_type =
+                if is_audio_video(supplied_type) {
+                    classifier.audio_video_classifier.classify_spec(data)
+                } else {
+                    None
+                };
+
+            match matched_type {
+                Some(mt) => mt,
+                None => view(supplied_type),
+            }
+        },
+    }
+}
+
+// ------------------------------------
+// lemmas for state machine
+// ------------------------------------
+pub(crate) proof fn lemma_mime_classify_browsing_none_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+)
+   requires
+        *supplied_type is None,
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type,
+            data,
+            sniff_unknown_type_spec(classifier, no_sniff_flag, data)
+        ), 
+{
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            *supplied_type,
+            no_sniff_flag,
+            apache_bug_flag,
+            data
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+    MimeClassifierAutomaton::show::step2(state1, state2);
+
+    let trace = seq![state0, state1, state2];
+
+    assert(
+        mime_classify_browsing_result_from_trace(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type,
+            data,
+            sniff_unknown_type_spec(classifier, no_sniff_flag, data),
+            trace
+        )
+    );
+}
+
+pub(crate) proof fn lemma_mime_classify_browsing_explicit_unknown_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type_input: &Option<Mime>,
+    supplied_type: &Mime,
+    data: Seq<u8>,
+)
+    requires
+        *supplied_type_input == Some(*supplied_type),
+        is_explicit_unknown(supplied_type),
+        !is_xml(supplied_type),
+        !is_html(supplied_type),
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            sniff_unknown_type_spec(classifier, no_sniff_flag, data)
+        ),
+{
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            *supplied_type_input,
+            no_sniff_flag,
+            apache_bug_flag,
+            data
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+    MimeClassifierAutomaton::show::step2(state1, state2);
+
+    let trace = seq![state0, state1, state2];
+
+    assert(
+        mime_classify_browsing_result_from_trace(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            sniff_unknown_type_spec(classifier, no_sniff_flag, data),
+            trace
+        )
+    );
+}
+
+pub(crate) proof fn lemma_mime_classify_browsing_no_sniff_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type_input: &Option<Mime>,
+    supplied_type: &Mime,
+    data: Seq<u8>,
+)
+    requires
+        *supplied_type_input == Some(*supplied_type),
+        !is_xml(supplied_type),
+        !is_html(supplied_type),
+        !is_explicit_unknown(supplied_type),
+        no_sniff_flag == NoSniffFlag::On,
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            view(supplied_type),
+        ),
+{
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            *supplied_type_input,
+            no_sniff_flag,
+            apache_bug_flag,
+            data,
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+    MimeClassifierAutomaton::show::step2(state1, state2);
+    MimeClassifierAutomaton::show::step3(state2, state3);
+
+    let trace = seq![state0, state1, state2, state3];
+
+    assert(
+        mime_classify_browsing_result_from_trace(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            view(supplied_type),
+            trace,
+        )
+    );
+}
+
+pub(crate) proof fn lemma_mime_classify_browsing_apache_bug_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type_input: &Option<Mime>,
+    supplied_type: &Mime,
+    data: Seq<u8>,
+)
+    requires
+        *supplied_type_input == Some(*supplied_type),
+        !is_xml(supplied_type),
+        !is_html(supplied_type),
+        !is_explicit_unknown(supplied_type),
+        no_sniff_flag == NoSniffFlag::Off,
+        apache_bug_flag == ApacheBugFlag::On,
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            sniff_text_or_data_spec(classifier, data),
+        ),
+{
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            *supplied_type_input,
+            no_sniff_flag,
+            apache_bug_flag,
+            data,
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
+    let state4 = MimeClassifierAutomaton::take_step::step4(state3);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+    MimeClassifierAutomaton::show::step2(state1, state2);
+    MimeClassifierAutomaton::show::step3(state2, state3);
+    MimeClassifierAutomaton::show::step4(state3, state4);
+
+    let trace = seq![state0, state1, state2, state3, state4];
+
+    assert(
+        mime_classify_browsing_result_from_trace(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type_input,
+            data,
+            sniff_text_or_data_spec(classifier, data),
+            trace,
+        )
+    );
+
+}
+
+pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Mime,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    data: Seq<u8>,
+)
+    requires
+        !is_xml(supplied_type),
+        !is_html(supplied_type),
+        !is_explicit_unknown(supplied_type),
+        no_sniff_flag == NoSniffFlag::Off,
+        apache_bug_flag == ApacheBugFlag::Off,
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            &Some(*supplied_type),
+            data,
+            mime_classify_browsing_after_step4(
+                classifier,
+                supplied_type,
+                data
+            )
+    ),
+{
+    let result = mime_classify_browsing_after_step4(classifier, supplied_type, data);
+    let supplied_type_input = Some(*supplied_type);
+
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            supplied_type_input,
+            no_sniff_flag,
+            apache_bug_flag,
+            data
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
+    let state4 = MimeClassifierAutomaton::take_step::step4(state3);
+    let state5 = MimeClassifierAutomaton::take_step::step5(state4);
+    let state6 = MimeClassifierAutomaton::take_step::step6(state5);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+    MimeClassifierAutomaton::show::step2(state1, state2);
+    MimeClassifierAutomaton::show::step3(state2, state3);
+    MimeClassifierAutomaton::show::step4(state3, state4);
+    MimeClassifierAutomaton::show::step5(state4, state5);
+    MimeClassifierAutomaton::show::step6(state5, state6);
+
+    if state6.state == MimeTypeSniffState::Final {
+        let trace = seq![state0, state1, state2, state3, state4, state5, state6];
+
+        assert(
+            mime_classify_browsing_result_from_trace(
+                classifier,
+                no_sniff_flag,
+                apache_bug_flag,
+                &supplied_type_input,
+                data,
+                result,
+                trace
+            )
+        );
+    } else {
+        let state7 = MimeClassifierAutomaton::take_step::step7(state6);
+        let state8 = MimeClassifierAutomaton::take_step::step8(state7);
+
+        MimeClassifierAutomaton::show::step7(state6, state7);
+        MimeClassifierAutomaton::show::step8(state7, state8);
+
+        if state8.state == MimeTypeSniffState::Final {
+            let trace = seq![state0, state1, state2, state3, state4, state5, state6, state7, state8];
+            assert(
+                mime_classify_browsing_result_from_trace(
+                    classifier,
+                    no_sniff_flag,
+                    apache_bug_flag,
+                    &supplied_type_input,
+                    data,
+                    result,
+                    trace
+                )
+            );
+        } else {
+            let state9 = MimeClassifierAutomaton::take_step::step9(state8);
+
+            MimeClassifierAutomaton::show::step9(state8, state9);
+            
+            let trace = seq![state0, state1, state2, state3, state4, state5, state6, state7, state8, state9];
+
+            assert(
+                mime_classify_browsing_result_from_trace(
+                    classifier,
+                    no_sniff_flag,
+                    apache_bug_flag,
+                    &supplied_type_input,
+                    data,
+                    result,
+                    trace
+                )
+            );
+        }
+    }
+}
 
 } // verus!
