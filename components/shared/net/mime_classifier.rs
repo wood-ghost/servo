@@ -1,13 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-// use verus_state_machines_macros::tokenized_state_machine;
-// use std::sync::Arc;
-// use vstd::atomic_ghost::*;
-// use vstd::modes::*;
 use vstd::prelude::*;
-// use vstd::thread::*;
-// use vstd::{pervasive::*, prelude::*, *};
 use vstd::std_specs::iter::{IteratorSpec, zip_seq};
 use vstd::assert_seqs_equal;
 
@@ -271,8 +265,6 @@ impl MimeClassifier {
 
                         return self.sniff_text_or_data(data);
                     }
-
-                    
 
                     proof {
                         SpecClassifier::lemma_mime_classify_browsing_after_step4_trace(
