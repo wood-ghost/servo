@@ -159,36 +159,13 @@ impl MimeClassifier {
                 reveal_strlit("application/xml");
                 reveal_strlit("text/html");
 
-                let supplied_mime_type = (*supplied_type)->Some_0;
-
-                let initial =
-                    SpecClassifier::MimeClassifierAutomaton::take_step::initialize(
-                        self,
-                        *supplied_type,
-                        no_sniff_flag,
-                        apache_bug_flag,
-                        data@,
-                    );
-
-
-                let final_state =
-                    SpecClassifier::MimeClassifierAutomaton::take_step::step1(initial);
-
-                SpecClassifier::MimeClassifierAutomaton::show::step1(
-                    initial,
-                    final_state,
-                );
-
-                let trace = seq![initial, final_state];
-
-                SpecClassifier::lemma_mime_classify_browsing_result_from_trace(
+                SpecClassifier::lemma_mime_classify_browsing_step1_result(
                     self,
                     no_sniff_flag,
                     apache_bug_flag,
                     supplied_type,
                     data@,
                     SpecMime::view(&supplied_type_or_octet_stream),
-                    trace,
                 ); 
             }
             return supplied_type_or_octet_stream;

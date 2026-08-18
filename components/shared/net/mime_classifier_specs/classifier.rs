@@ -754,6 +754,57 @@ pub(crate) open spec fn mime_classify_browsing_after_step4(
 // ------------------------------------
 // lemmas for state machine
 // ------------------------------------
+pub(crate) proof fn lemma_mime_classify_browsing_step1_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+)
+    requires
+        *supplied_type is Some,
+        is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0),
+        result == view(&supplied_type->Some_0),
+
+    ensures
+        mime_classify_browsing_result(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type,
+            data,
+            result,
+        ),
+{
+    let state0 =
+        MimeClassifierAutomaton::take_step::initialize(
+            classifier,
+            *supplied_type,
+            no_sniff_flag,
+            apache_bug_flag,
+            data,
+        );
+
+    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+
+    MimeClassifierAutomaton::show::step1(state0, state1);
+
+    let trace = seq![state0, state1];
+
+    assert(
+        mime_classify_browsing_result_from_trace(
+            classifier,
+            no_sniff_flag,
+            apache_bug_flag,
+            supplied_type,
+            data,
+            result,
+            trace,
+        )
+    );
+}
+
 pub(crate) proof fn lemma_mime_classify_browsing_none_result<'a>(
     classifier: &'a MimeClassifier,
     no_sniff_flag: NoSniffFlag,
