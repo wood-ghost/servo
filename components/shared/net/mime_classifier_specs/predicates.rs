@@ -88,6 +88,29 @@ pub open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
 }
 
+pub open spec fn is_javascript(mt: &Mime) -> bool {
+    essence_str(mt) == "application/javascript"@
+}
+
+pub open spec fn is_font(mt: &Mime) -> bool { //TODO:
+    essence_str(mt) == "font/woff"@
+        || essence_str(mt) == "font/woff2"@
+        || essence_str(mt) == "application/font-woff"@
+        || essence_str(mt) == "application/font-woff2"@
+}
+
+pub open spec fn is_json(mt: &Mime) -> bool { //TODO:
+    essence_str(mt) == "application/json"@
+}
+
+pub open spec fn is_text(mt: &Mime) -> bool { //TODO:
+    view(mt).type_ == text_name()
+}
+
+pub open spec fn is_css(mt: &Mime) -> bool { //TODO:
+    essence_str(mt) == "text/css"@
+}
+
 pub open spec fn is_explicit_unknown(mt: &Mime) -> bool {
     ||| essence_str(mt) == "application/unknown"@
     ||| essence_str(mt) == "unknown/unknown"@

@@ -125,8 +125,7 @@ impl MimeClassifier {
         data: &'a [u8],
     ) -> (result: Mime)
         requires
-            SpecClassifier::mime_classifier_validate_spec(self)
-            // SpecClassifier::classify_input_is_valid(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
+            SpecClassifier::mime_classifier_validate_spec(self),
         ensures
             // result == SpecClassifier::classify(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
             match context {
@@ -135,6 +134,14 @@ impl MimeClassifier {
                         self,
                         no_sniff_flag,
                         apache_bug_flag,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                // LoadContext::Image => true,
+                LoadContext::Image =>
+                    SpecClassifier::mime_classify_image_result(
+                        self,
                         supplied_type,
                         data@,
                         SpecMime::view(&result),
@@ -277,17 +284,33 @@ impl MimeClassifier {
                 },
             },
             LoadContext::Image => {
-                // Section 8.2 Sniffing an image context
+                let result =  self.image_classifier.classify(data)
+                    .unwrap_or(supplied_type_or_octet_stream);
+
+                proof {
+                    SpecClassifier::lemma_mime_classify_image_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    );
+                } 
+
+                // result
                 match MimeClassifier::maybe_get_media_type(supplied_type) {
                     Some(MediaType::Xml) => None,
                     _ => self.image_classifier.classify(data),
                 }
+                // self.image_classifier.classify(data)
                 .unwrap_or(supplied_type_or_octet_stream)
             },
             LoadContext::AudioVideo => {
                 // Section 8.3 Sniffing an image context
                 match MimeClassifier::maybe_get_media_type(supplied_type) {
-                    Some(MediaType::Xml) => None,
+                    Some(MediaType::Xml) => {
+                        assert(false);
+                        None
+                    },
                     _ => self.audio_video_classifier.classify(data),
                 }
                 .unwrap_or(supplied_type_or_octet_stream)
@@ -586,13 +609,7 @@ impl MimeClassifier {
     #[verifier::external_body] //TODO:
     pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
         ensures
-        !Spec::is_xml(mime) && !Spec::is_html(mime) ==> (
-            (result == Some(MediaType::Image))
-                == Spec::is_image(mime)
-            &&
-            (result == Some(MediaType::AudioVideo))
-                == Spec::is_audio_video(mime)
-        ),
+            SpecClassifier::get_media_type_spec(mime, result),
     {
         if MimeClassifier::is_xml(mime) {
             Some(MediaType::Xml)
@@ -617,7 +634,13 @@ impl MimeClassifier {
         }
     }
 
-    fn maybe_get_media_type(supplied_type: &Option<Mime>) -> Option<MediaType> {
+    fn maybe_get_media_type(supplied_type: &Option<Mime>) -> (result: Option<MediaType>) 
+        ensures
+            match supplied_type {
+                Some(mt) => SpecClassifier::get_media_type_spec(mt, result),
+                None => result == None,
+            },
+    {
         supplied_type
             .as_ref()
             .and_then(MimeClassifier::get_media_type)

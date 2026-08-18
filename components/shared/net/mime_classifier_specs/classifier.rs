@@ -30,6 +30,11 @@ use crate::mime_classifier_specs::predicates::{
     is_html,
     is_image,
     is_audio_video,
+    is_javascript,
+    is_font,
+    is_json,
+    is_text,
+    is_css,
     mime_essence_str_lemmas,
     is_explicit_unknown,
 };
@@ -202,6 +207,36 @@ pub(crate) proof fn lemma_mime_classifier_validate_spec(classifier: &MimeClassif
                     && classifier.font_classifier.validate_spec()
             ),
 {}
+
+pub open spec fn get_media_type_spec(
+    mime: &Mime, result: Option<MediaType>
+) -> bool {
+    &&& (result == Some(MediaType::Xml)) == is_xml(mime)
+    &&& (result == Some(MediaType::Html)) == (!is_xml(mime) && is_html(mime))
+    &&& (result == Some(MediaType::Image)) == (!is_xml(mime) && !is_html(mime) && is_image(mime))
+    &&& (result == Some(MediaType::AudioVideo)) == (!is_xml(mime) && !is_html(mime) 
+                                                    && !is_image(mime) && is_audio_video(mime))
+    &&& (result == Some(MediaType::JavaScript)) == (!is_xml(mime) && !is_html(mime) 
+                    && !is_image(mime) && !is_audio_video(mime) && is_javascript(mime))
+    &&& (result == Some(MediaType::Font)) == (!is_xml(mime) && !is_html(mime) 
+                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && is_font(mime))
+    &&& (result == Some(MediaType::Json)) == (!is_xml(mime) && !is_html(mime) 
+                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
+                    && is_json(mime))
+    &&& (result == Some(MediaType::Text)) == (!is_xml(mime) && !is_html(mime) 
+                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
+                    && !is_json(mime) && is_text(mime))
+    &&& (result == Some(MediaType::Css)) == (!is_xml(mime) && !is_html(mime) 
+                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
+                    && !is_json(mime) && !is_text(mime) && is_css(mime))
+    &&& !is_xml(mime) && !is_html(mime) == (
+                ((result == Some(MediaType::Image))
+                    == is_image(mime))
+                &&
+                ((result == Some(MediaType::AudioVideo))
+                    == is_audio_video(mime))
+            )
+}
 
 // ------------------------------------
 // MIME Classifier
@@ -1131,5 +1166,90 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
         }
     }
 }
+
+// ------------------------------------
+// Image Content Type Sniffing
+// ------------------------------------
+// To determine the computed MIME type of a resource with an image MIME type, execute the following 
+// rules for sniffing images specifically: 
+pub open spec fn sniff_image_context<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+) -> Option<MimeView> {
+    // 1. If the supplied MIME type is an XML MIME type, the computed MIME type is the supplied MIME type.
+    // Abort these steps.
+    // if supplied_type is Some && is_xml(&supplied_type->Some_0) {
+    if supplied_type is Some && (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { // Verus behavior
+        Some(view(&supplied_type->Some_0))
+    } else {
+        // 2. Let image-type-matched be the result of executing the image type pattern matching algorithm 
+        //    with the resource header as the byte sequence to be matched. 
+        let image_type_matched = classifier.image_type(data);
+        // 3. If image-type-matched is not undefined, the computed MIME type is image-type-matched
+        // Abort these steps.
+        match image_type_matched {
+            Some(mt) => Some(mt),
+            None => {
+                // 4. The computed MIME type is the supplied MIME type. 
+                option_view(supplied_type)
+            },
+        }
+    }
+}
+
+pub open spec fn mime_classify_image_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    // Based on Servo Behavior, we assume:
+    // If the supplied MIME type is undefined, the computed MIME type is "application/octet-stream". 
+    result == match sniff_image_context(classifier, supplied_type, data) {
+        Some(mt) => mt,
+        None => {
+            match supplied_type {
+                Some(mt) => view(mt),
+                None => application_octet_stream_identity(),
+            }
+        },
+    }
+}
+
+pub(crate) proof fn lemma_mime_classify_image_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+)
+    requires
+        match supplied_type {
+            Some(mt) => !is_xml(mt) && !is_html(mt),
+            None => true,
+        },
+    ensures
+        mime_classify_image_result(
+            classifier,
+            supplied_type,
+            data,
+            result,
+        )
+        ==
+        (
+            result ==
+                match image_type_pattern_matching_algo(classifier, data) {
+                    Some(mt) => mt,
+                    None => {
+                        match supplied_type {
+                            Some(mt) => view(mt),
+                            None => application_octet_stream_identity(),
+                        }
+                    },
+                }
+        ),
+{
+}
+        
 
 } // verus!

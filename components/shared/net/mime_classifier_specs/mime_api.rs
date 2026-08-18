@@ -18,7 +18,7 @@ pub struct MimeView {
 }
 
 pub uninterp spec fn view(mt: &Mime) -> MimeView;
-pub(crate) open spec fn option_view(value: &Option<Mime>) -> Option<MimeView> {
+pub open spec fn option_view(value: &Option<Mime>) -> Option<MimeView> {
     match value {
         Some(mt) => Some(view(mt)),
         None => None,
