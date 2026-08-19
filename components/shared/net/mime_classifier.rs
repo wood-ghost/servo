@@ -1708,6 +1708,7 @@ impl ByteMatcher {
             leading_ignore: b"\t\n\x0C\r ",
         }
     }
+
     // The string "%PDF-", the PDF signature.
     fn application_pdf() -> (r: ByteMatcher) 
         ensures Spec::is_application_pdf(&r)
@@ -1719,9 +1720,11 @@ impl ByteMatcher {
             leading_ignore: &[],
         }
     }
+
     // 34 bytes followed by the string "LP", the Embedded OpenType signature.
-    #[verifier::external_body]
-    fn application_vnd_ms_font_object() -> ByteMatcher {
+    fn application_vnd_ms_font_object() -> (r: ByteMatcher)
+        ensures Spec::is_application_vnd_ms_font_object(&r)
+    {
         ByteMatcher {
             pattern: b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
                        \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -1734,8 +1737,9 @@ impl ByteMatcher {
         }
     }
     // 4 bytes representing the version number 1.0, a TrueType signature.
-    #[verifier::external_body]
-    fn true_type() -> ByteMatcher {
+    fn true_type() -> (r: ByteMatcher) 
+        ensures Spec::is_true_type(&r)
+    {
         ByteMatcher {
             pattern: b"\x00\x01\x00\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1744,8 +1748,9 @@ impl ByteMatcher {
         }
     }
     // The string "OTTO", the OpenType signature.
-    #[verifier::external_body]
-    fn open_type() -> ByteMatcher {
+    fn open_type() -> (r: ByteMatcher) 
+        ensures Spec::is_open_type(&r)
+    {
         ByteMatcher {
             pattern: b"OTTO",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1754,8 +1759,9 @@ impl ByteMatcher {
         }
     }
     // The string "ttcf", the TrueType Collection signature.
-    #[verifier::external_body]
-    fn true_type_collection() -> ByteMatcher {
+    fn true_type_collection() -> (r: ByteMatcher) 
+        ensures Spec::is_true_type_collection(&r)
+    {
         ByteMatcher {
             pattern: b"ttcf",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1764,8 +1770,9 @@ impl ByteMatcher {
         }
     }
     // The string "wOFF", the Web Open Font Format signature.
-    #[verifier::external_body]
-    fn application_font_woff() -> ByteMatcher {
+    fn application_font_woff() -> (r: ByteMatcher) 
+        ensures Spec::is_application_font_woff(&r)
+    {
         ByteMatcher {
             pattern: b"wOFF",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1774,8 +1781,9 @@ impl ByteMatcher {
         }
     }
     // The GZIP archive signature.
-    #[verifier::external_body]
-    fn application_x_gzip() -> ByteMatcher {
+    fn application_x_gzip() -> (r: ByteMatcher) 
+        ensures Spec::is_application_x_gzip(&r)
+    {
         ByteMatcher {
             pattern: b"\x1F\x8B\x08",
             mask: b"\xFF\xFF\xFF",
@@ -1784,8 +1792,9 @@ impl ByteMatcher {
         }
     }
     // The string "PK" followed by ETX EOT, the ZIP archive signature.
-    #[verifier::external_body]
-    fn application_zip() -> ByteMatcher {
+    fn application_zip() -> (r: ByteMatcher) 
+        ensures Spec::is_application_zip(&r)
+    {
         ByteMatcher {
             pattern: b"PK\x03\x04",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1794,8 +1803,9 @@ impl ByteMatcher {
         }
     }
     // The string "Rar " followed by SUB BEL NUL, the RAR archive signature.
-    #[verifier::external_body]
-    fn application_x_rar_compressed() -> ByteMatcher {
+    fn application_x_rar_compressed() -> (r: ByteMatcher) 
+        ensures Spec::is_application_x_rar_compressed(&r)
+    {
         ByteMatcher {
             pattern: b"Rar \x1A\x07\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
