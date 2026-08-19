@@ -1814,8 +1814,9 @@ impl ByteMatcher {
         }
     }
     // The string "%!PS-Adobe-", the PostScript signature.
-    #[verifier::external_body]
-    fn application_postscript() -> ByteMatcher {
+    fn application_postscript() -> (r: ByteMatcher)
+        ensures Spec::is_application_postscript(&r)
+    {
         ByteMatcher {
             pattern: b"%!PS-Adobe-",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1824,8 +1825,9 @@ impl ByteMatcher {
         }
     }
     // UTF-16BE BOM
-    #[verifier::external_body]
-    fn text_plain_utf_16be_bom() -> ByteMatcher {
+    fn text_plain_utf_16be_bom() -> (r: ByteMatcher)
+        ensures Spec::is_text_plain_utf_16be_bom(&r)
+    {
         ByteMatcher {
             pattern: b"\xFE\xFF\x00\x00",
             mask: b"\xFF\xFF\x00\x00",
@@ -1834,8 +1836,9 @@ impl ByteMatcher {
         }
     }
     // UTF-16LE BOM
-    #[verifier::external_body]
-    fn text_plain_utf_16le_bom() -> ByteMatcher {
+    fn text_plain_utf_16le_bom() -> (r: ByteMatcher)
+        ensures Spec::is_text_plain_utf_16le_bom(&r)
+    {
         ByteMatcher {
             pattern: b"\xFF\xFE\x00\x00",
             mask: b"\xFF\xFF\x00\x00",
@@ -1844,8 +1847,9 @@ impl ByteMatcher {
         }
     }
     // UTF-8 BOM
-    #[verifier::external_body]
-    fn text_plain_utf_8_bom() -> ByteMatcher {
+    fn text_plain_utf_8_bom() -> (r: ByteMatcher)
+        ensures Spec::is_text_plain_utf_8_bom(&r)
+    {
         ByteMatcher {
             pattern: b"\xEF\xBB\xBF\x00",
             mask: b"\xFF\xFF\xFF\x00",

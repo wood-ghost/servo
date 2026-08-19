@@ -650,13 +650,37 @@ pub(crate) open spec fn is_application_x_rar_compressed(bm: &ByteMatcher) -> boo
 
 
 // https://mimesniff.spec.whatwg.org/#identifying-a-resource-with-an-unknown-mime-type
-// | Byte Pattern                  | Pattern Mask                  | Leading Bytes Ignored | Computed MIME Type     |
-// |-------------------------------|-------------------------------|-----------------------|------------------------|
-// | 25 21 50 53 2D 41 64 6F 62 65 | FF FF FF FF FF FF FF FF FF FF |                       |                        |
-// | 2D                            | FF                            | None                  | application/postscript |
-// | FE FF 00 00                   | FF FF 00 00                   | None                  | text/plain             |
-// | FF FE 00 00                   | FF FF 00 00                   | None                  | text/plain             |
-// | EF BB BF 00                   | FF FF FF 00                   | None                  | text/plain             |
+// | Byte Pattern       | Pattern Mask       | Leading Bytes Ignored | Computed MIME Type     |
+// |--------------------|--------------------|-----------------------|------------------------|
+// | 25 21 50 53 2D 41  | FF FF FF FF FF FF  | None                  |                        |
+// | 64 6F 62 65 2D     | FF FF FF FF FF     | None                  | application/postscript |
+pub(crate) open spec fn is_application_postscript(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\x25\x21\x50\x53\x2D\x41\x64\x6F\x62\x65\x2D"@
+    &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"@
+    &&& bm.leading_ignore@ == &[]@
+    &&& essence_str(&bm.content_type) == "application/postscript"@
+}
+// | FE FF 00 00        | FF FF 00 00        | None                  | text/plain             |
+pub(crate) open spec fn is_text_plain_utf_16be_bom(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\xFE\xFF\x00\x00"@
+    &&& bm.mask@ == b"\xFF\xFF\x00\x00"@
+    &&& bm.leading_ignore@ == &[]@
+    &&& essence_str(&bm.content_type) == "text/plain"@
+}
+// | FF FE 00 00        | FF FF 00 00        | None                  | text/plain             |
+pub(crate) open spec fn is_text_plain_utf_16le_bom(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\xFF\xFE\x00\x00"@
+    &&& bm.mask@ == b"\xFF\xFF\x00\x00"@
+    &&& bm.leading_ignore@ == &[]@
+    &&& essence_str(&bm.content_type) == "text/plain"@
+}
+// | EF BB BF 00        | FF FF FF 00        | None                  | text/plain             |
+pub(crate) open spec fn is_text_plain_utf_8_bom(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\xEF\xBB\xBF\x00"@
+    &&& bm.mask@ == b"\xFF\xFF\xFF\x00"@
+    &&& bm.leading_ignore@ == &[]@
+    &&& essence_str(&bm.content_type) == "text/plain"@
+}
 
 define_mime_essence_lemmas! {
     mime_essence_str_lemmas {
