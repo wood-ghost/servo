@@ -144,6 +144,16 @@ pub open spec fn application_octet_stream_identity() -> MimeView {
     }
 }
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#781
+// APPLICATION_PDF, "application/pdf", 11;
+pub open spec fn application_pdf_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "pdf"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 
 pub uninterp spec fn video_mp4_identity() -> MimeView;
 pub uninterp spec fn text_css() -> MimeView;
@@ -288,6 +298,11 @@ pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mim
         view(&result) == application_octet_stream_identity(),
 ;
 
+pub(crate) assume_specification [mime::APPLICATION_PDF] -> (result: Mime)
+    ensures
+        view(&result) == application_pdf_identity(),
+;
+
 pub(crate) assume_specification [mime::TEXT_CSS] -> (result: Mime)
     ensures
         view(&result) == text_css(),
@@ -367,6 +382,11 @@ pub assume_specification [mime::JSON] -> (result: Name<'static>)
 pub assume_specification [mime::FONT] -> (result: Name<'static>)
     ensures
         name_identity(&result) == font_name(),
+;
+
+pub assume_specification [mime::TEXT_XML] -> (result: Mime)
+    ensures
+        view(&result) == text_xml_identity(),
 ;
 
 // Mime

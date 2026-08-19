@@ -229,13 +229,13 @@ pub open spec fn get_media_type_spec(
     &&& (result == Some(MediaType::Css)) == (!is_xml(mime) && !is_html(mime) 
                     && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
                     && !is_json(mime) && !is_text(mime) && is_css(mime))
-    &&& !is_xml(mime) && !is_html(mime) == (
-                ((result == Some(MediaType::Image))
-                    == is_image(mime))
-                &&
-                ((result == Some(MediaType::AudioVideo))
-                    == is_audio_video(mime))
-            )
+    // &&& !is_xml(mime) && !is_html(mime) == (
+    //             ((result == Some(MediaType::Image))
+    //                 == is_image(mime))
+    //             &&
+    //             ((result == Some(MediaType::AudioVideo))
+    //                 == is_audio_video(mime))
+    //         )
 }
 
 // ------------------------------------

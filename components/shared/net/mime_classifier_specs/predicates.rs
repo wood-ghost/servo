@@ -2,7 +2,10 @@ use mime::Mime;
 use vstd::prelude::*;
 use vstd::assert_seqs_equal;
 
-use crate::mime_classifier::ByteMatcher;
+use crate::mime_classifier::{
+    ByteMatcher,
+    TagTerminatedByteMatcher,
+};
 use super::mime_api::*;
 
 macro_rules! define_mime_essence_lemmas {
@@ -86,6 +89,53 @@ pub open spec fn is_html(mt: &Mime) -> bool {
 
 pub open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
+}
+
+pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
+    ensures
+        #[trigger] is_image(mt) ==> !is_audio_video(mt),
+        #[trigger] is_audio_video(mt) ==> !is_image(mt),
+{
+    reveal_strlit("image");
+    reveal_strlit("audio");
+    reveal_strlit("video");
+    reveal_strlit("/");
+    reveal_strlit("application/ogg");
+
+    assert("image"@ != "audio"@) by {
+        if "image"@ == "audio"@ {
+            assert("image"@[0] == "audio"@[0]);
+            assert(false);
+        }
+    }
+
+    assert("image"@ != "video"@) by {
+        if "image"@ == "video"@ {
+            assert("image"@[0] == "video"@[0]);
+            assert(false);
+        }
+    }
+
+    if is_image(mt) {
+        assert(!essence_is_application_ogg(mt)) by {
+            if essence_is_application_ogg(mt) {
+                assert(
+                    (view(mt).type_ + "/"@ + view(mt).subtype)[0]
+                        == "application/ogg"@[0]
+                );
+
+                assert(false);
+            }
+        }
+
+        assert(!is_audio_video(mt));
+    }
+
+    if is_audio_video(mt) {
+        if is_image(mt) {
+            assert(false);
+        }
+    }
 }
 
 pub open spec fn is_javascript(mt: &Mime) -> bool {
@@ -190,27 +240,111 @@ pub(crate) open spec fn is_image_jpeg(bm: &ByteMatcher) -> bool {
 }
 
 // https://mimesniff.spec.whatwg.org/#signature-for-webm
+pub open spec fn webm_scan(sequence: Seq<u8>, iter: nat) -> bool {
+    webm_scan_fuel(sequence, iter, 38)
+}
+
+pub open spec fn webm_scan_fuel(sequence: Seq<u8>, iter: nat, fuel: nat,) -> bool
+    decreases fuel
+{
+    // 6. While iter is less than length and iter is less than 38, continuously 
+    //    loop through these steps: 
+    if fuel == 0 || iter >= sequence.len() || iter >= 38 {
+        // 7. Return false. 
+        false
+    } else if
+        // 6.1 If the two bytes from sequence[iter] to sequence[iter + 1] are equal to 0x42 0x82
+        iter + 1 < sequence.len()
+        && sequence[iter as int] == 0x42u8
+        && sequence[(iter + 1) as int] == 0x82u8
+    {
+        // 6.1.1 Increment iter by 2. 
+        let iter1 = iter + 2;
+        // 6.1.2 If iter is greater or equal than length, abort these steps. 
+        if iter1 >= sequence.len() {
+            // 6.2 Increment iter by 1. 
+            webm_scan_fuel(sequence, iter1 + 1, (fuel - 1) as nat)
+        } else {
+            // 6.1.3 Let number size be the result of parsing a vint starting at sequence[iter]. 
+            let number_size = parse_vint_number_size(sequence, iter1 as int);
+            // 6.1.4 Increment iter by number size. 
+            let iter2 = iter1 + number_size;
+            // 6.1.5 If iter is greater than or equal to length - 4, abort these steps. 
+            if iter2 >= sequence.len() - 4 {
+                // 6.2 Increment iter by 1. 
+                webm_scan_fuel(sequence, iter2 + 1, (fuel - 1) as nat)
+            // 6.1.6 Let matched be the result of matching a padded sequence 
+            //       0x77 0x65 0x62 0x6D ("webm") on sequence at offset iter. 
+            } else if padded_webm_match(sequence, iter2 as int, sequence.len() as int - 1) {
+                // 6.1.7 If matched is true, abort these steps and return true.  
+                true
+            } else {
+                // Step 6.2
+                webm_scan_fuel(sequence, iter2 + 1, (fuel - 1) as nat)
+            }
+        }
+    } else {
+        // 6.2 Increment iter by 1. 
+        webm_scan_fuel(sequence, iter + 1, (fuel - 1) as nat)
+    }
+}
+
+// https://mimesniff.spec.whatwg.org/#matching-a-padded-sequence
+pub open spec fn padded_webm_match(
+    sequence: Seq<u8>,
+    offset: int,
+    end: int,
+) -> bool {
+    // Matching a padded sequence pattern on a sequence sequence at starting at byte offset 
+    // and ending at by end means returning true 
+    &&& 0 <= offset <= end
+    // if sequence has a length greater than end, 
+    &&& end < sequence.len()
+
+    // and contains exactly, in the range [offset, end], the bytes in pattern, in the same order, 
+    &&& exists |start: int| #![trigger sequence[start]]
+        offset <= start <= end
+        // eventually preceded by bytes with a value of 0x00, false otherwise. 
+        && (forall |i: int|
+            offset <= i < start ==>
+                #[trigger] sequence[i] == 0x00u8)
+        // "webm"
+        && sequence[start]     == 0x77u8
+        && sequence[start + 1] == 0x65u8
+        && sequence[start + 2] == 0x62u8
+        && sequence[start + 3] == 0x6Du8
+}
+
+// https://mimesniff.spec.whatwg.org/#parse-a-vint
+// FIXME: Iter and index are ambiguous in the specification.  
+// pub(crate) uninterp spec fn parse_vint(sequence: Seq<u8>, iter: int) -> Option<(nat, nat)>; 
+pub uninterp spec fn parse_vint_number_size(sequence: Seq<u8>, iter: int) -> nat;
+
 pub(crate) open spec fn is_video_webm(bm: &ByteMatcher) -> bool {
     &&& bm.leading_ignore@ == &[]@
     &&& essence_str(&bm.content_type) == "video/webm"@
-    // If length is less than 4, return false. 
-    &&& (bm.pattern@.len() < 4) ==> false
-    // If the four bytes from sequence[0] to sequence[3], are not equal to 0x1A 0x45 0xDF 0xA3, return false. 
-    &&& (bm.pattern@.len() == 4) ==> (
-        (bm.pattern@ == b"\x1A\x45\xDF\xA3"@) 
-        && bm.mask@ == b"\xFF\xFF\xFF\xFF"@
-    )
-    // ...
+    // 3. If length is less than 4, return false. 
+    &&& bm.pattern@.len() >= 4 
+    // 4. If the four bytes from sequence[0] to sequence[3], are not equal to 
+    //    0x1A 0x45 0xDF 0xA3, return false. 
+    &&& bm.pattern@[0] == 0x1Au8
+    &&& bm.pattern@[1] == 0x45u8
+    &&& bm.pattern@[2] == 0xDFu8
+    &&& bm.pattern@[3] == 0xA3u8
+    // 5. Let iter be 4. webm_scan
+    &&& (bm.pattern@.len() > 4) ==> webm_scan(bm.pattern@, 4)
+    // only for current servo implementation
+    &&& (bm.pattern@.len() == 4) ==> bm.mask@ == b"\xFF\xFF\xFF\xFF"@
 }
 
 // https://mimesniff.spec.whatwg.org/#matching-an-audio-or-video-type-pattern
 //
-// | Byte Pattern                              | Pattern Mask                             | Leading Bytes Ignored | Audio or Video MIME Type |
-// |-------------------------------------------|------------------------------------------|-----------------------|--------------------------|
+// | Byte Pattern   | Pattern Mask    | Leading Bytes Ignored | Audio or Video MIME Type |
+// |----------------|-----------------|-----------------------|--------------------------|
 
 // https://whatpr.org/mimesniff/36/74065de...3f70580.html#matching-an-audio-or-video-type-pattern
 // FIXME: deprecated
-// | 2E 73 6E 64                               | FF FF FF FF                              | None                  | audio/basic              |
+// | 2E 73 6E 64    | FF FF FF FF     | None                  | audio/basic              |
 pub(crate) open spec fn is_audio_basic(bm: &ByteMatcher) -> bool {
     &&& bm.pattern@ == b"\x2E\x73\x6E\x64"@
     &&& bm.mask@ == b"\xFF\xFF\xFF\xFF"@
@@ -218,7 +352,7 @@ pub(crate) open spec fn is_audio_basic(bm: &ByteMatcher) -> bool {
     &&& essence_str(&bm.content_type) == "audio/basic"@
 }
 
-// | 46 4F 52 4D 00 00 00 00 41 49 46 46       | FF FF FF FF 00 00 00 00 FF FF FF FF      | None                  | audio/aiff               |
+// | 46 4F 52 4D 00 00 00 00 41 49 46 46 | FF FF FF FF 00 00 00 00 FF FF FF FF | None | audio/aiff |
 pub(crate) open spec fn is_audio_aiff(bm: &ByteMatcher) -> bool {
     &&& bm.pattern@ == b"\x46\x4F\x52\x4D\x00\x00\x00\x00\x41\x49\x46\x46"@
     &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF"@
@@ -226,7 +360,7 @@ pub(crate) open spec fn is_audio_aiff(bm: &ByteMatcher) -> bool {
     &&& essence_str(&bm.content_type) == "audio/aiff"@
 }
 
-// | 49 44 33                                  | FF FF FF                                 | None                  | audio/mpeg               |
+// | 49 44 33        | FF FF FF      | None                  | audio/mpeg               |
 pub(crate) open spec fn is_audio_mpeg(bm: &ByteMatcher) -> bool {
     &&& bm.pattern@ == b"\x49\x44\x33"@
     &&& bm.mask@ == b"\xFF\xFF\xFF"@
@@ -234,7 +368,7 @@ pub(crate) open spec fn is_audio_mpeg(bm: &ByteMatcher) -> bool {
     &&& essence_str(&bm.content_type) == "audio/mpeg"@
 }
 
-// | 4F 67 67 53 00                            | FF FF FF FF FF                           | None                  | application/ogg          |
+// | 4F 67 67 53 00  | FF FF FF FF FF | None                  | application/ogg          |
 pub(crate) open spec fn is_application_ogg(bm: &ByteMatcher) -> bool {
     &&& bm.pattern@ == b"\x4F\x67\x67\x53\x00"@
     &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\xFF"@
@@ -265,29 +399,173 @@ pub(crate) open spec fn is_audio_wave(bm: &ByteMatcher) -> bool {
     &&& essence_str(&bm.content_type) == "audio/wave"@
 }
 
+// https://mimesniff.spec.whatwg.org/#whitespace-byte
+pub open spec fn contains_byte(bytes: Seq<u8>, byte: u8) -> bool {
+    exists |i: int| 0 <= i < bytes.len() && #[trigger] bytes[i] == byte
+}
+
+// A whitespace byte (abbreviated 0xWS) is any one of the following bytes: 
+// 0x09 (HT), 0x0A (LF), 0x0C (FF), 0x0D (CR), 0x20 (SP). 
+pub open spec fn contains_all_whitespace(leading_ignore: Seq<u8>) -> bool {
+    &&& leading_ignore.len() == 5
+    &&& contains_byte(leading_ignore, 0x09u8) // HT  \t
+    &&& contains_byte(leading_ignore, 0x0Au8) // LF  \n
+    &&& contains_byte(leading_ignore, 0x0Cu8) // FF
+    &&& contains_byte(leading_ignore, 0x0Du8) // CR  \r
+    &&& contains_byte(leading_ignore, 0x20u8) // SP
+}
+
+pub(crate) broadcast proof fn lemma_contains_all_whitespace(bstr: Seq<u8>)
+    requires
+        bstr == b"\t\n\x0C\r "@,
+    ensures
+        #[trigger] contains_all_whitespace(bstr),
+{
+    reveal_byteslit(b"\t\n\x0C\r ");
+}
+
+pub(crate) broadcast group whitespace_lemmas {
+    lemma_contains_all_whitespace,
+}
+
 // https://mimesniff.spec.whatwg.org/#identifying-a-resource-with-an-unknown-mime-type
-//
+// A tag-terminating byte (abbreviated 0xTT) is any one of the following bytes: 0x20 (SP), 0x3E (">"). 
 // | Byte Pattern            | Pattern Mask            | Leading Bytes Ignored | Computed MIME Type |
 // |------------------------------------------------|------------------------------------------------|-----------------------|--------------------|
 // | 3C 21 44 4F 43 54 59 50 45 20 48 54 4D 4C TT | FF FF DF DF DF DF DF DF DF FF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_doctype(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x21\x44\x4F\x43\x54\x59\x50\x45\x20\x48\x54\x4D\x4C"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xFF\xDF\xDF\xDF\xDF\xDF\xDF\xDF\xFF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
+
 // | 3C 48 54 4D 4C TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_page(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x48\x54\x4D\x4C"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 48 45 41 44 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_head(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x48\x45\x41\x44"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 53 43 52 49 50 54 TT | FF DF DF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_script(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x53\x43\x52\x49\x50\x54"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 49 46 52 41 4D 45 TT | FF DF DF DF DF DF DF FF | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_iframe(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x49\x46\x52\x41\x4D\x45"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 48 31 TT             | FF DF FF FF             | Whitespace bytes      | `text/html`        |
+pub (crate) open spec fn is_text_html_h1(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x48\x31"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xFF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 44 49 56 TT          | FF DF DF DF FF          | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_div(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x44\x49\x56"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 46 4F 4E 54 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_font(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x46\x4F\x4E\x54"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 54 41 42 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_table(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x54\x41\x42\x4C\x45"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 41 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_a(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x41"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 53 54 59 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_style(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x53\x54\x59\x4C\x45"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 54 49 54 4C 45 TT    | FF DF DF DF DF DF FF    | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_title(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x54\x49\x54\x4C\x45"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 42 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_b(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x42"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 42 4F 44 59 TT       | FF DF DF DF DF FF       | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_body(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x42\x4F\x44\x59"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 42 52 TT             | FF DF DF FF             | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_br(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x42\x52"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 50 TT                | FF DF FF                | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_p(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x50"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xDF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 21 2D 2D TT          | FF FF FF FF FF          | Whitespace bytes      | `text/html`        |
+pub(crate) open spec fn is_text_html_comment(ttbm: &TagTerminatedByteMatcher) -> bool {
+    &&& ttbm.matcher.pattern@ == b"\x3C\x21\x2D\x2D"@
+    &&& ttbm.matcher.mask@ == b"\xFF\xFF\xFF\xFF"@
+    &&& contains_all_whitespace(ttbm.matcher.leading_ignore@)
+    &&& essence_str(&ttbm.matcher.content_type) == "text/html"@
+}
 // | 3C 3F 78 6D 6C          | FF FF FF FF FF          | Whitespace bytes      | `text/xml`         |
+pub(crate) open spec fn is_text_xml(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\x3C\x3F\x78\x6D\x6C"@
+    &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\xFF"@
+    &&& bm.leading_ignore@ == b"\t\n\x0C\r "@
+    &&& essence_str(&bm.content_type) == "text/xml"@
+}
 // | 25 50 44 46 2D          | FF FF FF FF FF          | None                  | `application/pdf`  |
+pub(crate) open spec fn is_application_pdf(bm: &ByteMatcher) -> bool {
+    &&& bm.pattern@ == b"\x25\x50\x44\x46\x2D"@
+    &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\xFF"@
+    &&& bm.leading_ignore@ == &[]@
+    &&& essence_str(&bm.content_type) == "application/pdf"@
+}
 
 
 define_mime_essence_lemmas! {
@@ -302,9 +580,9 @@ define_mime_essence_lemmas! {
 
         lemma_text_html_essence_str => ("text", "html"),
 
-        lemma_text_plain_essence_str => ("text", "plain"),
+        lemma_text_xml_essence_str => ("text", "xml"),
 
-        // lemma_text_xml_essence_str => ("text", "xml"),
+        lemma_text_plain_essence_str => ("text", "plain"),
 
         lemma_application_xml_essence_str => ("application", "xml"),
 
@@ -317,6 +595,8 @@ define_mime_essence_lemmas! {
         lemma_application_unknown_essence_str => ("application", "unknown"),
 
         lemma_star_star_essence_str => ("*", "*"),
+
+        lemma_application_ogg_essence_str => ("application", "ogg"),
     }
 }
 

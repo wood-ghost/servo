@@ -27,6 +27,8 @@ verus! {
 
 broadcast use {
     Spec::mime_essence_str_lemmas,
+    Spec::lemma_image_audio_video_disjoint,
+    Spec::whitespace_lemmas,
     SpecFlag::group_flag_partial_eq_axioms,
 };
 
@@ -553,7 +555,11 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
-    pub fn is_javascript(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    pub fn is_javascript(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_javascript(mt),
+    {
         (mt.type_() == mime::APPLICATION &&
             (["ecmascript", "javascript", "x-ecmascript", "x-javascript"]
                 .contains(&mt.subtype().as_str()))) ||
@@ -576,14 +582,22 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#json-mime-type>
-    pub fn is_json(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    pub fn is_json(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_json(mt),
+    {
         mt.suffix() == Some(mime::JSON) ||
             mt.essence_str() == "application/json" ||
             mt.essence_str() == "text/json"
     }
 
     /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
-    fn is_font(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    fn is_font(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_font(mt),
+    {
         mt.type_() == mime::FONT ||
             (mt.type_() == mime::APPLICATION &&
                 ([
@@ -598,15 +612,23 @@ impl MimeClassifier {
                 .contains(&mt.subtype().as_str())))
     }
 
-    fn is_text(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    fn is_text(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_text(mt),
+    {
         *mt == mime::TEXT_PLAIN || mt.essence_str() == "text/vtt"
     }
 
-    pub fn is_css(mt: &Mime) -> bool {
+    #[verifier::external_body] //TODO:
+    pub fn is_css(mt: &Mime) -> (result: bool)
+        ensures
+            result == Spec::is_css(mt),
+    {
         mt.essence_str() == "text/css"
     }
 
-    #[verifier::external_body] //TODO:
+    // #[verifier::external_body] //TODO:
     pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
         ensures
             SpecClassifier::get_media_type_spec(mime, result),
@@ -1351,6 +1373,7 @@ impl ByteMatcher {
     fn video_webm() -> (r: ByteMatcher) 
         ensures Spec::is_video_webm(&r)
     {
+        proof { reveal_byteslit(b"\x1A\x45\xDF\xA3"); }
         ByteMatcher {
             pattern: b"\x1A\x45\xDF\xA3",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1437,7 +1460,9 @@ impl ByteMatcher {
         }
     }
     // doctype terminated with Tag terminating (TT) Byte
-    fn text_html_doctype() -> TagTerminatedByteMatcher {
+    fn text_html_doctype() -> (r: TagTerminatedByteMatcher)
+        ensures Spec::is_text_html_doctype(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<!DOCTYPE HTML",
@@ -1449,8 +1474,9 @@ impl ByteMatcher {
     }
 
     // HTML terminated with Tag terminating (TT) Byte: 0x20 (SP)
-    #[verifier::external_body]
-    fn text_html_page() -> TagTerminatedByteMatcher {
+    fn text_html_page() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_page(&r)
+    { 
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<HTML",
@@ -1462,8 +1488,9 @@ impl ByteMatcher {
     }
 
     // head terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_head() -> TagTerminatedByteMatcher {
+    fn text_html_head() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_head(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<HEAD",
@@ -1475,8 +1502,9 @@ impl ByteMatcher {
     }
 
     // script terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_script() -> TagTerminatedByteMatcher {
+    fn text_html_script() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_script(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<SCRIPT",
@@ -1488,8 +1516,9 @@ impl ByteMatcher {
     }
 
     // iframe terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_iframe() -> TagTerminatedByteMatcher {
+    fn text_html_iframe() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_iframe(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<IFRAME",
@@ -1501,8 +1530,9 @@ impl ByteMatcher {
     }
 
     // h1 terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_h1() -> TagTerminatedByteMatcher {
+    fn text_html_h1() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_h1(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<H1",
@@ -1514,8 +1544,9 @@ impl ByteMatcher {
     }
 
     // div terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_div() -> TagTerminatedByteMatcher {
+    fn text_html_div() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_div(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<DIV",
@@ -1527,8 +1558,9 @@ impl ByteMatcher {
     }
 
     // font terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_font() -> TagTerminatedByteMatcher {
+    fn text_html_font() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_font(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<FONT",
@@ -1540,8 +1572,9 @@ impl ByteMatcher {
     }
 
     // table terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_table() -> TagTerminatedByteMatcher {
+    fn text_html_table() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_table(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<TABLE",
@@ -1553,8 +1586,9 @@ impl ByteMatcher {
     }
 
     // a terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_a() -> TagTerminatedByteMatcher {
+    fn text_html_a() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_a(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<A",
@@ -1566,8 +1600,9 @@ impl ByteMatcher {
     }
 
     // style terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_style() -> TagTerminatedByteMatcher {
+    fn text_html_style() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_style(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<STYLE",
@@ -1579,8 +1614,9 @@ impl ByteMatcher {
     }
 
     // title terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_title() -> TagTerminatedByteMatcher {
+    fn text_html_title() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_title(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<TITLE",
@@ -1592,8 +1628,9 @@ impl ByteMatcher {
     }
 
     // b terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_b() -> TagTerminatedByteMatcher {
+    fn text_html_b() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_b(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<B",
@@ -1605,8 +1642,9 @@ impl ByteMatcher {
     }
 
     // body terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_body() -> TagTerminatedByteMatcher {
+    fn text_html_body() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_body(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<BODY",
@@ -1618,8 +1656,9 @@ impl ByteMatcher {
     }
 
     // br terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_br() -> TagTerminatedByteMatcher {
+    fn text_html_br() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_br(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<BR",
@@ -1631,8 +1670,9 @@ impl ByteMatcher {
     }
 
     // p terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_p() -> TagTerminatedByteMatcher {
+    fn text_html_p() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_p(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<P",
@@ -1644,8 +1684,9 @@ impl ByteMatcher {
     }
 
     // comment terminated with Tag Terminating (TT) Byte
-    #[verifier::external_body]
-    fn text_html_comment() -> TagTerminatedByteMatcher {
+    fn text_html_comment() -> (r: TagTerminatedByteMatcher) 
+        ensures Spec::is_text_html_comment(&r)
+    {
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<!--",
@@ -1657,8 +1698,9 @@ impl ByteMatcher {
     }
 
     // The string "<?xml".
-    #[verifier::external_body]
-    fn text_xml() -> ByteMatcher {
+    fn text_xml() -> (r: ByteMatcher) 
+        ensures Spec::is_text_xml(&r)
+    {
         ByteMatcher {
             pattern: b"<?xml",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1667,8 +1709,9 @@ impl ByteMatcher {
         }
     }
     // The string "%PDF-", the PDF signature.
-    #[verifier::external_body]
-    fn application_pdf() -> ByteMatcher {
+    fn application_pdf() -> (r: ByteMatcher) 
+        ensures Spec::is_application_pdf(&r)
+    {
         ByteMatcher {
             pattern: b"%PDF-",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
