@@ -208,17 +208,29 @@ impl FromStrSpecImpl for Mime {
             essence_str(&result->Ok_0) == input
         })
         // hardcode
-        &&& result is Ok
-        // &&& (input == "image/x-icon"@) ==> result is Ok
-        // &&& (input == "image/webp"@) ==> result is Ok
-        // &&& (input == "video/webm"@) ==> result is Ok
-        // &&& (input == "audio/basic"@) ==> result is Ok
-        // &&& (input == "audio/aiff"@) ==> result is Ok
-        // &&& (input == "audio/mpeg"@) ==> result is Ok
-        // &&& (input == "application/ogg"@) ==> result is Ok
-        // &&& (input == "audio/midi"@) ==> result is Ok
-        // &&& (input == "video/avi"@) ==> result is Ok
-        // &&& (input == "audio/wave"@) ==> result is Ok
+        // &&& result is Ok
+        &&& (input == "image/x-icon"@) ==> result is Ok
+        &&& (input == "image/webp"@) ==> result is Ok
+        &&& (input == "video/webm"@) ==> result is Ok
+        &&& (input == "audio/basic"@) ==> result is Ok
+        &&& (input == "audio/aiff"@) ==> result is Ok
+        &&& (input == "audio/mpeg"@) ==> result is Ok
+        &&& (input == "application/ogg"@) ==> result is Ok
+        &&& (input == "audio/midi"@) ==> result is Ok
+        &&& (input == "video/avi"@) ==> result is Ok
+        &&& (input == "audio/wave"@) ==> result is Ok
+
+        &&& (input == "application/postscript"@) ==> result is Ok
+        &&& (input == "application/x-gzip"@) ==> result is Ok
+        &&& (input == "application/zip"@) ==> result is Ok
+        &&& (input == "application/x-rar-compressed"@) ==> result is Ok
+        &&& (input == "application/font-woff"@) ==> result is Ok
+        &&& (input == "application/font-sfnt"@) ==> result is Ok
+        &&& (input == "application/vnd.ms-fontobject"@) ==> result is Ok
+        &&& (input == "video/mp4"@) ==> result is Ok
+        &&& (input == "text/vtt"@) ==> result is Ok
+        &&& (input == "text/cache-manifest"@) ==> result is Ok
+
         &&& input == "video/mp4"@ ==> view(&result->Ok_0) == video_mp4_identity()
     } 
 }

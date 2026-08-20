@@ -45,7 +45,61 @@ macro_rules! define_mime_essence_lemmas {
     };
 }
 
+macro_rules! define_mime_essence_parts_lemmas {
+    (
+        $group_name:ident {
+            $(
+                $lemma_name:ident => ($type_:literal, $subtype:literal, $subtype_start:literal)
+            ),* $(,)?
+        }
+    ) => {
+        verus! {
+            $(
+                pub(crate) broadcast proof fn $lemma_name(mt: &Mime)
+                    ensures
+                        (#[trigger] essence_str(mt) == (concat!($type_, "/", $subtype))@) ==
+                        (view(mt).type_ == ($type_)@ && view(mt).subtype == ($subtype)@),
+                {
+                    reveal_strlit($type_);
+                    reveal_strlit("/");
+                    reveal_strlit($subtype);
+                    reveal_strlit(concat!($type_, "/", $subtype));
 
+                    let type_ = view(mt).type_;
+                    let subtype = view(mt).subtype;
+
+                    assert(($type_)@.len() as int + 1 == $subtype_start as int);
+
+                    // Forward: components imply essence.
+                    if type_ == ($type_)@ && subtype == ($subtype)@ {
+                        assert(essence_str(mt) == (concat!($type_, "/", $subtype))@);
+                    }
+
+                    // Backward: essence implies components.
+                    if essence_str(mt) == (concat!($type_, "/", $subtype))@ {
+                        assert(essence_str(mt)[type_.len() as int] == '/');
+
+                        assert_seqs_equal!(type_ == ($type_)@, i => {
+                                assert(essence_str(mt)[i] == type_[i]);
+                            }
+                        );
+
+                        assert_seqs_equal!(subtype == ($subtype)@, i => {
+                                assert(essence_str(mt)[$subtype_start as int + i] == subtype[i]);
+                            }
+                        );
+                    }
+                }
+            )*
+
+            pub(crate) broadcast group $group_name {
+                $(
+                    $lemma_name,
+                )*
+            }
+        }
+    };
+}
 
 verus! {
 
@@ -166,6 +220,7 @@ pub open spec fn is_explicit_unknown(mt: &Mime) -> bool {
     ||| essence_str(mt) == "unknown/unknown"@
     ||| essence_str(mt) == "*/*"@
 }
+
 // ----------------------------
 // check hard coded byte matchers
 // ----------------------------
@@ -698,6 +753,10 @@ define_mime_essence_lemmas! {
 
         lemma_text_plain_essence_str => ("text", "plain"),
 
+        lemma_text_css_essence_str => ("text", "css"),
+
+        lemma_text_vtt_essence_str => ("text", "vtt"),
+
         lemma_application_xml_essence_str => ("application", "xml"),
 
         lemma_application_pdf_essence_str => ("application", "pdf"),
@@ -711,6 +770,14 @@ define_mime_essence_lemmas! {
         lemma_star_star_essence_str => ("*", "*"),
 
         lemma_application_ogg_essence_str => ("application", "ogg"),
+    }
+}
+
+define_mime_essence_parts_lemmas! {
+    mime_essence_parts_str_lemmas {
+        lemma_unknown_unknown_essence_parts_str => ("unknown", "unknown", 8),
+        lemma_application_unknown_essence_parts_str => ("application", "unknown", 12),
+        lemma_star_star_essence_parts_str => ("*", "*", 2),
     }
 }
 

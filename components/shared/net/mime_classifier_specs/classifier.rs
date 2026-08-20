@@ -194,6 +194,7 @@ pub closed spec fn mime_classifier_validate_spec(classifier: &MimeClassifier) ->
         && classifier.font_classifier.validate_spec()
 }
 
+// TODO: necessary?
 pub(crate) proof fn lemma_mime_classifier_validate_spec(classifier: &MimeClassifier)
     ensures
         mime_classifier_validate_spec(classifier)

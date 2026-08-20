@@ -29,6 +29,8 @@ broadcast use {
     Spec::mime_essence_str_lemmas,
     Spec::lemma_image_audio_video_disjoint,
     Spec::whitespace_lemmas,
+    Spec::mime_essence_parts_str_lemmas,
+    SpecMime::group_name_partial_eq_axioms,
     SpecFlag::group_flag_partial_eq_axioms,
 };
 
@@ -488,7 +490,6 @@ impl MimeClassifier {
             .expect("BinaryOrPlaintextClassifier always succeeds")
     }
 
-    #[verifier::external_body] //TODO:
     fn sniff_text_or_data<'a>(&'a self, data: &'a [u8]) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
@@ -510,7 +511,7 @@ impl MimeClassifier {
         ensures
             result == Spec::is_xml(mt),
     {
-        broadcast use SpecMime::group_name_partial_eq_axioms;
+        // broadcast use SpecMime::group_name_partial_eq_axioms;
         
         !Self::is_image(mt) &&
             (mt.suffix() == Some(mime::XML) ||
@@ -544,7 +545,6 @@ impl MimeClassifier {
             mt.essence_str() == "application/ogg"
     }
 
-    #[verifier::external_body] //TODO:
     fn is_explicit_unknown(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_explicit_unknown(mt),
@@ -620,7 +620,6 @@ impl MimeClassifier {
         *mt == mime::TEXT_PLAIN || mt.essence_str() == "text/vtt"
     }
 
-    #[verifier::external_body] //TODO:
     pub fn is_css(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_css(mt),
