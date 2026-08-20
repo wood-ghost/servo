@@ -192,23 +192,48 @@ pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
     }
 }
 
+/// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
 pub open spec fn is_javascript(mt: &Mime) -> bool {
-    essence_str(mt) == "application/javascript"@
+    ||| essence_str(mt) == "application/ecmascript"@
+    ||| essence_str(mt) == "application/javascript"@
+    ||| essence_str(mt) == "application/x-ecmascript"@
+    ||| essence_str(mt) == "application/x-javascript"@
+    ||| essence_str(mt) == "text/ecmascript"@
+    ||| essence_str(mt) == "text/javascript"@
+    ||| essence_str(mt) == "text/javascript1.0"@
+    ||| essence_str(mt) == "text/javascript1.1"@
+    ||| essence_str(mt) == "text/javascript1.2"@
+    ||| essence_str(mt) == "text/javascript1.3"@
+    ||| essence_str(mt) == "text/javascript1.4"@
+    ||| essence_str(mt) == "text/javascript1.5"@
+    ||| essence_str(mt) == "text/jscript"@
+    ||| essence_str(mt) == "text/livescript"@
+    ||| essence_str(mt) == "text/x-ecmascript"@
+    ||| essence_str(mt) == "text/x-javascript"@
 }
 
+/// <https://mimesniff.spec.whatwg.org/#font-mime-type>
 pub open spec fn is_font(mt: &Mime) -> bool { //TODO:
-    essence_str(mt) == "font/woff"@
-        || essence_str(mt) == "font/woff2"@
-        || essence_str(mt) == "application/font-woff"@
-        || essence_str(mt) == "application/font-woff2"@
+    ||| view(mt).type_ == font_name()
+    ||| essence_str(mt) == "application/font-cff"@
+    ||| essence_str(mt) == "application/font-off"@ //TODO: new version is font-otf
+    ||| essence_str(mt) == "application/font-sfnt"@
+    ||| essence_str(mt) == "application/font-ttf"@
+    ||| essence_str(mt) == "application/font-woff"@
+    ||| essence_str(mt) == "application/vnd.ms-fontobject"@
+    ||| essence_str(mt) == "application/vnd.ms-opentype"@
 }
 
-pub open spec fn is_json(mt: &Mime) -> bool { //TODO:
-    essence_str(mt) == "application/json"@
+/// <https://mimesniff.spec.whatwg.org/#json-mime-type>
+pub open spec fn is_json(mt: &Mime) -> bool { 
+    ||| view(mt).suffix == Some(json_name())@ //TODO: suffix is +.* at the end of subtype
+    ||| essence_str(mt) == "application/json"@
+    ||| essence_str(mt) == "text/json"@
 }
 
 pub open spec fn is_text(mt: &Mime) -> bool { //TODO:
-    view(mt).type_ == text_name()
+    view(mt) == text_plain_identity()
+    || essence_str(mt) == "text/vtt"@
 }
 
 pub open spec fn is_css(mt: &Mime) -> bool { //TODO:
@@ -778,6 +803,31 @@ define_mime_essence_parts_lemmas! {
         lemma_unknown_unknown_essence_parts_str => ("unknown", "unknown", 8),
         lemma_application_unknown_essence_parts_str => ("application", "unknown", 12),
         lemma_star_star_essence_parts_str => ("*", "*", 2),
+
+        lemma_application_ecmascript_essence_parts_str => ("application", "ecmascript", 12),
+        lemma_application_javascript_essence_parts_str => ("application", "javascript", 12),
+        lemma_application_x_ecmascript_essence_parts_str => ("application", "x-ecmascript", 12),
+        lemma_application_x_javascript_essence_parts_str => ("application", "x-javascript", 12),
+        lemma_text_ecmascript_essence_parts_str => ("text", "ecmascript", 5),
+        lemma_text_javascript_essence_parts_str => ("text", "javascript", 5),
+        lemma_text_javascript0_essence_parts_str => ("text", "javascript1.0", 5),
+        lemma_text_javascript1_essence_parts_str => ("text", "javascript1.1", 5),
+        lemma_text_javascript2_essence_parts_str => ("text", "javascript1.2", 5),
+        lemma_text_javascript3_essence_parts_str => ("text", "javascript1.3", 5),
+        lemma_text_javascript4_essence_parts_str => ("text", "javascript1.4", 5),
+        lemma_text_javascript5_essence_parts_str => ("text", "javascript1.5", 5),
+        lemma_text_jscript_essence_parts_str => ("text", "jscript", 5),
+        lemma_text_livescript_essence_parts_str => ("text", "livescript", 5),
+        lemma_text_x_ecmascript_essence_parts_str => ("text", "x-ecmascript", 5),
+        lemma_text_x_javascript_essence_parts_str => ("text", "x-javascript", 5),
+
+        lemma_application_font_cff_essence_parts_str => ("application", "font-cff", 12),
+        lemma_application_font_off_essence_parts_str => ("application", "font-off", 12),
+        lemma_application_font_sfnt_essence_parts_str => ("application", "font-sfnt", 12),
+        lemma_application_font_ttf_essence_parts_str => ("application", "font-ttf", 12),
+        lemma_application_font_woff_essence_parts_str => ("application", "font-woff", 12),
+        lemma_application_font_vnd_ms_fontobject_essence_parts_str => ("application", "vnd.ms-fontobject", 12),
+        lemma_application_font_vnd_ms_opentype_essence_parts_str => ("application", "vnd.ms-opentype", 12),
     }
 }
 

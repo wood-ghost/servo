@@ -20,14 +20,14 @@ verus! {
 //         },
 // ;
 
-pub assume_specification<T>
-    [<[T]>::contains]
-    (slice: &[T], value: &T) -> (result: bool)
-where
-    T: std::cmp::PartialEq,
-    ensures
-        result == slice@.to_set().contains(*value),
-;
+// pub assume_specification<T>
+//     [<[T]>::contains]
+//     (slice: &[T], value: &T) -> (result: bool)
+// where
+//     T: std::cmp::PartialEq,
+//     ensures
+//         result == slice@.to_set().contains(*value),
+// ;
 
 // pub assume_specification<'a, T, P>
 //     [<std::slice::Iter<'a, T> as std::iter::Iterator>::position]

@@ -555,7 +555,6 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
-    #[verifier::external_body] //TODO:
     pub fn is_javascript(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_javascript(mt),
@@ -582,7 +581,6 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#json-mime-type>
-    #[verifier::external_body] //TODO:
     pub fn is_json(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_json(mt),
@@ -593,7 +591,6 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
-    #[verifier::external_body] //TODO:
     fn is_font(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_font(mt),
@@ -612,7 +609,6 @@ impl MimeClassifier {
                 .contains(&mt.subtype().as_str())))
     }
 
-    #[verifier::external_body] //TODO:
     fn is_text(mt: &Mime) -> (result: bool)
         ensures
             result == Spec::is_text(mt),
@@ -627,7 +623,6 @@ impl MimeClassifier {
         mt.essence_str() == "text/css"
     }
 
-    // #[verifier::external_body] //TODO:
     pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
         ensures
             SpecClassifier::get_media_type_spec(mime, result),

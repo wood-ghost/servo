@@ -231,6 +231,25 @@ impl FromStrSpecImpl for Mime {
         &&& (input == "text/vtt"@) ==> result is Ok
         &&& (input == "text/cache-manifest"@) ==> result is Ok
 
+        &&& (input == "application/ecmascript"@) ==> result is Ok
+        &&& (input == "application/javascript"@) ==> result is Ok
+        &&& (input == "application/ecmascript"@) ==> result is Ok
+        &&& (input == "application/javascript"@) ==> result is Ok
+        &&& (input == "application/x-ecmascript"@) ==> result is Ok
+        &&& (input == "application/x-javascript"@) ==> result is Ok
+        &&& (input == "text/ecmascript"@) ==> result is Ok
+        &&& (input == "text/javascript"@) ==> result is Ok
+        &&& (input == "text/javascript1.0"@) ==> result is Ok
+        &&& (input == "text/javascript1.1"@) ==> result is Ok
+        &&& (input == "text/javascript1.2"@) ==> result is Ok
+        &&& (input == "text/javascript1.3"@) ==> result is Ok
+        &&& (input == "text/javascript1.4"@) ==> result is Ok
+        &&& (input == "text/javascript1.5"@) ==> result is Ok
+        &&& (input == "text/jscript"@) ==> result is Ok
+        &&& (input == "text/livescript"@) ==> result is Ok
+        &&& (input == "text/x-ecmascript"@) ==> result is Ok
+        &&& (input == "text/x-javascript"@) ==> result is Ok
+
         &&& input == "video/mp4"@ ==> view(&result->Ok_0) == video_mp4_identity()
     } 
 }
