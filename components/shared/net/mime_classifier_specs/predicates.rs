@@ -765,36 +765,16 @@ pub(crate) open spec fn is_text_plain_utf_8_bom(bm: &ByteMatcher) -> bool {
 define_mime_essence_lemmas! {
     mime_essence_str_lemmas {
         lemma_image_bmp_essence_str => ("image", "bmp"),
-
         lemma_image_png_essence_str => ("image", "png"),
-
         lemma_image_gif_essence_str => ("image", "gif"),
-
         lemma_image_jpeg_essence_str => ("image", "jpeg"),
 
         lemma_text_html_essence_str => ("text", "html"),
-
         lemma_text_xml_essence_str => ("text", "xml"),
-
         lemma_text_plain_essence_str => ("text", "plain"),
 
-        lemma_text_css_essence_str => ("text", "css"),
-
-        lemma_text_vtt_essence_str => ("text", "vtt"),
-
-        lemma_application_xml_essence_str => ("application", "xml"),
-
         lemma_application_pdf_essence_str => ("application", "pdf"),
-
         lemma_application_octet_stream_essence_str => ("application", "octet-stream"),
-
-        lemma_unknown_unknown_essence_str => ("unknown", "unknown"),
-
-        lemma_application_unknown_essence_str => ("application", "unknown"),
-
-        lemma_star_star_essence_str => ("*", "*"),
-
-        lemma_application_ogg_essence_str => ("application", "ogg"),
     }
 }
 

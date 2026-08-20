@@ -119,7 +119,6 @@ impl Default for MimeClassifier {
 
 impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#mime-type-sniffing-algorithm>
-    // #[verifier::external_body]
     pub fn classify<'a>(
         &'a self,
         context: LoadContext,
@@ -142,12 +141,59 @@ impl MimeClassifier {
                         data@,
                         SpecMime::view(&result),
                     ),
-                // LoadContext::Image => true,
                 LoadContext::Image =>
                     SpecClassifier::mime_classify_image_result(
                         self,
                         supplied_type,
                         data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::AudioVideo =>
+                    SpecClassifier::mime_classify_audio_video_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::Plugin =>
+                    SpecClassifier::mime_classify_plugin_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::Style =>
+                    SpecClassifier::mime_classify_style_result(
+                        self,
+                        no_sniff_flag,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::Script =>
+                    SpecClassifier::mime_classify_script_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::Font =>
+                    SpecClassifier::mime_classify_font_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::TextTrack =>
+                    SpecClassifier::mime_classify_text_track_result(
+                        self,
+                        supplied_type, // for Servo behavior
+                        SpecMime::view(&result),
+                    ),
+                LoadContext::CacheManifest =>
+                    SpecClassifier::mime_classify_cache_manifest_result(
+                        self,
+                        supplied_type, // for Servo behavior
                         SpecMime::view(&result),
                     ),
                 _ => true,
@@ -309,6 +355,17 @@ impl MimeClassifier {
                 .unwrap_or(supplied_type_or_octet_stream)
             },
             LoadContext::AudioVideo => {
+                let result = self.audio_video_classifier.classify(data)
+                    .unwrap_or(supplied_type_or_octet_stream);
+                proof {
+                    SpecClassifier::lemma_mime_classify_audio_video_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    );
+                }
+
                 // Section 8.3 Sniffing an image context
                 match MimeClassifier::maybe_get_media_type(supplied_type) {
                     Some(MediaType::Xml) => {
@@ -334,7 +391,14 @@ impl MimeClassifier {
                 //
                 // This section was *not* finalized in the specs at the time
                 // of this implementation.
-                supplied_type.clone().unwrap_or_else(|| {
+                supplied_type.clone().unwrap_or_else(|| -> (r: Mime)
+                    ensures
+                        SpecMime::view(&r) == if no_sniff_flag == NoSniffFlag::On {
+                            SpecMime::application_octet_stream_identity()
+                        } else {
+                            SpecMime::text_css_identity()
+                        },
+                {
                     if no_sniff_flag == NoSniffFlag::On {
                         mime::APPLICATION_OCTET_STREAM
                     } else {
@@ -353,6 +417,16 @@ impl MimeClassifier {
                 }
             },
             LoadContext::Font => {
+                let result = self.font_classifier.classify(data)
+                    .unwrap_or(supplied_type_or_octet_stream);
+                proof {
+                    SpecClassifier::lemma_mime_classify_font_result(
+                        self,
+                        supplied_type,
+                        data@,
+                        SpecMime::view(&result),
+                    );
+                }
                 // 8.7 Sniffing in a font context
                 match MimeClassifier::maybe_get_media_type(supplied_type) {
                     Some(MediaType::Xml) => None,

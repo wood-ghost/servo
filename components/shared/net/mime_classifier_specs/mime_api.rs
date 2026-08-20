@@ -81,6 +81,27 @@ pub open spec fn text_html_identity() -> MimeView {
     }
 }
 
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#754
+// TEXT_CSS, "text/css", 4;
+pub open spec fn text_css_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "css"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#756
+// TEXT_JAVASCRIPT, "text/javascript", 4;
+pub open spec fn text_javascript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#757
 // TEXT_XML, "text/xml", 4;
 pub open spec fn text_xml_identity() -> MimeView {
@@ -156,8 +177,7 @@ pub open spec fn application_pdf_identity() -> MimeView {
 }
 
 pub uninterp spec fn video_mp4_identity() -> MimeView;
-pub uninterp spec fn text_css() -> MimeView;
-pub uninterp spec fn text_javascript() -> MimeView;
+
 
 
 // Mime
@@ -167,6 +187,10 @@ pub uninterp spec fn text_javascript() -> MimeView;
 pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
     view(mt).type_ + "/"@ + view(mt).subtype
 }
+pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
+    mt.type_ + "/"@ + mt.subtype
+}
+
 
 pub open spec fn suffix(mt: &Mime) -> Option<Seq<char>> {
     view(mt).suffix
@@ -336,12 +360,12 @@ pub(crate) assume_specification [mime::APPLICATION_PDF] -> (result: Mime)
 
 pub(crate) assume_specification [mime::TEXT_CSS] -> (result: Mime)
     ensures
-        view(&result) == text_css(),
+        view(&result) == text_css_identity(),
 ;
 
 pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
     ensures
-        view(&result) == text_javascript(),
+        view(&result) == text_javascript_identity(),
 ;
 
 pub(crate) assume_specification [mime::IMAGE_JPEG] -> (result: Mime)

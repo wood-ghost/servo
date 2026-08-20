@@ -19,9 +19,12 @@ use crate::mime_classifier::{
 use super::byte_matcher as SpecByteMatcher;
 use crate::mime_classifier_specs::mime_api::{
     text_plain_identity,
+    text_css_identity,
+    text_javascript_identity,
     application_octet_stream_identity,
     MimeView,
     essence_str,
+    essence_str_view,
     view,
     option_view,
 };
@@ -184,6 +187,15 @@ pub(crate) open spec fn audio_or_video_type_pattern_matching_algo(
     classifier.audio_video_classifier.classify_spec(data)
 }
 
+// https://mimesniff.spec.whatwg.org/#font-type-pattern-matching-algorithm
+pub(crate) open spec fn font_type_pattern_matching_algo(
+    classifier: &MimeClassifier, 
+    data: Seq<u8>,
+) -> Option<MimeView> {
+    //TODO:
+    classifier.font_classifier.classify_spec(data)
+}
+
 pub closed spec fn mime_classifier_validate_spec(classifier: &MimeClassifier) -> bool {
     classifier.image_classifier.validate_spec()
         && classifier.audio_video_classifier.validate_spec()
@@ -250,6 +262,8 @@ pub trait MimeClassifierModel {
     spec fn image_type(&self, data: Seq<u8>) -> Option<MimeView>;
 
     spec fn audio_video_type(&self, data: Seq<u8>) -> Option<MimeView>;
+
+    spec fn font_type(&self, data: Seq<u8>) -> Option<MimeView>;
 }
 
 impl<'a> MimeClassifierModel for &'a MimeClassifier {
@@ -267,6 +281,10 @@ impl<'a> MimeClassifierModel for &'a MimeClassifier {
 
     closed spec fn audio_video_type(&self, data: Seq<u8>) -> Option<MimeView> {
         audio_or_video_type_pattern_matching_algo(*self, data)
+    }
+
+    closed spec fn font_type(&self, data: Seq<u8>) -> Option<MimeView> {
+        font_type_pattern_matching_algo(*self, data)
     }
 }
 
@@ -1181,8 +1199,9 @@ pub open spec fn sniff_image_context<C: MimeClassifierModel>(
     // 1. If the supplied MIME type is an XML MIME type, the computed MIME type is the supplied MIME type.
     // Abort these steps.
     // if supplied_type is Some && is_xml(&supplied_type->Some_0) {
-    if supplied_type is Some && (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { // Verus behavior
-        Some(view(&supplied_type->Some_0))
+    if supplied_type is Some 
+        && (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { //FIXME: Servo behavior
+        option_view(supplied_type)
     } else {
         // 2. Let image-type-matched be the result of executing the image type pattern matching algorithm 
         //    with the resource header as the byte sequence to be matched. 
@@ -1249,8 +1268,280 @@ pub(crate) proof fn lemma_mime_classify_image_result<'a>(
                     },
                 }
         ),
-{
+{}
+
+// ------------------------------------
+// Audio/Video Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-an-audio-or-video-context
+// To determine the computed MIME type of a resource with an audio or video MIME 
+// type, execute the following rules for sniffing audio and video specifically: 
+pub open spec fn sniff_audio_video_context<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+) -> Option<MimeView> {
+    // 1. If the supplied MIME type is an XML MIME type, the computed MIME type is the supplied MIME type.
+    //    Abort these steps.
+    if supplied_type is Some && 
+        (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) {//FIXME: Servo behavior
+        option_view(supplied_type)
+    } else {
+        // 2. Let audio-or-video-type-matched be the result of executing the audio or video type pattern 
+        //    matching algorithm with the resource header as the byte sequence to be matched.
+        let audio_video_type_matched = classifier.audio_video_type(data);
+        // 3. If audio-or-video-type-matched is not undefined, the computed MIME type is 
+        //    audio-or-video-type-matched. 
+        // Abort these steps.
+        match audio_video_type_matched {
+            Some(mt) => Some(mt),
+            None => {
+                // 4. The computed MIME type is the supplied MIME type. 
+                option_view(supplied_type)
+            },
+        }
+    }
 }
-        
+
+pub open spec fn mime_classify_audio_video_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    // Based on Servo Behavior, we assume:
+    // If the supplied MIME type is undefined, the computed MIME type is "application/octet-stream". 
+    result == match sniff_audio_video_context(classifier, supplied_type, data) {
+        Some(mt) => mt,
+        None => {
+            match supplied_type {
+                Some(mt) => view(mt),
+                None => application_octet_stream_identity(),
+            }
+        },
+    }
+}
+
+pub(crate) proof fn lemma_mime_classify_audio_video_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+)
+    requires
+        match supplied_type {
+            Some(mt) => !is_xml(mt) && !is_html(mt),
+            None => true,
+        },
+    ensures
+        mime_classify_audio_video_result(
+            classifier,
+            supplied_type,
+            data,
+            result,
+        )
+        ==
+        (
+            result ==
+                match audio_or_video_type_pattern_matching_algo(classifier, data) {
+                    Some(mt) => mt,
+                    None => {
+                        match supplied_type {
+                            Some(mt) => view(mt),
+                            None => application_octet_stream_identity(),
+                        }
+                    },
+                }
+        ),
+{}
+
+// ------------------------------------
+// Plugin Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-plugin-context
+// To determine the computed MIME type of a resource fetched in a plugin context, 
+// execute the following rules for sniffing in a plugin context: 
+pub open spec fn mime_classify_plugin_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    result == match supplied_type {
+        // 1. If the supplied MIME type is undefined, the computed MIME type is "application/octet-stream". 
+        Some(mt) => view(mt),
+        // 2. The computed MIME type is the supplied MIME type. 
+        None => application_octet_stream_identity(),
+    }
+}
+
+// ------------------------------------
+// Style Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-style-context
+// To determine the computed MIME type of a resource fetched in a style context, execute the following 
+// rules for sniffing in a style context: 
+pub open spec fn mime_classify_style_result<'a>(
+    classifier: &'a MimeClassifier,
+    no_sniff_flag: NoSniffFlag,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    result == match supplied_type {
+        // 1. If the supplied MIME type is undefined, …. (follow Servo behavior) 
+        None => {
+            if no_sniff_flag == NoSniffFlag::On {
+                application_octet_stream_identity()
+            } else {
+                text_css_identity() 
+            }
+        } 
+        // 2. The computed MIME type is the supplied MIME type. 
+        Some(mt) => view(mt),
+    }
+}
+
+// ------------------------------------
+// Script Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-script-context
+// To determine the computed MIME type of a resource fetched in a script context, 
+// execute the following rules for sniffing in a script context: 
+pub open spec fn mime_classify_script_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    result == match supplied_type {
+        // 1. If the supplied MIME type is undefined, …. (follow Servo behavior) 
+        None => {
+           text_javascript_identity() 
+        } 
+        // 2. The computed MIME type is the supplied MIME type. 
+        Some(mt) => view(mt),
+    }
+}
+
+// ------------------------------------
+// Font Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-font-context
+// To determine the computed MIME type of a resource with a font MIME type, 
+// execute the following rules for sniffing fonts specifically: 
+pub open spec fn sniff_font_context<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+) -> Option<MimeView> {
+    // If the supplied MIME type is an XML MIME type, the computed MIME type is the supplied MIME type.
+    // Abort these steps.
+    if supplied_type is Some 
+        && (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { //FIXME: Servo behavior
+        option_view(supplied_type)
+    } else {
+        // 2. Let font-type-matched be the result of executing the font type pattern matching 
+        //    algorithm with the resource header as the byte sequence to be matched.
+        let font_type_matched = classifier.font_type(data);
+        match font_type_matched {
+            // 3. If font-type-matched is not undefined, the computed MIME type is font-type-matched. 
+            // Abort these steps.
+            Some(mt) => Some(mt),
+            None => {
+                // 4. The computed MIME type is the supplied MIME type. 
+                option_view(supplied_type)
+            },
+        }
+    }
+}
+
+pub open spec fn mime_classify_font_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    // Based on Servo Behavior, we assume:
+    // If the supplied MIME type is undefined, the computed MIME type is "application/octet-stream". 
+    result == match sniff_font_context(classifier, supplied_type, data) {
+        Some(mt) => mt,
+        None => {
+            match supplied_type {
+                Some(mt) => view(mt),
+                None => application_octet_stream_identity(),
+            }
+        },
+    }
+}
+
+pub(crate) proof fn lemma_mime_classify_font_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+)
+    requires
+        match supplied_type {
+            Some(mt) => !is_xml(mt) && !is_html(mt),
+            None => true,
+        },
+    ensures
+        mime_classify_font_result(
+            classifier,
+            supplied_type,
+            data,
+            result,
+        )
+        ==
+        (
+            result ==
+                match font_type_pattern_matching_algo(classifier, data) {
+                    Some(mt) => mt,
+                    None => {
+                        match supplied_type {
+                            Some(mt) => view(mt),
+                            None => application_octet_stream_identity(),
+                        }
+                    },
+                }
+        ),
+{}
+
+// ------------------------------------
+// TextTrack Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-text-track-context
+pub open spec fn mime_classify_text_track_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    result: MimeView,
+) -> bool {
+    if supplied_type is Some && 
+        (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { // FIXME: Servo behavior
+        view(&supplied_type->Some_0) == result
+    } else {
+        // The computed MIME type is "text/vtt". 
+        essence_str_view(&result) == "text/vtt"@
+    }
+}
+
+// ------------------------------------
+// Cache Manifest Content Type Sniffing
+// ------------------------------------
+// https://mimesniff.spec.whatwg.org/#sniffing-in-a-cache-manifest-context
+pub open spec fn mime_classify_cache_manifest_result<'a>(
+    classifier: &'a MimeClassifier,
+    supplied_type: &Option<Mime>,
+    result: MimeView,
+) -> bool {
+    if supplied_type is Some && 
+        (is_xml(&supplied_type->Some_0) || is_html(&supplied_type->Some_0)) { // FIXME: Servo behavior
+        view(&supplied_type->Some_0) == result
+    } else {
+        // The computed MIME type is "text/cache-manifest". 
+        essence_str_view(&result) == "text/cache-manifest"@
+    }
+}
 
 } // verus!
