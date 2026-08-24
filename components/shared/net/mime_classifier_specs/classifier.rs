@@ -223,6 +223,21 @@ pub(crate) proof fn lemma_mime_classifier_validate_spec(classifier: &MimeClassif
             ),
 {}
 
+pub(crate) broadcast proof fn lemma_valid_mime_classifier_from_valid_fields(
+    classifier: &MimeClassifier,
+)
+    requires
+        classifier.image_classifier.validate_spec(),
+        classifier.audio_video_classifier.validate_spec(),
+        classifier.scriptable_classifier.validate_spec(),
+        classifier.plaintext_classifier.validate_spec(),
+        classifier.archive_classifier.validate_spec(),
+        classifier.binary_or_plaintext.validate_spec(),
+        classifier.font_classifier.validate_spec(),
+    ensures
+        #[trigger] mime_classifier_validate_spec(classifier)
+{}
+
 pub open spec fn get_media_type_spec(
     mime: &Mime, result: Option<MediaType>
 ) -> bool {

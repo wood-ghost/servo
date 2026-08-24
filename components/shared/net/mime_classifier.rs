@@ -133,16 +133,8 @@ impl Default for MimeClassifier {
     fn default() -> (result: Self) //TODO:
         ensures SpecClassifier::mime_classifier_validate_spec(&result),
     {
-        // Self {
-        //     image_classifier: GroupedClassifier::image_classifer(),
-        //     audio_video_classifier: GroupedClassifier::audio_video_classifier(),
-        //     scriptable_classifier: GroupedClassifier::scriptable_classifier(),
-        //     plaintext_classifier: GroupedClassifier::plaintext_classifier(),
-        //     archive_classifier: GroupedClassifier::archive_classifier(),
-        //     binary_or_plaintext: BinaryOrPlaintextClassifier,
-        //     font_classifier: GroupedClassifier::font_classifier(),
-        // }
-        let classifier = Self {
+        broadcast use SpecClassifier::lemma_valid_mime_classifier_from_valid_fields;
+        Self {
             image_classifier: GroupedClassifier::image_classifer(),
             audio_video_classifier: GroupedClassifier::audio_video_classifier(),
             scriptable_classifier: GroupedClassifier::scriptable_classifier(),
@@ -150,13 +142,7 @@ impl Default for MimeClassifier {
             archive_classifier: GroupedClassifier::archive_classifier(),
             binary_or_plaintext: BinaryOrPlaintextClassifier,
             font_classifier: GroupedClassifier::font_classifier(),
-        };
-
-        proof {
-            SpecClassifier::lemma_mime_classifier_validate_spec(&classifier);
         }
-
-        classifier
     }
 }
 
