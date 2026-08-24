@@ -23,6 +23,33 @@ use crate::mime_classifier_specs::{
 
 use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
 
+macro_rules! prove_valid_byte_literals {
+    ($pattern:literal, $mask:literal) => {
+        ::vstd::prelude::proof! {
+            reveal_byteslit($pattern);
+            reveal_byteslit($mask);
+
+            let pattern = ($pattern)@;
+            let mask = ($mask)@;
+
+            assert forall |i: int| #![trigger pattern[i]]
+                0 <= i < pattern.len()
+                implies
+                (pattern[i] & mask[i]) == pattern[i]
+            by {
+                let p = pattern[i];
+                let m = mask[i];
+                assert((p & m) == p) by (bit_vector)
+                    requires
+                        m == 0xFFu8
+                        || (m == 0x00u8 && p == 0x00u8)
+                        || (m == 0xDFu8 && 0x40u8 <= p && p < 0x60u8),
+                ;
+            }
+        }
+    };
+}
+
 verus! {
 
 broadcast use {
@@ -103,8 +130,19 @@ impl From<bool> for NoSniffFlag {
 }
 
 impl Default for MimeClassifier {
-    fn default() -> Self {
-        Self {
+    fn default() -> (result: Self) //TODO:
+        ensures SpecClassifier::mime_classifier_validate_spec(&result),
+    {
+        // Self {
+        //     image_classifier: GroupedClassifier::image_classifer(),
+        //     audio_video_classifier: GroupedClassifier::audio_video_classifier(),
+        //     scriptable_classifier: GroupedClassifier::scriptable_classifier(),
+        //     plaintext_classifier: GroupedClassifier::plaintext_classifier(),
+        //     archive_classifier: GroupedClassifier::archive_classifier(),
+        //     binary_or_plaintext: BinaryOrPlaintextClassifier,
+        //     font_classifier: GroupedClassifier::font_classifier(),
+        // }
+        let classifier = Self {
             image_classifier: GroupedClassifier::image_classifer(),
             audio_video_classifier: GroupedClassifier::audio_video_classifier(),
             scriptable_classifier: GroupedClassifier::scriptable_classifier(),
@@ -112,7 +150,13 @@ impl Default for MimeClassifier {
             archive_classifier: GroupedClassifier::archive_classifier(),
             binary_or_plaintext: BinaryOrPlaintextClassifier,
             font_classifier: GroupedClassifier::font_classifier(),
+        };
+
+        proof {
+            SpecClassifier::lemma_mime_classifier_validate_spec(&classifier);
         }
+
+        classifier
     }
 }
 
@@ -130,7 +174,6 @@ impl MimeClassifier {
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
         ensures
-            // result == SpecClassifier::classify(context, no_sniff_flag, apache_bug_flag, supplied_type, data),
             match context {
                 LoadContext::Browsing =>
                     SpecClassifier::mime_classify_browsing_result(
@@ -925,12 +968,7 @@ impl MIMEChecker for ByteMatcher {
 
     fn validate(&self) -> (result: Result<(), String>)
         ensures
-            // result.is_ok() == SpecByteMatcher::validate_ok(self.pattern@, self.mask@),
             result.is_ok() == self.validate_spec(),
-            // match result {
-            //     Ok(()) => SpecByteMatcher::validate_ok(self.pattern@, self.mask@), 
-            //     Err(_) => !SpecByteMatcher::validate_ok(self.pattern@, self.mask@) 
-            // }
     {
         if self.pattern.is_empty() {
             // return Err(format!("Zero length pattern for {:?}", self.content_type));
@@ -1026,7 +1064,6 @@ pub struct Mp4Matcher;
 
 impl Mp4Matcher {
     /// <https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4>
-    #[verifier::external_body] //TODO:
     pub fn matches(&self, data: &[u8]) -> (result: bool) 
         ensures
             result == SpecMP4Matcher::matches_mp4_signature(data@),
@@ -1045,6 +1082,11 @@ impl Mp4Matcher {
             ((data[1] as u32) << 16) |
             ((data[2] as u32) << 8) |
             (data[3] as u32)) as usize;
+
+        proof {
+            SpecMP4Matcher::lemma_step4_u32_eq_int(box_size as u32, data@);
+        }
+
         // Step 5. If length is less than box-size or if box-size modulo 4 is not equal to 0, return false.
         if (data.len() < box_size) || !box_size.is_multiple_of(4) {
             return false;
@@ -1058,20 +1100,126 @@ impl Mp4Matcher {
 
         // Step 7. If the three bytes from sequence[8] to sequence[10] are equal to 0x6D 0x70 0x34 ("mp4"), return true.
         let mp4 = [0x6D, 0x70, 0x34];
-        data[8..].starts_with(&mp4) ||
-        // Step 8. Let bytes-read be 16.
-        // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
-            data[16..box_size]
-            // Step 11. Increment bytes-read by 4.
-                .chunks(4)
-                // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
-                // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
-                .any(|chunk| chunk.starts_with(&mp4))
+
+        let major_brand_result = data[8..].starts_with(&mp4);
+       
+        let compatible_brand_result = box_size >= 16 && {
+            let mut chunks = data[16..box_size].chunks(4);
+
+            // Follow the pattern used by the Iterator::any test.
+            let ghost initial = chunks;
+            let ghost initial_chunks = IteratorSpec::remaining(&initial);
+
+            let result = chunks.any(
+                |chunk: &[u8]| -> (r: bool)
+                    ensures
+                        r == SpecMP4Matcher::has_mp4_prefix(chunk@)
+                {
+                    chunk.starts_with(&mp4)
+                },
+            );
+
+            proof {
+                let b = box_size as int;
+
+                let p = |offset: int| {
+                    data@[offset] == 0x6D
+                    && data@[offset + 1] == 0x70
+                    && data@[offset + 2] == 0x34
+                };
+
+                if result {
+                    let i =
+                        initial_chunks.len()
+                        - IteratorSpec::remaining(&chunks).len()
+                        - 1;
+
+                    assert(p(16 + 4 * i));
+                } else {
+                    assert forall |i: int|
+                        #![trigger p(16 + 4 * i)]
+                        0 <= i
+                        && 16 + 4 * i < b
+                    implies
+                        !p(16 + 4 * i)
+                    by {
+
+                        assert(!(
+                            initial_chunks[i]@.len() >= 3
+                            && initial_chunks[i]@[0] == 0x6D
+                            && initial_chunks[i]@[1] == 0x70
+                            && initial_chunks[i]@[2] == 0x34
+                        ));
+                    };
+                }
+
+                SpecMP4Matcher::lemma_mp4_offsets_are_chunk_indices(
+                    b,
+                    p,
+                );
+
+                assert(
+                    (exists |bytes_read: int|
+                        16 <= bytes_read < b
+                        && bytes_read % 4 == 0
+                        && #[trigger] p(bytes_read))
+                    ==
+                    (exists |bytes_read: int|
+                        16 <= bytes_read < b
+                        && bytes_read % 4 == 0
+                        && #[trigger] data@[bytes_read] == 0x6D
+                        && data@[bytes_read + 1] == 0x70
+                        && data@[bytes_read + 2] == 0x34)
+                ) by {
+                    if exists |bytes_read: int|
+                        16 <= bytes_read < b
+                        && bytes_read % 4 == 0
+                        && #[trigger] data@[bytes_read] == 0x6D
+                        && data@[bytes_read + 1] == 0x70
+                        && data@[bytes_read + 2] == 0x34
+                    {
+                        let bytes_read = choose |bytes_read: int|
+                            16 <= bytes_read < b
+                            && bytes_read % 4 == 0
+                            && #[trigger] data@[bytes_read] == 0x6D
+                            && data@[bytes_read + 1] == 0x70
+                            && data@[bytes_read + 2] == 0x34;
+
+                        assert(p(bytes_read));
+                    }
+                };
+            }
+
+            result
+        };
+
+
+
+            
+        // data[8..].starts_with(&mp4) ||
+        // // Step 8. Let bytes-read be 16.
+        // // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
+        //     ((box_size >= 16) && //TODO: add for specification
+        //     data[16..box_size]
+        //     // Step 11. Increment bytes-read by 4.
+        //         .chunks(4)
+        //         // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
+        //         // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
+        //         .any(|chunk: &[u8]| -> (r: bool)
+        //             ensures
+        //                 r == SpecMP4Matcher::has_mp4_prefix(chunk@)
+        //         { 
+        //             chunk.starts_with(&mp4)
+        //         }))
         // Step 12. Return false.
+        major_brand_result || compatible_brand_result
     }
 }
 impl MIMEChecker for Mp4Matcher {
-    fn classify(&self, data: &[u8]) -> Option<Mime> {
+    fn classify(&self, data: &[u8]) -> (result: Option<Mime>) 
+        ensures
+            SpecMime::option_view(&result) == self.classify_spec(data@),
+    {
         if self.matches(data) {
             Some("video/mp4".parse().unwrap())
         } else {
@@ -1079,7 +1227,10 @@ impl MIMEChecker for Mp4Matcher {
         }
     }
 
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> (result: Result<(), String>) 
+        ensures
+            result.is_ok() == self.validate_spec()
+    {
         Ok(())
     }
 }
@@ -1186,13 +1337,82 @@ struct GroupedClassifier {
 }
 
 #[cfg(verus_only)]
-pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {}
+pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
+    spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<SpecMime::MimeView>;
+    spec fn dyn_validate_spec(&self) -> bool;
+    proof fn bridge_validate_spec(tracked &self)
+        ensures 
+            self.dyn_validate_spec() == self.validate_spec();
+    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>)
+        ensures
+            self.dyn_classify_spec(data) == self.classify_spec(data);
+}
+
+// #[cfg(verus_only)]
+// impl<T> ThreadSafeMIMEChecker for T
+// where
+//     T: MIMEChecker + Send + Sync,
+// {
+//     open spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<SpecMime::MimeView> {
+//         self.classify_spec(data)
+//     }
+
+//     open spec fn dyn_validate_spec(&self) -> bool {
+//         self.validate_spec()
+//     }
+// }
+
 
 #[cfg(verus_only)]
-impl<T> ThreadSafeMIMEChecker for T
-where
-    T: MIMEChecker + Send + Sync,
-{}
+impl ThreadSafeMIMEChecker for ByteMatcher {
+    open spec fn dyn_validate_spec(&self) -> bool {
+        self.validate_spec()
+    }
+
+    open spec fn dyn_classify_spec(
+        &self,
+        data: Seq<u8>,
+    ) -> Option<SpecMime::MimeView> {
+        self.classify_spec(data)
+    }
+
+    proof fn bridge_validate_spec(tracked &self) {}
+    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
+}
+
+#[cfg(verus_only)]
+impl ThreadSafeMIMEChecker for TagTerminatedByteMatcher {
+    open spec fn dyn_validate_spec(&self) -> bool {
+        self.validate_spec()
+    }
+
+    open spec fn dyn_classify_spec(
+        &self,
+        data: Seq<u8>,
+    ) -> Option<SpecMime::MimeView> {
+        self.classify_spec(data)
+    }
+
+    proof fn bridge_validate_spec(tracked &self) {}
+    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
+}
+
+#[cfg(verus_only)]
+impl ThreadSafeMIMEChecker for Mp4Matcher {
+    open spec fn dyn_validate_spec(&self) -> bool {
+        self.validate_spec()
+    }
+
+    open spec fn dyn_classify_spec(
+        &self,
+        data: Seq<u8>,
+    ) -> Option<SpecMime::MimeView> {
+        self.classify_spec(data)
+    }
+
+    proof fn bridge_validate_spec(tracked &self) {}
+    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
+}
 
 #[cfg(verus_only)]
 pub(crate) struct GroupedClassifier {
@@ -1201,7 +1421,9 @@ pub(crate) struct GroupedClassifier {
 
 
 impl GroupedClassifier {
-    fn image_classifer() -> GroupedClassifier {
+    fn image_classifer() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 // Keep this in sync with 'is_supported_mime_type' from
@@ -1217,7 +1439,9 @@ impl GroupedClassifier {
             ],
         }
     }
-    fn audio_video_classifier() -> GroupedClassifier {
+    fn audio_video_classifier() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 Box::new(ByteMatcher::video_webm()),
@@ -1232,7 +1456,9 @@ impl GroupedClassifier {
             ],
         }
     }
-    fn scriptable_classifier() -> GroupedClassifier {
+    fn scriptable_classifier() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 Box::new(ByteMatcher::text_html_doctype()),
@@ -1257,7 +1483,9 @@ impl GroupedClassifier {
             ],
         }
     }
-    fn plaintext_classifier() -> GroupedClassifier {
+    fn plaintext_classifier() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 Box::new(ByteMatcher::text_plain_utf_8_bom()),
@@ -1267,7 +1495,9 @@ impl GroupedClassifier {
             ],
         }
     }
-    fn archive_classifier() -> GroupedClassifier {
+    fn archive_classifier() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 Box::new(ByteMatcher::application_x_gzip()),
@@ -1277,7 +1507,9 @@ impl GroupedClassifier {
         }
     }
 
-    fn font_classifier() -> GroupedClassifier {
+    fn font_classifier() -> (result: GroupedClassifier) 
+        ensures result.validate_spec(),
+    {
         GroupedClassifier {
             byte_matchers: vec![
                 Box::new(ByteMatcher::application_font_woff()),
@@ -1313,6 +1545,12 @@ impl MIMEChecker for GroupedClassifier {
         {
             let matcher: &dyn ThreadSafeMIMEChecker =
                 &*self.byte_matchers[i];
+
+            proof {
+                matcher.bridge_validate_spec();
+                matcher.bridge_classify_spec(data@);
+            }
+
             let result = MIMEChecker::classify(matcher, data);
 
             match result {
@@ -1337,8 +1575,12 @@ impl MIMEChecker for GroupedClassifier {
         for byte_matcher in iter: &self.byte_matchers 
             invariant
                 forall |j: int| 0 <= j < iter.index() ==>
-                    #[trigger] self.byte_matchers@[j].validate_spec(),
+                    // #[trigger] self.byte_matchers@[j].validate_spec(),
+                    #[trigger] self.byte_matchers@[j].dyn_validate_spec(),
         {
+            proof {
+                byte_matcher.bridge_validate_spec();
+            }
             byte_matcher.validate()?
         }
         Ok(())
@@ -1350,8 +1592,11 @@ impl MIMEChecker for GroupedClassifier {
 impl ByteMatcher {
     // A Windows Icon signature
     fn image_x_icon() -> (r: ByteMatcher) 
-        ensures Spec::is_image_x_icon(&r)
+        ensures 
+            Spec::is_image_x_icon(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\x00\x00\x01\x00", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1361,8 +1606,11 @@ impl ByteMatcher {
     }
     // A Windows Cursor signature.
     fn image_x_icon_cursor() -> (r: ByteMatcher)
-        ensures Spec::is_image_x_icon_cursor(&r)
+        ensures
+            Spec::is_image_x_icon_cursor(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\x00\x00\x02\x00", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1372,8 +1620,11 @@ impl ByteMatcher {
     }
     // The string "BM", a BMP signature.
     fn image_bmp() -> (r: ByteMatcher) 
-        ensures Spec::is_image_bmp(&r)
+        ensures 
+            Spec::is_image_bmp(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"BM", b"\xFF\xFF");
         ByteMatcher {
             pattern: b"BM",
             mask: b"\xFF\xFF",
@@ -1383,8 +1634,11 @@ impl ByteMatcher {
     }
     // The string "GIF89a", a GIF signature.
     fn image_gif89a() -> (r: ByteMatcher)
-        ensures Spec::is_image_gif89a(&r)
+        ensures 
+            Spec::is_image_gif89a(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"GIF89a", b"\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"GIF89a",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1394,8 +1648,11 @@ impl ByteMatcher {
     }
     // The string "GIF87a", a GIF signature.
     fn image_gif87a() -> (r: ByteMatcher) 
-        ensures Spec::is_image_gif87a(&r)
+        ensures 
+            Spec::is_image_gif87a(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"GIF87a", b"\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"GIF87a",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1405,8 +1662,14 @@ impl ByteMatcher {
     }
     // The string "RIFF" followed by four bytes followed by the string "WEBPVP".
     fn image_webp() -> (r: ByteMatcher)
-        ensures Spec::is_image_webp(&r)
+        ensures 
+            Spec::is_image_webp(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"RIFF\x00\x00\x00\x00WEBPVP", 
+            b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF"
+        );
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WEBPVP",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1417,8 +1680,11 @@ impl ByteMatcher {
     // An error-checking byte followed by the string "PNG" followed by CR LF SUB LF, the PNG
     // signature.
     fn image_png() -> (r: ByteMatcher) 
-        ensures Spec::is_image_png(&r)
+        ensures 
+            Spec::is_image_png(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\x89PNG\r\n\x1A\n", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x89PNG\r\n\x1A\n",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1428,8 +1694,11 @@ impl ByteMatcher {
     }
     // The JPEG Start of Image marker followed by the indicator byte of another marker.
     fn image_jpeg() -> (r: ByteMatcher) 
-        ensures Spec::is_image_jpeg(&r)
+        ensures 
+            Spec::is_image_jpeg(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\xFF\xD8\xFF", b"\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\xFF\xD8\xFF",
             mask: b"\xFF\xFF\xFF",
@@ -1439,9 +1708,11 @@ impl ByteMatcher {
     }
     // The WebM signature. [TODO: Use more bytes?]
     fn video_webm() -> (r: ByteMatcher) 
-        ensures Spec::is_video_webm(&r)
+        ensures 
+            Spec::is_video_webm(&r),
+            r.validate_spec(),
     {
-        proof { reveal_byteslit(b"\x1A\x45\xDF\xA3"); }
+        prove_valid_byte_literals!(b"\x1A\x45\xDF\xA3", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x1A\x45\xDF\xA3",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1451,8 +1722,11 @@ impl ByteMatcher {
     }
     // The string ".snd", the basic audio signature.
     fn audio_basic() -> (r: ByteMatcher) 
-        ensures Spec::is_audio_basic(&r)
+        ensures 
+            Spec::is_audio_basic(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b".snd", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b".snd",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1462,8 +1736,14 @@ impl ByteMatcher {
     }
     // The string "FORM" followed by four bytes followed by the string "AIFF", the AIFF signature.
     fn audio_aiff() -> (r: ByteMatcher) 
-        ensures Spec::is_audio_aiff(&r)
+        ensures 
+            Spec::is_audio_aiff(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"FORM\x00\x00\x00\x00AIFF", 
+            b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF"
+        );
         ByteMatcher {
             pattern: b"FORM\x00\x00\x00\x00AIFF",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1473,8 +1753,11 @@ impl ByteMatcher {
     }
     // The string "ID3", the ID3v2-tagged MP3 signature.
     fn audio_mpeg() -> (r: ByteMatcher) 
-        ensures Spec::is_audio_mpeg(&r)
+        ensures 
+            Spec::is_audio_mpeg(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"ID3", b"\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"ID3",
             mask: b"\xFF\xFF\xFF",
@@ -1484,8 +1767,11 @@ impl ByteMatcher {
     }
     // The string "OggS" followed by NUL, the Ogg container signature.
     fn application_ogg() -> (r: ByteMatcher)
-        ensures Spec::is_application_ogg(&r)
+        ensures 
+            Spec::is_application_ogg(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"OggS\x00", b"\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"OggS\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1496,8 +1782,11 @@ impl ByteMatcher {
     // The string "MThd" followed by four bytes representing the number 6 in 32 bits (big-endian),
     // the MIDI signature.
     fn audio_midi() -> (r: ByteMatcher) 
-        ensures Spec::is_audio_midi(&r)
+        ensures 
+            Spec::is_audio_midi(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"MThd\x00\x00\x00\x06", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"MThd\x00\x00\x00\x06",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1507,8 +1796,14 @@ impl ByteMatcher {
     }
     // The string "RIFF" followed by four bytes followed by the string "AVI ", the AVI signature.
     fn video_avi() -> (r: ByteMatcher) 
-        ensures Spec::is_video_avi(&r)
+        ensures 
+            Spec::is_video_avi(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"RIFF\x00\x00\x00\x00AVI ", 
+            b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF"
+        );
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00AVI ",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1518,8 +1813,14 @@ impl ByteMatcher {
     }
     // The string "RIFF" followed by four bytes followed by the string "WAVE", the WAVE signature.
     fn audio_wave() -> (r: ByteMatcher) 
-        ensures Spec::is_audio_wave(&r)
+        ensures 
+            Spec::is_audio_wave(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"RIFF\x00\x00\x00\x00WAVE", 
+            b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF"
+        );
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WAVE",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1529,8 +1830,14 @@ impl ByteMatcher {
     }
     // doctype terminated with Tag terminating (TT) Byte
     fn text_html_doctype() -> (r: TagTerminatedByteMatcher)
-        ensures Spec::is_text_html_doctype(&r)
+        ensures 
+            Spec::is_text_html_doctype(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"<!DOCTYPE HTML", 
+            b"\xFF\xFF\xDF\xDF\xDF\xDF\xDF\xDF\xDF\xFF\xDF\xDF\xDF\xDF"
+        );
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<!DOCTYPE HTML",
@@ -1543,8 +1850,11 @@ impl ByteMatcher {
 
     // HTML terminated with Tag terminating (TT) Byte: 0x20 (SP)
     fn text_html_page() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_page(&r)
+        ensures 
+            Spec::is_text_html_page(&r),
+            r.validate_spec(),
     { 
+        prove_valid_byte_literals!(b"<HTML", b"\xFF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<HTML",
@@ -1557,8 +1867,11 @@ impl ByteMatcher {
 
     // head terminated with Tag Terminating (TT) Byte
     fn text_html_head() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_head(&r)
+        ensures 
+            Spec::is_text_html_head(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<HEAD", b"\xFF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<HEAD",
@@ -1571,8 +1884,11 @@ impl ByteMatcher {
 
     // script terminated with Tag Terminating (TT) Byte
     fn text_html_script() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_script(&r)
+        ensures 
+            Spec::is_text_html_script(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<SCRIPT", b"\xFF\xDF\xDF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<SCRIPT",
@@ -1585,8 +1901,11 @@ impl ByteMatcher {
 
     // iframe terminated with Tag Terminating (TT) Byte
     fn text_html_iframe() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_iframe(&r)
+        ensures 
+            Spec::is_text_html_iframe(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<IFRAME", b"\xFF\xDF\xDF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<IFRAME",
@@ -1599,8 +1918,11 @@ impl ByteMatcher {
 
     // h1 terminated with Tag Terminating (TT) Byte
     fn text_html_h1() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_h1(&r)
+        ensures 
+            Spec::is_text_html_h1(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<H1", b"\xFF\xDF\xFF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<H1",
@@ -1613,8 +1935,11 @@ impl ByteMatcher {
 
     // div terminated with Tag Terminating (TT) Byte
     fn text_html_div() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_div(&r)
+        ensures 
+            Spec::is_text_html_div(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<DIV", b"\xFF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<DIV",
@@ -1627,8 +1952,11 @@ impl ByteMatcher {
 
     // font terminated with Tag Terminating (TT) Byte
     fn text_html_font() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_font(&r)
+        ensures 
+            Spec::is_text_html_font(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<FONT", b"\xFF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<FONT",
@@ -1641,8 +1969,11 @@ impl ByteMatcher {
 
     // table terminated with Tag Terminating (TT) Byte
     fn text_html_table() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_table(&r)
+        ensures 
+            Spec::is_text_html_table(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<TABLE", b"\xFF\xDF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<TABLE",
@@ -1655,8 +1986,11 @@ impl ByteMatcher {
 
     // a terminated with Tag Terminating (TT) Byte
     fn text_html_a() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_a(&r)
+        ensures 
+            Spec::is_text_html_a(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<A", b"\xFF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<A",
@@ -1669,8 +2003,11 @@ impl ByteMatcher {
 
     // style terminated with Tag Terminating (TT) Byte
     fn text_html_style() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_style(&r)
+        ensures 
+            Spec::is_text_html_style(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<STYLE", b"\xFF\xDF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<STYLE",
@@ -1683,8 +2020,11 @@ impl ByteMatcher {
 
     // title terminated with Tag Terminating (TT) Byte
     fn text_html_title() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_title(&r)
+        ensures 
+            Spec::is_text_html_title(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<TITLE", b"\xFF\xDF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<TITLE",
@@ -1697,8 +2037,11 @@ impl ByteMatcher {
 
     // b terminated with Tag Terminating (TT) Byte
     fn text_html_b() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_b(&r)
+        ensures 
+            Spec::is_text_html_b(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<B", b"\xFF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<B",
@@ -1711,8 +2054,11 @@ impl ByteMatcher {
 
     // body terminated with Tag Terminating (TT) Byte
     fn text_html_body() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_body(&r)
+        ensures 
+            Spec::is_text_html_body(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<BODY", b"\xFF\xDF\xDF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<BODY",
@@ -1725,8 +2071,11 @@ impl ByteMatcher {
 
     // br terminated with Tag Terminating (TT) Byte
     fn text_html_br() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_br(&r)
+        ensures 
+            Spec::is_text_html_br(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<BR", b"\xFF\xDF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<BR",
@@ -1739,8 +2088,11 @@ impl ByteMatcher {
 
     // p terminated with Tag Terminating (TT) Byte
     fn text_html_p() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_p(&r)
+        ensures 
+            Spec::is_text_html_p(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<P", b"\xFF\xDF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<P",
@@ -1753,8 +2105,11 @@ impl ByteMatcher {
 
     // comment terminated with Tag Terminating (TT) Byte
     fn text_html_comment() -> (r: TagTerminatedByteMatcher) 
-        ensures Spec::is_text_html_comment(&r)
+        ensures 
+            Spec::is_text_html_comment(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<!--", b"\xFF\xFF\xFF\xFF");
         TagTerminatedByteMatcher {
             matcher: ByteMatcher {
                 pattern: b"<!--",
@@ -1767,8 +2122,11 @@ impl ByteMatcher {
 
     // The string "<?xml".
     fn text_xml() -> (r: ByteMatcher) 
-        ensures Spec::is_text_xml(&r)
+        ensures 
+            Spec::is_text_xml(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"<?xml", b"\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"<?xml",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1779,8 +2137,11 @@ impl ByteMatcher {
 
     // The string "%PDF-", the PDF signature.
     fn application_pdf() -> (r: ByteMatcher) 
-        ensures Spec::is_application_pdf(&r)
+        ensures 
+            Spec::is_application_pdf(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"%PDF-", b"\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"%PDF-",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1791,8 +2152,18 @@ impl ByteMatcher {
 
     // 34 bytes followed by the string "LP", the Embedded OpenType signature.
     fn application_vnd_ms_font_object() -> (r: ByteMatcher)
-        ensures Spec::is_application_vnd_ms_font_object(&r)
+        ensures 
+            Spec::is_application_vnd_ms_font_object(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+                \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+                \x00\x00LP", 
+            b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+                \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+                \x00\x00\xFF\xFF"
+        );
         ByteMatcher {
             pattern: b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
                        \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -1806,8 +2177,11 @@ impl ByteMatcher {
     }
     // 4 bytes representing the version number 1.0, a TrueType signature.
     fn true_type() -> (r: ByteMatcher) 
-        ensures Spec::is_true_type(&r)
+        ensures 
+            Spec::is_true_type(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\x00\x01\x00\x00", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x00\x01\x00\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1817,8 +2191,11 @@ impl ByteMatcher {
     }
     // The string "OTTO", the OpenType signature.
     fn open_type() -> (r: ByteMatcher) 
-        ensures Spec::is_open_type(&r)
+        ensures 
+            Spec::is_open_type(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"OTTO", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"OTTO",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1828,8 +2205,11 @@ impl ByteMatcher {
     }
     // The string "ttcf", the TrueType Collection signature.
     fn true_type_collection() -> (r: ByteMatcher) 
-        ensures Spec::is_true_type_collection(&r)
+        ensures 
+            Spec::is_true_type_collection(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"ttcf", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"ttcf",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1839,8 +2219,11 @@ impl ByteMatcher {
     }
     // The string "wOFF", the Web Open Font Format signature.
     fn application_font_woff() -> (r: ByteMatcher) 
-        ensures Spec::is_application_font_woff(&r)
+        ensures 
+            Spec::is_application_font_woff(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"wOFF", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"wOFF",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1850,8 +2233,11 @@ impl ByteMatcher {
     }
     // The GZIP archive signature.
     fn application_x_gzip() -> (r: ByteMatcher) 
-        ensures Spec::is_application_x_gzip(&r)
+        ensures 
+            Spec::is_application_x_gzip(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\x1F\x8B\x08", b"\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"\x1F\x8B\x08",
             mask: b"\xFF\xFF\xFF",
@@ -1861,8 +2247,11 @@ impl ByteMatcher {
     }
     // The string "PK" followed by ETX EOT, the ZIP archive signature.
     fn application_zip() -> (r: ByteMatcher) 
-        ensures Spec::is_application_zip(&r)
+        ensures 
+            Spec::is_application_zip(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"PK\x03\x04", b"\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"PK\x03\x04",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1872,8 +2261,11 @@ impl ByteMatcher {
     }
     // The string "Rar " followed by SUB BEL NUL, the RAR archive signature.
     fn application_x_rar_compressed() -> (r: ByteMatcher) 
-        ensures Spec::is_application_x_rar_compressed(&r)
+        ensures 
+            Spec::is_application_x_rar_compressed(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"Rar \x1A\x07\x00", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"Rar \x1A\x07\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1883,8 +2275,11 @@ impl ByteMatcher {
     }
     // The string "%!PS-Adobe-", the PostScript signature.
     fn application_postscript() -> (r: ByteMatcher)
-        ensures Spec::is_application_postscript(&r)
+        ensures 
+            Spec::is_application_postscript(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"%!PS-Adobe-", b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
         ByteMatcher {
             pattern: b"%!PS-Adobe-",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1894,8 +2289,11 @@ impl ByteMatcher {
     }
     // UTF-16BE BOM
     fn text_plain_utf_16be_bom() -> (r: ByteMatcher)
-        ensures Spec::is_text_plain_utf_16be_bom(&r)
+        ensures 
+            Spec::is_text_plain_utf_16be_bom(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\xFE\xFF\x00\x00", b"\xFF\xFF\x00\x00");
         ByteMatcher {
             pattern: b"\xFE\xFF\x00\x00",
             mask: b"\xFF\xFF\x00\x00",
@@ -1905,8 +2303,11 @@ impl ByteMatcher {
     }
     // UTF-16LE BOM
     fn text_plain_utf_16le_bom() -> (r: ByteMatcher)
-        ensures Spec::is_text_plain_utf_16le_bom(&r)
+        ensures 
+            Spec::is_text_plain_utf_16le_bom(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\xFF\xFE\x00\x00", b"\xFF\xFF\x00\x00");
         ByteMatcher {
             pattern: b"\xFF\xFE\x00\x00",
             mask: b"\xFF\xFF\x00\x00",
@@ -1916,8 +2317,11 @@ impl ByteMatcher {
     }
     // UTF-8 BOM
     fn text_plain_utf_8_bom() -> (r: ByteMatcher)
-        ensures Spec::is_text_plain_utf_8_bom(&r)
+        ensures 
+            Spec::is_text_plain_utf_8_bom(&r),
+            r.validate_spec(),
     {
+        prove_valid_byte_literals!(b"\xEF\xBB\xBF\x00", b"\xFF\xFF\xFF\x00");
         ByteMatcher {
             pattern: b"\xEF\xBB\xBF\x00",
             mask: b"\xFF\xFF\xFF\x00",

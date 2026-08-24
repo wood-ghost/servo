@@ -9,6 +9,11 @@ use crate::mime_classifier_specs::mime_api::{
     MimeView,
 };
 
+use vstd::arithmetic::div_mod::{
+    lemma_fundamental_div_mod,
+    lemma_mod_multiples_vanish,
+};
+
 verus! {
 
 // https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4
@@ -59,7 +64,6 @@ pub open spec fn matches_mp4_signature(seq: Seq<u8>) -> bool {
     }
 }
 
-
 impl MIMECheckerSpec for Mp4Matcher {
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         if matches_mp4_signature(data) {
@@ -73,4 +77,75 @@ impl MIMECheckerSpec for Mp4Matcher {
         true
     }
 }
+
+pub open spec fn has_mp4_prefix(chunk: Seq<u8>) -> bool {
+    chunk.len() >= 3
+    && chunk[0] == 0x6D
+    && chunk[1] == 0x70
+    && chunk[2] == 0x34
+}
+
+pub(crate) proof fn lemma_step4_u32_eq_int(box_size: u32, data: Seq<u8>) 
+    requires
+        data.len() >= 4,
+        box_size == ((data[0] as u32) << 24)
+            | ((data[1] as u32) << 16)
+            | ((data[2] as u32) << 8)
+            | (data[3] as u32),
+    ensures
+        box_size as int == (data[0] as int) * 0x1000000
+            + (data[1] as int) * 0x10000
+            + (data[2] as int) * 0x100
+            + data[3] as int,
+{
+    let b0 = data[0];
+    let b1 = data[1];
+    let b2 = data[2];
+    let b3 = data[3];
+
+    assert(
+        (((b0 as u32) << 24)
+            | ((b1 as u32) << 16)
+            | ((b2 as u32) << 8)
+            | (b3 as u32)) as int
+        == (b0 as int) * 0x1000000
+            + (b1 as int) * 0x10000
+            + (b2 as int) * 0x100
+            + b3 as int
+    ) by (bit_vector);
+}
+
+
+
+pub(crate) proof fn lemma_mp4_offsets_are_chunk_indices(
+    box_size: int,
+    p: spec_fn(int) -> bool,
+)
+    ensures
+        (exists |bytes_read: int|
+            16 <= bytes_read < box_size
+            && bytes_read % 4 == 0
+            && #[trigger] p(bytes_read))
+        ==
+        (exists |chunk_index: int|
+            0 <= chunk_index
+            && 16 + 4 * chunk_index < box_size
+            && #[trigger] p(16 + 4 * chunk_index)),
+{
+    if exists |bytes_read: int|
+        16 <= bytes_read < box_size
+        && bytes_read % 4 == 0
+        && #[trigger] p(bytes_read)
+    {
+        let bytes_read = choose |bytes_read: int|
+            16 <= bytes_read < box_size
+            && bytes_read % 4 == 0
+            && #[trigger] p(bytes_read);
+
+        let chunk_index = (bytes_read - 16) / 4;
+
+        assert(bytes_read == 16 + 4 * chunk_index);
+    }
+}
+
 } // verus!

@@ -2,8 +2,6 @@ use vstd::prelude::*;
 
 verus! {
 
-
-
 // #[verifier::allow(undeclared_external_trait)]
 // pub assume_specification<T, F>
 //     [Option::<T>::or_else]
@@ -44,15 +42,15 @@ verus! {
 
 
 
-pub assume_specification<'a, T>
-    [<[T]>::chunks]
-    (
-        slice: &'a [T],
-        chunk_size: usize,
-    ) -> (result: std::slice::Chunks<'a, T>)
-    requires
-        chunk_size > 0,
-;
+// pub assume_specification<'a, T>
+//     [<[T]>::chunks]
+//     (
+//         slice: &'a [T],
+//         chunk_size: usize,
+//     ) -> (result: std::slice::Chunks<'a, T>)
+//     requires
+//         chunk_size > 0,
+// ;
 
 // pub assume_specification<T>
 //     [<[T]>::starts_with]
@@ -85,10 +83,10 @@ where
         },
 ;
 
-#[verifier::reject_recursive_types(T)]
-#[verifier::external_type_specification]
-#[verifier::external_body]
-pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
+// #[verifier::reject_recursive_types(T)]
+// #[verifier::external_type_specification]
+// #[verifier::external_body]
+// pub struct ExChunks<'a, T: 'a>(std::slice::Chunks<'a, T>);
 
 // #[verifier::external_body]
 // pub fn u8_slice_to_vec(

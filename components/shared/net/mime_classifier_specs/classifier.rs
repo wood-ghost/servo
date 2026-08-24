@@ -137,6 +137,7 @@ impl MIMECheckerSpec for BinaryOrPlaintextClassifier {
 //         }
 //     }
 // }
+
 pub(crate) open spec fn classify_group_from(
     matchers: Seq<Box<dyn ThreadSafeMIMEChecker>>,
     data: Seq<u8>,
@@ -165,7 +166,8 @@ impl MIMECheckerSpec for GroupedClassifier {
     open spec fn validate_spec(&self) -> bool {
         forall |i: int|
             0 <= i < self.byte_matchers@.len() ==>
-                #[trigger] self.byte_matchers@[i].validate_spec()
+                // #[trigger] self.byte_matchers@[i].validate_spec()
+                #[trigger] self.byte_matchers@[i].dyn_validate_spec()
     }
 }
 
@@ -197,13 +199,13 @@ pub(crate) open spec fn font_type_pattern_matching_algo(
 }
 
 pub closed spec fn mime_classifier_validate_spec(classifier: &MimeClassifier) -> bool {
-    classifier.image_classifier.validate_spec()
-        && classifier.audio_video_classifier.validate_spec()
-        && classifier.scriptable_classifier.validate_spec()
-        && classifier.plaintext_classifier.validate_spec()
-        && classifier.archive_classifier.validate_spec()
-        && classifier.binary_or_plaintext.validate_spec()
-        && classifier.font_classifier.validate_spec()
+    &&& classifier.image_classifier.validate_spec()
+    &&& classifier.audio_video_classifier.validate_spec()
+    &&& classifier.scriptable_classifier.validate_spec()
+    &&& classifier.plaintext_classifier.validate_spec()
+    &&& classifier.archive_classifier.validate_spec()
+    &&& classifier.binary_or_plaintext.validate_spec()
+    &&& classifier.font_classifier.validate_spec()
 }
 
 // TODO: necessary?
