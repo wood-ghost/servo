@@ -257,7 +257,7 @@ impl MimeClassifier {
             return supplied_type_or_octet_stream;
         }
 
-        let supplied_type_input = supplied_type;
+        let ghost supplied_type_input = supplied_type;
 
         match context {
             LoadContext::Browsing => match *supplied_type {
@@ -1232,6 +1232,10 @@ impl BinaryOrPlaintextClassifier {
         ensures
             self.classify_spec(data@) == Some(SpecMime::view(&result)),
     {
+        proof {
+            // Connect the slice iterator's Seq<&u8> model back to Seq<u8>.
+            assert(data@.as_ref().unref() == data@);
+        }
         // Step 1. Let length be the number of bytes in the resource header.
         // Step 2. If length is greater than or equal to 2 and
         // the first 2 bytes of the resource header are equal to 0xFE 0xFF (UTF-16BE BOM)
@@ -1246,64 +1250,29 @@ impl BinaryOrPlaintextClassifier {
             mime::TEXT_PLAIN
         // TODO: recover the original code
         // } else if data.iter().any(|&x| {
-            // x <= 0x08u8 ||
-                // x == 0x0Bu8 ||
-                // (0x0Eu8..=0x1Au8).contains(&x) ||
-                // (0x1Cu8..=0x1Fu8).contains(&x)
-        // } else if data.iter().any(|xp: &u8| -> (r: bool) 
-        //     ensures
-        //         r == SpecClassifier::is_binary_data_byte(*xp)
-        // {
-        //     *xp <= 0x08u8 ||
-        //         *xp == 0x0Bu8 ||
-        //         (0x0Eu8..=0x1Au8).contains(xp) ||
-        //         (0x1Cu8..=0x1Fu8).contains(xp)
-        // }) {
-        } else {
+        //     x <= 0x08u8 ||
+        //         x == 0x0Bu8 ||
+        //         (0x0Eu8..=0x1Au8).contains(&x) ||
+        //         (0x1Cu8..=0x1Fu8).contains(&x)
+        } else if data.iter().any(|xp: &u8| -> (r: bool) 
+            ensures
+                r == SpecClassifier::is_binary_data_byte(*xp)
+        {
+            *xp <= 0x08u8 ||
+                *xp == 0x0Bu8 ||
+                (0x0Eu8..=0x1Au8).contains(xp) ||
+                (0x1Cu8..=0x1Fu8).contains(xp)
+        }) {
             // Step 5. The computed MIME type is "application/octet-stream".
-            // mime::APPLICATION_OCTET_STREAM
-        // } else {
+            mime::APPLICATION_OCTET_STREAM
+        } else {
             // Step 4. If the resource header contains no binary data bytes,
             // the computed MIME type is "text/plain".
-            // mime::TEXT_PLAIN
-            let mut i: usize = 0;
-
-            while i < data.len()
-                invariant
-                    i <= data.len(),
-                    !(data.len() >= 2 && ((data@[0] == 0xFFu8 && data@[1] == 0xFEu8)
-                        || (data@[0] == 0xFEu8 && data@[1] == 0xFFu8)
-                    )),
-                    !(data.len() >= 3
-                        && data@[0] == 0xEFu8
-                        && data@[1] == 0xBBu8
-                        && data@[2] == 0xBFu8
-                    ),
-                    forall|j: int| #![trigger data@[j]]
-                        0 <= j < i as int ==>
-                            !SpecClassifier::is_binary_data_byte(data@[j]),
-                decreases
-                    data.len() - i,
-            {
-                let x = data[i];
-
-                let is_binary =
-                    x <= 0x08u8 ||
-                    x == 0x0Bu8 ||
-                    (0x0Eu8 <= x && x <= 0x1Au8) ||
-                    (0x1Cu8 <= x && x <= 0x1Fu8);
-
-                if is_binary {
-                    return mime::APPLICATION_OCTET_STREAM;
-                }
-
-                i += 1;
-            }
-
             mime::TEXT_PLAIN
         }
     }
 }
+
 impl MIMEChecker for BinaryOrPlaintextClassifier {
     fn classify(&self, data: &[u8]) -> (r: Option<Mime>)
         ensures
