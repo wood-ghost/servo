@@ -59,13 +59,51 @@ pub open spec fn is_match_result(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>
     }
 }
 
+pub open spec fn position_found(input: Seq<&u8>, ignored: Set<u8>, start: int) -> bool {
+    &&& 0 <= start < input.len()
+    &&& !ignored.contains(*input[start])
+    &&& forall |j: int| #![trigger input[j]] 0 <= j < start ==> ignored.contains(*input[j])
+}
+
+pub open spec fn position_not_found(input: Seq<&u8>, ignored: Set<u8>) -> bool {
+    forall |j: int| #![trigger ignored.contains(*input[j])]
+        0 <= j < input.len() ==> ignored.contains(*input[j])
+}
+
+pub broadcast proof fn position_not_found_implies_no_pattern_matching(
+    input: Seq<u8>,
+    pattern: Seq<u8>,
+    mask: Seq<u8>,
+    ignored: Set<u8>,
+)
+    requires
+        0 < pattern.len(),
+        pattern.len() <= input.len(),
+    ensures
+        #![trigger pattern_matching_success(input, pattern, mask, ignored)]
+        position_not_found(
+            input.subrange(0, input.len() - pattern.len() + 1).as_ref(),
+            ignored,
+        ) ==> !pattern_matching_success(input, pattern, mask, ignored),
+{
+    let prefix = input.subrange(0, input.len() - pattern.len() + 1);
+
+    if position_not_found(prefix.as_ref(), ignored)
+        && pattern_matching_success(input, pattern, mask, ignored)
+    {
+        let start = choose |start: int|
+            pattern_matching_at(input, pattern, mask, ignored, start);
+        assert(ignored.contains(*prefix.as_ref()[start]));
+
+        assert(false);
+    }
+}
+
 
 // proofs
 pub proof fn match_return_some(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, start: int)
     requires
-        // pattern.len() > 0,
         pattern.len() == mask.len(),
-        // pattern.len() <= data.len(),
         !(data =~= pattern),
         start >= 0,
         start + pattern.len() <= data.len(),
@@ -91,12 +129,23 @@ pub proof fn match_return_some(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
 
 pub proof fn match_return_none(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, start: int)
     requires
+        start + pattern.len() <= data.len(),
+        is_first_not_ignored_idx(data, ignored, start),
         exists |p: int| #![trigger pattern[p]]
             0 <= p < pattern.len()
             && (data[start + p] & mask[p]) != pattern[p],
     ensures
         !pattern_matching_at(data, pattern, mask, ignored, start)
-{}
+{
+    if pattern_matching_success(data, pattern, mask, ignored) {
+        let p = choose |p: int| #![trigger pattern[p]]
+            0 <= p < pattern.len()
+            && (data[start + p] & mask[p]) != pattern[p];
+        assert((data[start + p] & mask[p]) != pattern[p]);
+
+        assert(false);
+    }
+}
 
 // impl
 impl MIMECheckerSpec for ByteMatcher {

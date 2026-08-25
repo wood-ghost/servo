@@ -3,10 +3,19 @@ use vstd::prelude::*;
 
 // use super::model::*;
 use vstd::std_specs::cmp::PartialEqSpec;
+use vstd::std_specs::fmt::fmt_req_all;
 
 use core::str::FromStr;
 
 verus! {
+
+// api
+
+pub broadcast axiom fn axiom_fmt_req_all_mime()
+    ensures
+        #[trigger] fmt_req_all::<Mime>(),
+;
+
 
 // abstract Mime
 pub struct MimeView {

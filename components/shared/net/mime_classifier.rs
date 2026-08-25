@@ -822,31 +822,52 @@ impl ByteMatcher {
         } else if data == self.pattern {
             return Some(self.pattern.len());
         } else {
-            let max_start = data.len() - self.pattern.len();
-            let mut start: usize = 0;
-
-            while start <= max_start
-                invariant
-                    start <= max_start + 1,
-                    self.pattern.len() <= data.len(),
-                    self.pattern.len() == self.mask.len(),
-                    max_start == data.len() - self.pattern.len(), 
-                    self.pattern.len() > 0,
-                    !(data@ =~= self.pattern@),
-                    forall|j: int| #![trigger data@[j]] 0 <= j < start as int ==> self.leading_ignore@.to_set().contains(data@[j]),
-                decreases
-                    max_start + 1 - start,
-            {
-                if !self.leading_ignore.contains(&data[start]) {
+            broadcast use SpecByteMatcher::position_not_found_implies_no_pattern_matching;
+            data[..data.len() - self.pattern.len() + 1]
+                .iter()
+                .position(|x: &u8| -> (r: bool)
+                    ensures 
+                        r == !self.leading_ignore@.to_set().contains(*x),
+                    { 
+                        !self.leading_ignore.contains(&x) 
+                    },
+                )
+                .and_then(|start: usize| -> (result: Option<usize>)
+                    requires 
+                        SpecByteMatcher::position_found(
+                            data@.subrange(0, (data.len() - self.pattern.len() + 1) as int).as_ref(),
+                            self.leading_ignore@.to_set(),
+                            start as int,
+                        ),
+                    ensures
+                        match result {
+                            Some(r) => SpecByteMatcher::is_match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int),
+                            None => !SpecByteMatcher::pattern_matching_success(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()), 
+                        },
+                {
                     proof {
-                        assert(start < data.len());
-                        assert(start + self.pattern.len() <= data.len());
-                        assert(!self.leading_ignore@.to_set().contains(data@[start as int]));
-
-                        assert(
-                            SpecByteMatcher::is_first_not_ignored_idx(data@, self.leading_ignore@.to_set(), start as int)
-                        );
-                    }
+                        if SpecByteMatcher::position_found(
+                            data@.subrange(0, 
+                                (data.len() - self.pattern.len() + 1) as int
+                            ).as_ref(),
+                            self.leading_ignore@.to_set(),
+                            start as int,
+                        ) {
+                            assert forall |j: int| #![trigger data@[j]]
+                                0 <= j < start as int
+                                implies
+                                self.leading_ignore@.to_set().contains(data@[j])
+                            by {
+                                assert(
+                                    self.leading_ignore@.to_set().contains(
+                                        *data@.subrange(0, 
+                                            (data.len() - self.pattern.len() + 1) as int
+                                        ).as_ref()[j],
+                                    )
+                                );
+                            }
+                        }
+                    } 
                     if data[start..]
                         .iter()
                         .zip(self.pattern.iter())
@@ -861,84 +882,50 @@ impl ByteMatcher {
                         })
                     {
                         proof {
-                            SpecByteMatcher::match_return_some(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int);
+                            if SpecByteMatcher::position_found(
+                                data@.subrange(
+                                    0,
+                                    (data.len() - self.pattern.len() + 1) as int,
+                                ).as_ref(),
+                                self.leading_ignore@.to_set(),
+                                start as int,
+                            ) {
+                                SpecByteMatcher::match_return_some(
+                                    data@,
+                                    self.pattern@,
+                                    self.mask@,
+                                    self.leading_ignore@.to_set(),
+                                    start as int,
+                                );
+                            }
                         }
-                        return Some(start + self.pattern.len());
+                    
+                        Some(start + self.pattern.len())
                     } else {
                         proof {
-                            SpecByteMatcher::match_return_none(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), start as int);
+                            if SpecByteMatcher::position_found(
+                                data@.subrange(
+                                    0,
+                                    (data.len() - self.pattern.len() + 1) as int,
+                                ).as_ref(),
+                                self.leading_ignore@.to_set(),
+                                start as int,
+                            ) {
+                                SpecByteMatcher::match_return_none(
+                                    data@,
+                                    self.pattern@,
+                                    self.mask@,
+                                    self.leading_ignore@.to_set(),
+                                    start as int,
+                                );
+                            }
                         }
-                        return None;
+                        None
                     }
-                }
-                start += 1;
+                })
             }
-            return None;
-        }
-        // TODO: keep the original code 
-        // } else {
-
-
-        //     data[..data.len() - self.pattern.len() + 1]
-        //         .iter()
-        //         .position(|x: u8| -> (r: bool)
-        //             ensures r == !self.leading_ignore@.to_set().contains(x),
-        //             { 
-        //                 !self.leading_ignore.contains(&x) 
-        //             },
-        //         )
-        //         .and_then(|start: usize| -> (result: Option<usize>)
-        //             requires 
-        //                 start < data.len() - self.pattern.len() + 1,
-        //                 // SpecByteMatcher::is_first_not_ignored_idx(data@, self.leading_ignore@.to_set(), start as int),
-        //                 !self.leading_ignore@.to_set().contains(
-        //                     data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[start as int],
-        //                 ),
-
-        //                 forall |j: int| 
-        //                     #![trigger self.leading_ignore@.to_set().contains(data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[j])]
-        //                     0 <= j < start as int ==> 
-        //                     self.leading_ignore@.to_set().contains(data@.subrange(0, (data.len() - self.pattern.len() + 1) as int)[j]),
-        //             ensures
-        //                 match result {
-        //                     Some(r) => SpecByteMatcher::match_result(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set(), r as int),
-        //                     None => !SpecByteMatcher::pattern_matching_success(data@, self.pattern@, self.mask@, self.leading_ignore@.to_set()), 
-        //                 },
-        //         {
-        //             if data[start..]
-        //                 .iter()
-        //                 .zip(self.pattern.iter())
-        //                 .zip(self.mask.iter())
-        //                 // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
-        //                 .all(|x: ((&u8, &u8), &u8)| -> (r: bool) 
-        //                     ensures
-        //                         r == ((*x.0.0 & *x.1) == *x.0.1),
-        //                 {
-        //                     let ((data_p, pattern_p), mask_p) = x;
-        //                     (*data_p & *mask_p) == *pattern_p
-        //                 })
-        //             {
-        //                 Some(start + self.pattern.len())
-        //             } else {
-        //                 None
-        //             }
-        //         })
-        //     }
     }
     
-}
-
-#[verifier::external_body]
-fn MIMEChecker_validate_empty_pattern_error(mt: &Mime) -> (result: String) {
-    format!("Zero length pattern for {:?}", mt)
-}
-#[verifier::external_body]
-fn MIMEChecker_validate_unequal_pattern_error(mt: &Mime) -> (result: String) {
-    format!("Unequal pattern and mask length for {:?}", mt)
-}
-#[verifier::external_body]
-fn MIMEChecker_validate_premasked_error(mt: &Mime) -> (result: String) {
-    format!("Pattern not pre-masked for {:?}", mt)
 }
 
 impl MIMEChecker for ByteMatcher {
@@ -956,16 +943,16 @@ impl MIMEChecker for ByteMatcher {
         ensures
             result.is_ok() == self.validate_spec(),
     {
+        broadcast use SpecMime::axiom_fmt_req_all_mime;
+
         if self.pattern.is_empty() {
-            // return Err(format!("Zero length pattern for {:?}", self.content_type));
-            return Err(MIMEChecker_validate_empty_pattern_error(&self.content_type));
+            return Err(format!("Zero length pattern for {:?}", self.content_type));
         }
         if self.pattern.len() != self.mask.len() {
-            // return Err(format!(
-            //     "Unequal pattern and mask length for {:?}",
-            //     self.content_type
-            // ));
-            return Err(MIMEChecker_validate_unequal_pattern_error(&self.content_type));
+            return Err(format!(
+                "Unequal pattern and mask length for {:?}",
+                self.content_type
+            ));
         }
 
         if self
@@ -981,11 +968,10 @@ impl MIMEChecker for ByteMatcher {
                 *pattern_p & *mask_p != *pattern_p
             })
         {
-            // return Err(format!(
-            //     "Pattern not pre-masked for {:?}",
-            //     self.content_type
-            // ));
-            return Err(MIMEChecker_validate_premasked_error(&self.content_type));
+            return Err(format!(
+                "Pattern not pre-masked for {:?}",
+                self.content_type
+            ));
         }
 
         proof {
