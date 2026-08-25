@@ -1073,118 +1073,24 @@ impl Mp4Matcher {
         // Step 7. If the three bytes from sequence[8] to sequence[10] are equal to 0x6D 0x70 0x34 ("mp4"), return true.
         let mp4 = [0x6D, 0x70, 0x34];
 
-        let major_brand_result = data[8..].starts_with(&mp4);
-       
-        let compatible_brand_result = box_size >= 16 && {
-            let mut chunks = data[16..box_size].chunks(4);
-
-            // Follow the pattern used by the Iterator::any test.
-            let ghost initial = chunks;
-            let ghost initial_chunks = IteratorSpec::remaining(&initial);
-
-            let result = chunks.any(
-                |chunk: &[u8]| -> (r: bool)
+        broadcast use SpecMP4Matcher::lemma_chunks_mp4_equivalence;
+            
+        data[8..].starts_with(&mp4) ||
+        // Step 8. Let bytes-read be 16.
+        // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
+            ((box_size >= 16) && //TODO: add for specification
+            data[16..box_size]
+            // Step 11. Increment bytes-read by 4.
+                .chunks(4)
+                // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
+                // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
+                .any(|chunk: &[u8]| -> (r: bool)
                     ensures
                         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
-                {
+                { 
                     chunk.starts_with(&mp4)
-                },
-            );
-
-            proof {
-                let b = box_size as int;
-
-                let p = |offset: int| {
-                    data@[offset] == 0x6D
-                    && data@[offset + 1] == 0x70
-                    && data@[offset + 2] == 0x34
-                };
-
-                if result {
-                    let i =
-                        initial_chunks.len()
-                        - IteratorSpec::remaining(&chunks).len()
-                        - 1;
-
-                    assert(p(16 + 4 * i));
-                } else {
-                    assert forall |i: int|
-                        #![trigger p(16 + 4 * i)]
-                        0 <= i
-                        && 16 + 4 * i < b
-                    implies
-                        !p(16 + 4 * i)
-                    by {
-
-                        assert(!(
-                            initial_chunks[i]@.len() >= 3
-                            && initial_chunks[i]@[0] == 0x6D
-                            && initial_chunks[i]@[1] == 0x70
-                            && initial_chunks[i]@[2] == 0x34
-                        ));
-                    };
-                }
-
-                SpecMP4Matcher::lemma_mp4_offsets_are_chunk_indices(
-                    b,
-                    p,
-                );
-
-                assert(
-                    (exists |bytes_read: int|
-                        16 <= bytes_read < b
-                        && bytes_read % 4 == 0
-                        && #[trigger] p(bytes_read))
-                    ==
-                    (exists |bytes_read: int|
-                        16 <= bytes_read < b
-                        && bytes_read % 4 == 0
-                        && #[trigger] data@[bytes_read] == 0x6D
-                        && data@[bytes_read + 1] == 0x70
-                        && data@[bytes_read + 2] == 0x34)
-                ) by {
-                    if exists |bytes_read: int|
-                        16 <= bytes_read < b
-                        && bytes_read % 4 == 0
-                        && #[trigger] data@[bytes_read] == 0x6D
-                        && data@[bytes_read + 1] == 0x70
-                        && data@[bytes_read + 2] == 0x34
-                    {
-                        let bytes_read = choose |bytes_read: int|
-                            16 <= bytes_read < b
-                            && bytes_read % 4 == 0
-                            && #[trigger] data@[bytes_read] == 0x6D
-                            && data@[bytes_read + 1] == 0x70
-                            && data@[bytes_read + 2] == 0x34;
-
-                        assert(p(bytes_read));
-                    }
-                };
-            }
-
-            result
-        };
-
-
-
-            
-        // data[8..].starts_with(&mp4) ||
-        // // Step 8. Let bytes-read be 16.
-        // // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
-        //     ((box_size >= 16) && //TODO: add for specification
-        //     data[16..box_size]
-        //     // Step 11. Increment bytes-read by 4.
-        //         .chunks(4)
-        //         // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
-        //         // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
-        //         .any(|chunk: &[u8]| -> (r: bool)
-        //             ensures
-        //                 r == SpecMP4Matcher::has_mp4_prefix(chunk@)
-        //         { 
-        //             chunk.starts_with(&mp4)
-        //         }))
+                }))
         // Step 12. Return false.
-        major_brand_result || compatible_brand_result
     }
 }
 impl MIMEChecker for Mp4Matcher {
@@ -1301,8 +1207,11 @@ pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
 //     open spec fn dyn_validate_spec(&self) -> bool {
 //         self.validate_spec()
 //     }
-// }
+    
+//     proof fn bridge_validate_spec(tracked &self) {}
 
+//     proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
+// }
 
 #[cfg(verus_only)]
 impl ThreadSafeMIMEChecker for ByteMatcher {

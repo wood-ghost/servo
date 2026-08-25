@@ -9,11 +9,6 @@ use crate::mime_classifier_specs::mime_api::{
     MimeView,
 };
 
-use vstd::arithmetic::div_mod::{
-    lemma_fundamental_div_mod,
-    lemma_mod_multiples_vanish,
-};
-
 verus! {
 
 // https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4
@@ -115,23 +110,120 @@ pub(crate) proof fn lemma_step4_u32_eq_int(box_size: u32, data: Seq<u8>)
     ) by (bit_vector);
 }
 
-
-
-pub(crate) proof fn lemma_mp4_offsets_are_chunk_indices(
+pub broadcast proof fn lemma_chunks_mp4_equivalence(
+    data: Seq<u8>,
     box_size: int,
-    p: spec_fn(int) -> bool,
+    chunks: Seq<&[u8]>,
 )
+    requires
+        16 <= box_size <= data.len(),
+        box_size % 4 == 0,
+        chunks.len() == (data.subrange(16, box_size).len() + 3) / 4,
+
+        forall |i: int|
+            #![trigger chunks[i]]
+            0 <= i < chunks.len() ==> {
+                let source = data.subrange(16, box_size);
+                let start = 4 * i;
+                let end =
+                    if start + 4 <= source.len() {
+                        start + 4
+                    } else {
+                        source.len() as int
+                    };
+
+                chunks[i]@ == source.subrange(start, end)
+            },
     ensures
+        #![trigger chunks.len(), data.subrange(16, box_size)] 
+        (exists |i: int|
+            0 <= i < chunks.len()
+            && #[trigger] has_mp4_prefix(chunks[i]@))
+        ==
+        (exists |bytes_read: int|
+            16 <= bytes_read < box_size
+            && bytes_read % 4 == 0
+            && #[trigger] data[bytes_read] == 0x6D
+            && data[bytes_read + 1] == 0x70
+            && data[bytes_read + 2] == 0x34),
+{
+    let source = data.subrange(16, box_size);
+    let n = box_size - 16;
+    let q = n / 4;
+
+    let p = |offset: int| {
+        data[offset] == 0x6D
+            && data[offset + 1] == 0x70
+            && data[offset + 2] == 0x34
+    };
+
+    assert(
+        (exists |i: int|
+            0 <= i < chunks.len()
+            && #[trigger] has_mp4_prefix(chunks[i]@))
+        ==
+        (exists |i: int|
+            0 <= i
+            && 16 + 4 * i < box_size
+            && #[trigger] p(16 + 4 * i))
+    ) by {
+        if exists |i: int|
+            0 <= i < chunks.len()
+            && #[trigger] has_mp4_prefix(chunks[i]@)
+        {
+            let i = choose |i: int|
+                0 <= i < chunks.len()
+                && #[trigger] has_mp4_prefix(chunks[i]@);
+
+            assert(p(16 + 4 * i));
+        }
+
+        if exists |i: int|
+            0 <= i
+            && 16 + 4 * i < box_size
+            && #[trigger] p(16 + 4 * i)
+        {
+            let i = choose |i: int|
+                0 <= i
+                && 16 + 4 * i < box_size
+                && #[trigger] p(16 + 4 * i);
+
+            assert(i < chunks.len());
+            assert(has_mp4_prefix(chunks[i]@));
+        }
+    }
+
+    assert(
         (exists |bytes_read: int|
             16 <= bytes_read < box_size
             && bytes_read % 4 == 0
             && #[trigger] p(bytes_read))
         ==
-        (exists |chunk_index: int|
-            0 <= chunk_index
-            && 16 + 4 * chunk_index < box_size
-            && #[trigger] p(16 + 4 * chunk_index)),
-{
+        (exists |bytes_read: int|
+            16 <= bytes_read < box_size
+            && bytes_read % 4 == 0
+            && #[trigger] data[bytes_read] == 0x6D
+            && data[bytes_read + 1] == 0x70
+            && data[bytes_read + 2] == 0x34)
+    ) by {
+        if exists |bytes_read: int|
+            16 <= bytes_read < box_size
+            && bytes_read % 4 == 0
+            && #[trigger] data[bytes_read] == 0x6D
+            && data[bytes_read + 1] == 0x70
+            && data[bytes_read + 2] == 0x34
+        {
+            let bytes_read = choose |bytes_read: int|
+                16 <= bytes_read < box_size
+                && bytes_read % 4 == 0
+                && #[trigger] data[bytes_read] == 0x6D
+                && data[bytes_read + 1] == 0x70
+                && data[bytes_read + 2] == 0x34;
+
+            assert(p(bytes_read));
+        }
+    }
+
     if exists |bytes_read: int|
         16 <= bytes_read < box_size
         && bytes_read % 4 == 0
