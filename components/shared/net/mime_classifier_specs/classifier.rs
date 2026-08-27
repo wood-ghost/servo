@@ -158,6 +158,56 @@ pub(crate) open spec fn classify_group_from(
     }
 }
 
+pub(crate) broadcast proof fn lemma_classify_group_from_first_some(
+    matchers: Seq<Box<dyn ThreadSafeMIMEChecker>>,
+    data: Seq<u8>,
+    idx: int,
+)
+    requires
+        0 <= idx < matchers.len(),
+        forall |j: int|
+            #![trigger matchers[j].classify_spec(data)]
+            0 <= j < idx ==>
+                matchers[j].classify_spec(data).is_none(),
+        matchers[idx].classify_spec(data).is_some(),
+    ensures
+        #![trigger
+            classify_group_from(matchers, data),
+            matchers[idx].classify_spec(data)
+        ]
+        classify_group_from(matchers, data) == matchers[idx].classify_spec(data),
+    decreases idx
+{
+    if idx > 0 {
+        lemma_classify_group_from_first_some(
+            matchers.drop_first(),
+            data,
+            idx - 1,
+        );
+    }
+}
+
+pub(crate) broadcast proof fn lemma_classify_group_from_all_none(
+    matchers: Seq<Box<dyn ThreadSafeMIMEChecker>>,
+    data: Seq<u8>,
+)
+    requires
+        forall |j: int|
+            #![trigger matchers[j].classify_spec(data)]
+            0 <= j < matchers.len() ==>
+                matchers[j].classify_spec(data).is_none(),
+    ensures
+        #[trigger] classify_group_from(matchers, data).is_none(),
+    decreases matchers.len()
+{
+    if matchers.len() > 0 {
+        lemma_classify_group_from_all_none(
+            matchers.drop_first(),
+            data,
+        );
+    }
+}
+
 impl MIMECheckerSpec for GroupedClassifier {
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         classify_group_from(self.byte_matchers@, data)

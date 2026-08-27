@@ -1372,50 +1372,30 @@ impl GroupedClassifier {
     }
 }
 impl MIMEChecker for GroupedClassifier {
-    fn classify(&self, data: &[u8]) -> Option<Mime> {
-        // self.byte_matchers
-        //     .iter()
-        //     .find_map(|matcher| matcher.classify(data))
-        let mut i: usize = 0;
-
-        assert(self.byte_matchers@.skip(i as int) == self.byte_matchers@);
-
-        while i < self.byte_matchers.len()
-            invariant
-                i <= self.byte_matchers.len(),
-                self.validate_spec(),
-
-                SpecClassifier::classify_group_from(self.byte_matchers@, data@) 
-                    == SpecClassifier::classify_group_from(
-                        self.byte_matchers@.skip(i as int), 
-                        data@,
-                    ),
-            decreases
-                self.byte_matchers.len() - i,
-        {
-            let matcher: &dyn ThreadSafeMIMEChecker =
-                &*self.byte_matchers[i];
-
-            proof {
-                matcher.bridge_validate_spec();
-                matcher.bridge_classify_spec(data@);
-            }
-
-            let result = MIMEChecker::classify(matcher, data);
-
-            match result {
-                Some(mt) => return Some(mt),
-                None => {
-                    assert(
-                        self.byte_matchers@.skip(i as int).drop_first()
-                            == self.byte_matchers@.skip((i + 1) as int)
-                    );
-
-                    i += 1;
+    fn classify(&self, data: &[u8]) -> (r: Option<Mime>) 
+        ensures
+            SpecMime::option_view(&r) == self.classify_spec(data@),
+    {
+        broadcast use {
+            SpecClassifier::lemma_classify_group_from_first_some,
+            SpecClassifier::lemma_classify_group_from_all_none,
+        };
+        self.byte_matchers
+            .iter()
+            .find_map(
+                |matcher| -> (ret: Option<Mime>)
+                    requires
+                        matcher.dyn_validate_spec(),
+                    ensures
+                        SpecMime::option_view(&ret) == matcher.dyn_classify_spec(data@),
+                        matcher.dyn_classify_spec(data@) == matcher.classify_spec(data@)
+            {
+                proof {
+                    matcher.bridge_validate_spec();
+                    matcher.bridge_classify_spec(data@);
                 }
-            }
-        } 
-        None
+                matcher.classify(data)
+            })
     }
 
     fn validate(&self) -> (r: Result<(), String>) 
