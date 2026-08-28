@@ -493,7 +493,7 @@ impl Mp4Matcher {
         data[8..].starts_with(&mp4) ||
         // Step 8. Let bytes-read be 16.
         // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
-            data[16..box_size]
+            (box_size >= 16) && data[16..box_size]
             // Step 11. Increment bytes-read by 4.
                 .chunks(4)
                 // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]

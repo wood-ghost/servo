@@ -52,6 +52,19 @@ fn test_sniff_mp4_matcher_long() {
 }
 
 #[test]
+fn test_sniff_mp4_matcher_box_size_less_than_16() {
+    let matcher = Mp4Matcher;
+
+    let data = [
+        0x00, 0x00, 0x00, 0x0C, // box_size = 12 
+        0x66, 0x74, 0x79, 0x70, // ftyp 
+        0x00, 0x00, 0x00, 0x00, // not mp4 signature
+    ];
+
+    assert!(!matcher.matches(&data));
+}
+
+#[test]
 fn test_validate_classifier() {
     let classifier = MimeClassifier::default();
     classifier.validate().expect("Validation error")
