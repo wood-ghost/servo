@@ -4,6 +4,7 @@ use vstd::prelude::*;
 // use super::model::*;
 use vstd::std_specs::cmp::PartialEqSpec;
 use vstd::std_specs::fmt::fmt_req_all;
+use vstd::utf8::valid_first_scalar;
 
 use core::str::FromStr;
 
@@ -185,7 +186,323 @@ pub open spec fn application_pdf_identity() -> MimeView {
     }
 }
 
-pub uninterp spec fn video_mp4_identity() -> MimeView;
+// parse from string
+// "image/x-icon"
+pub open spec fn image_x_icon_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "x-icon"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "image/webp"
+pub open spec fn image_webp_identity() -> MimeView {
+    MimeView {
+        type_: "image"@,
+        subtype: "webp"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "video/webm"
+pub open spec fn video_webm_identity() -> MimeView {
+    MimeView {
+        type_: "video"@,
+        subtype: "webm"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "audio/basic"
+pub open spec fn audio_basic_identity() -> MimeView {
+    MimeView {
+        type_: "audio"@,
+        subtype: "basic"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "audio/aiff"
+pub open spec fn audio_aiff_identity() -> MimeView {
+    MimeView {
+        type_: "audio"@,
+        subtype: "aiff"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "audio/mpeg"
+pub open spec fn audio_mpeg_identity() -> MimeView {
+    MimeView {
+        type_: "audio"@,
+        subtype: "mpeg"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/ogg"
+pub open spec fn application_ogg_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "ogg"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "audio/midi"
+pub open spec fn audio_midi_identity() -> MimeView {
+    MimeView {
+        type_: "audio"@,
+        subtype: "midi"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "video/avi"
+pub open spec fn video_avi_identity() -> MimeView {
+    MimeView {
+        type_: "video"@,
+        subtype: "avi"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "audio/wave"
+pub open spec fn audio_wave_identity() -> MimeView {
+    MimeView {
+        type_: "audio"@,
+        subtype: "wave"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+
+// "application/postscript"
+pub open spec fn application_postscript_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "postscript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/x-gzip"
+pub open spec fn application_x_gzip_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "x-gzip"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/zip"
+pub open spec fn application_zip_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "zip"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/x-rar-compressed"
+pub open spec fn application_x_rar_compressed_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "x-rar-compressed"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/font-woff"
+pub open spec fn application_font_woff_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "font-woff"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/font-sfnt"
+pub open spec fn application_font_sfnt_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "font-sfnt"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/vnd.ms-fontobject"
+pub open spec fn application_vnd_ms_fontobject_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "vnd.ms-fontobject"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "video/mp4"
+pub open spec fn video_mp4_identity() -> MimeView {
+    MimeView {
+        type_: "video"@,
+        subtype: "mp4"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/vtt"
+pub open spec fn text_vtt_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "vtt"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/cache-manifest"
+pub open spec fn text_cache_manifest_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "cache-manifest"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/ecmascript"
+pub open spec fn application_ecmascript_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "ecmascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/javascript"
+pub open spec fn application_javascript_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "javascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/x-ecmascript"
+pub open spec fn application_x_ecmascript_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "x-ecmascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "application/x-javascript"
+pub open spec fn application_x_javascript_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "x-javascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/ecmascript"
+pub open spec fn text_ecmascript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "ecmascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.0"
+pub open spec fn text_javascript1_0_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.0"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.1"
+pub open spec fn text_javascript1_1_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.1"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.2"
+pub open spec fn text_javascript1_2_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.2"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.3"
+pub open spec fn text_javascript1_3_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.3"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.4"
+pub open spec fn text_javascript1_4_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.4"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/javascript1.5"
+pub open spec fn text_javascript1_5_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "javascript1.5"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/jscript"
+pub open spec fn text_jscript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "jscript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/livescript"
+pub open spec fn text_livescript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "livescript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/x-ecmascript"
+pub open spec fn text_x_ecmascript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "x-ecmascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
+// "text/x-javascript"
+pub open spec fn text_x_javascript_identity() -> MimeView {
+    MimeView {
+        type_: "text"@,
+        subtype: "x-javascript"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 
 
 
@@ -194,10 +511,18 @@ pub uninterp spec fn video_mp4_identity() -> MimeView;
 
 // https://docs.rs/mime/latest/mime/struct.Mime.html#method.essence_str
 pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
-    view(mt).type_ + "/"@ + view(mt).subtype
+    // match(view(mt).suffix) {
+    //     Some(suffix) => view(mt).type_ + "/"@ + view(mt).subtype + "+"@ + suffix,
+    //     None => view(mt).type_ + "/"@ + view(mt).subtype,
+    // }
+    view(mt).type_ + "/"@ + view(mt).subtype // for servo behavior
 }
 pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
-    mt.type_ + "/"@ + mt.subtype
+    // match(mt.suffix) {
+    //     Some(suffix) => mt.type_ + "/"@ + mt.subtype + "+"@ + suffix,
+    //     None => mt.type_ + "/"@ + mt.subtype,
+    // }
+    mt.type_ + "/"@ + mt.subtype // for servo behavior
 }
 
 
@@ -266,8 +591,6 @@ impl FromStrSpecImpl for Mime {
 
         &&& (input == "application/ecmascript"@) ==> result is Ok
         &&& (input == "application/javascript"@) ==> result is Ok
-        &&& (input == "application/ecmascript"@) ==> result is Ok
-        &&& (input == "application/javascript"@) ==> result is Ok
         &&& (input == "application/x-ecmascript"@) ==> result is Ok
         &&& (input == "application/x-javascript"@) ==> result is Ok
         &&& (input == "text/ecmascript"@) ==> result is Ok
@@ -283,7 +606,44 @@ impl FromStrSpecImpl for Mime {
         &&& (input == "text/x-ecmascript"@) ==> result is Ok
         &&& (input == "text/x-javascript"@) ==> result is Ok
 
-        &&& input == "video/mp4"@ ==> view(&result->Ok_0) == video_mp4_identity()
+        &&& (input == "image/x-icon"@) ==> view(&result->Ok_0) == image_x_icon_identity()
+        &&& (input == "image/webp"@) ==> view(&result->Ok_0) == image_webp_identity()
+        &&& (input == "video/webm"@) ==> view(&result->Ok_0) == video_webm_identity()
+        &&& (input == "audio/basic"@) ==> view(&result->Ok_0) == audio_basic_identity()
+        &&& (input == "audio/aiff"@) ==> view(&result->Ok_0) == audio_aiff_identity()
+        &&& (input == "audio/mpeg"@) ==> view(&result->Ok_0) == audio_mpeg_identity()
+        &&& (input == "application/ogg"@) ==> view(&result->Ok_0) == application_ogg_identity()
+        &&& (input == "audio/midi"@) ==> view(&result->Ok_0) == audio_midi_identity()
+        &&& (input == "video/avi"@) ==> view(&result->Ok_0) == video_avi_identity()
+        &&& (input == "audio/wave"@) ==> view(&result->Ok_0) == audio_wave_identity()
+
+        &&& (input == "application/postscript"@) ==> view(&result->Ok_0) == application_postscript_identity()
+        &&& (input == "application/x-gzip"@) ==> view(&result->Ok_0) == application_x_gzip_identity()
+        &&& (input == "application/zip"@) ==> view(&result->Ok_0) == application_zip_identity()
+        &&& (input == "application/x-rar-compressed"@) ==> view(&result->Ok_0) == application_x_rar_compressed_identity()
+        &&& (input == "application/font-woff"@) ==> view(&result->Ok_0) == application_font_woff_identity()
+        &&& (input == "application/font-sfnt"@) ==> view(&result->Ok_0) == application_font_sfnt_identity()
+        &&& (input == "application/vnd.ms-fontobject"@) ==> view(&result->Ok_0) == application_vnd_ms_fontobject_identity()
+        &&& (input == "video/mp4"@) ==> view(&result->Ok_0) == video_mp4_identity()
+        &&& (input == "text/vtt"@) ==> view(&result->Ok_0) == text_vtt_identity()
+        &&& (input == "text/cache-manifest"@) ==> view(&result->Ok_0) == text_cache_manifest_identity()
+
+        &&& (input == "application/ecmascript"@) ==> view(&result->Ok_0) == application_ecmascript_identity()
+        &&& (input == "application/javascript"@) ==> view(&result->Ok_0) == application_javascript_identity()
+        &&& (input == "application/x-ecmascript"@) ==> view(&result->Ok_0) == application_x_ecmascript_identity()
+        &&& (input == "application/x-javascript"@) ==> view(&result->Ok_0) == application_x_javascript_identity()
+        &&& (input == "text/ecmascript"@) ==> view(&result->Ok_0) == text_ecmascript_identity()
+        &&& (input == "text/javascript"@) ==> view(&result->Ok_0) == text_javascript_identity()
+        &&& (input == "text/javascript1.0"@) ==> view(&result->Ok_0) == text_javascript1_0_identity()
+        &&& (input == "text/javascript1.1"@) ==> view(&result->Ok_0) == text_javascript1_1_identity()
+        &&& (input == "text/javascript1.2"@) ==> view(&result->Ok_0) == text_javascript1_2_identity()
+        &&& (input == "text/javascript1.3"@) ==> view(&result->Ok_0) == text_javascript1_3_identity()
+        &&& (input == "text/javascript1.4"@) ==> view(&result->Ok_0) == text_javascript1_4_identity()
+        &&& (input == "text/javascript1.5"@) ==> view(&result->Ok_0) == text_javascript1_5_identity()
+        &&& (input == "text/jscript"@) ==> view(&result->Ok_0) == text_jscript_identity()
+        &&& (input == "text/livescript"@) ==> view(&result->Ok_0) == text_livescript_identity()
+        &&& (input == "text/x-ecmascript"@) ==> view(&result->Ok_0) == text_x_ecmascript_identity()
+        &&& (input == "text/x-javascript"@) ==> view(&result->Ok_0) == text_x_javascript_identity()
     } 
 }
 

@@ -11,7 +11,6 @@ use mime::{self, Mime, Name};
 use crate::LoadContext;
 
 use crate::mime_classifier_specs::{
-    // model as Model,
     predicates as Spec,
     flag as SpecFlag,
     classifier as SpecClassifier,
@@ -511,11 +510,6 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
-            SpecClassifier::lemma_sniff_unknown_type_spec(
-                self,
-                no_sniff_flag,
-                data@,
-            );
         }
         let should_sniff_scriptable = no_sniff_flag == NoSniffFlag::Off;
         let sniffed = if should_sniff_scriptable {
@@ -1073,23 +1067,41 @@ impl Mp4Matcher {
         // Step 7. If the three bytes from sequence[8] to sequence[10] are equal to 0x6D 0x70 0x34 ("mp4"), return true.
         let mp4 = [0x6D, 0x70, 0x34];
 
+        let ghost input = data@;
         broadcast use SpecMP4Matcher::lemma_chunks_mp4_equivalence;
             
         data[8..].starts_with(&mp4) ||
         // Step 8. Let bytes-read be 16.
         // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
-            ((box_size >= 16) && //TODO: add for specification
-            data[16..box_size]
+            data.get(16..box_size).map(|data| -> (r: bool)
+                requires
+                    box_size as int >= 16,
+                    data@ == input.subrange(16, box_size as int),
+                ensures
+                    r == (exists |bytes_read: int| 16 <= bytes_read < (box_size as int)
+                        && bytes_read % 4 == 0
+                        && #[trigger] input[bytes_read] == 0x6D
+                        && input[bytes_read + 1] == 0x70
+                        && input[bytes_read + 2] == 0x34),
             // Step 11. Increment bytes-read by 4.
-                .chunks(4)
-                // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
-                // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
-                .any(|chunk: &[u8]| -> (r: bool)
+            {
+                data.chunks(4).any(|chunk: &[u8]| -> (r:bool)
                     ensures
                         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
-                { 
+                {
                     chunk.starts_with(&mp4)
-                }))
+                })
+            }).unwrap_or(false)
+        // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
+        // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
+                // // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
+                // // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
+                // .any(|chunk: &[u8]| -> (r: bool)
+                //     ensures
+                //         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
+                // { 
+                //     chunk.starts_with(&mp4)
+                // }
         // Step 12. Return false.
     }
 }

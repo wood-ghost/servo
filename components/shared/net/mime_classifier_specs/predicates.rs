@@ -22,6 +22,7 @@ macro_rules! define_mime_essence_lemmas {
                     requires
                         view(mt).type_ =~= ($type_)@,
                         view(mt).subtype =~= ($subtype)@,
+                        // view(mt).suffix is None, // for servo behavior
                     ensures
                         #[trigger] essence_str(mt) =~= (concat!($type_, "/", $subtype))@,
                 {
@@ -56,6 +57,7 @@ macro_rules! define_mime_essence_parts_lemmas {
         verus! {
             $(
                 pub(crate) broadcast proof fn $lemma_name(mt: &Mime)
+                    // requires view(mt).suffix is None, // for servo behavior
                     ensures
                         (#[trigger] essence_str(mt) == (concat!($type_, "/", $subtype))@) ==
                         (view(mt).type_ == ($type_)@ && view(mt).subtype == ($subtype)@),

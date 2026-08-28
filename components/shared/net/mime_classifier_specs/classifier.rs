@@ -1,6 +1,10 @@
 use mime::Mime;
 use vstd::prelude::*;
-use verus_state_machines_macros::state_machine;
+// use verus_state_machines_macros::state_machine;
+use verus_state_machines_macros::{
+    state_machine,
+    case_on_next,
+};
 
 use crate::LoadContext;
 use crate::mime_classifier::{
@@ -309,13 +313,6 @@ pub open spec fn get_media_type_spec(
     &&& (result == Some(MediaType::Css)) == (!is_xml(mime) && !is_html(mime) 
                     && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
                     && !is_json(mime) && !is_text(mime) && is_css(mime))
-    // &&& !is_xml(mime) && !is_html(mime) == (
-    //             ((result == Some(MediaType::Image))
-    //                 == is_image(mime))
-    //             &&
-    //             ((result == Some(MediaType::AudioVideo))
-    //                 == is_audio_video(mime))
-    //         )
 }
 
 // ------------------------------------
@@ -335,7 +332,7 @@ pub trait MimeClassifierModel {
 
 impl<'a> MimeClassifierModel for &'a MimeClassifier {
     closed spec fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: Seq<u8>) -> MimeView {
-        _sniff_unknown_type_spec(*self, no_sniff_flag, data)
+        sniff_unknown_type_spec(*self, no_sniff_flag, data)
     }
 
     closed spec fn sniff_text_or_data(&self, data: Seq<u8>) -> MimeView {
@@ -358,7 +355,7 @@ impl<'a> MimeClassifierModel for &'a MimeClassifier {
 // https://mimesniff.spec.whatwg.org/#rules-for-identifying-an-unknown-mime-type
 // To determine the computed MIME type of a resource resource with an unknown MIME type, 
 // execute the following rules for identifying an unknown MIME type: 
-pub(crate) open spec fn _sniff_unknown_type_spec(
+pub(crate) open spec fn sniff_unknown_type_spec(
     classifier: &MimeClassifier,
     no_sniff_flag: NoSniffFlag,
     data: Seq<u8>,
@@ -420,18 +417,6 @@ pub(crate) open spec fn _sniff_unknown_type_spec(
             bin_or_plain_classify_spec(data)
         },
     }
-}
-
-pub closed spec fn sniff_unknown_type_spec(
-    classifier: &MimeClassifier,
-    no_sniff_flag: NoSniffFlag,
-    data: Seq<u8>,
-) -> MimeView {
-    _sniff_unknown_type_spec(
-        classifier,
-        no_sniff_flag,
-        data,
-    )
 }
 
 // https://mimesniff.spec.whatwg.org/#rules-for-text-or-binary
@@ -823,24 +808,6 @@ pub(crate) open spec fn mime_classify_browsing_result_from_trace<'a>(
     )
     &&& trace.last().computed_mime_type == Some(result)
 }
-
-
-pub(crate) proof fn lemma_sniff_unknown_type_spec(
-    classifier: &MimeClassifier,
-    no_sniff_flag: NoSniffFlag,
-    data: Seq<u8>,
-)
-    ensures
-        sniff_unknown_type_spec(
-            classifier,
-            no_sniff_flag,
-            data,
-        ) == _sniff_unknown_type_spec(
-            classifier,
-            no_sniff_flag,
-            data,
-        ),
-{}
 
 pub(crate) open spec fn mime_classify_browsing_after_step4(
     classifier: &MimeClassifier,
