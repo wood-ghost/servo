@@ -128,7 +128,7 @@ impl From<bool> for NoSniffFlag {
 }
 
 impl Default for MimeClassifier {
-    fn default() -> (result: Self) //TODO:
+    fn default() -> (result: Self) 
         ensures SpecClassifier::mime_classifier_validate_spec(&result),
     {
         broadcast use SpecClassifier::lemma_valid_mime_classifier_from_valid_fields;
@@ -765,10 +765,7 @@ pub(crate) trait MIMEChecker: MIMECheckerSpec {
         requires
             self.validate_spec(),
         ensures
-            match r {
-                Some(mt) => self.classify_spec(data@) == Some(SpecMime::view(&mt)),
-                None => self.classify_spec(data@).is_none(),
-            }
+            SpecMime::option_view(&r) == self.classify_spec(data@),
     ;
     /// Validate the MIME checker configuration
     fn validate(&self) -> (r: Result<(), String>)
@@ -932,10 +929,7 @@ impl MIMEChecker for ByteMatcher {
         })
     }
 
-    fn validate(&self) -> (result: Result<(), String>)
-        ensures
-            result.is_ok() == self.validate_spec(),
-    {
+    fn validate(&self) -> Result<(), String> {
         broadcast use SpecMime::axiom_fmt_req_all_mime;
 
         if self.pattern.is_empty() {
@@ -1017,10 +1011,7 @@ impl MIMEChecker for TagTerminatedByteMatcher {
         })
     }
 
-    fn validate(&self) -> (result: Result<(), String>) 
-        ensures
-            result.is_ok() == self.validate_spec()
-    {
+    fn validate(&self) -> (result: Result<(), String>) {
         self.matcher.validate()
     }
 }
@@ -1105,10 +1096,7 @@ impl Mp4Matcher {
     }
 }
 impl MIMEChecker for Mp4Matcher {
-    fn classify(&self, data: &[u8]) -> (result: Option<Mime>) 
-        ensures
-            SpecMime::option_view(&result) == self.classify_spec(data@),
-    {
+    fn classify(&self, data: &[u8]) -> Option<Mime> {
         if self.matches(data) {
             Some("video/mp4".parse().unwrap())
         } else {
@@ -1116,10 +1104,7 @@ impl MIMEChecker for Mp4Matcher {
         }
     }
 
-    fn validate(&self) -> (result: Result<(), String>) 
-        ensures
-            result.is_ok() == self.validate_spec()
-    {
+    fn validate(&self) -> (result: Result<(), String>) {
         Ok(())
     }
 }
@@ -1383,10 +1368,7 @@ impl GroupedClassifier {
     }
 }
 impl MIMEChecker for GroupedClassifier {
-    fn classify(&self, data: &[u8]) -> (r: Option<Mime>) 
-        ensures
-            SpecMime::option_view(&r) == self.classify_spec(data@),
-    {
+    fn classify(&self, data: &[u8]) -> Option<Mime> {
         broadcast use {
             SpecClassifier::lemma_classify_group_from_first_some,
             SpecClassifier::lemma_classify_group_from_all_none,
@@ -1409,10 +1391,7 @@ impl MIMEChecker for GroupedClassifier {
             })
     }
 
-    fn validate(&self) -> (r: Result<(), String>) 
-        ensures
-            r.is_ok() == self.validate_spec(),
-    {
+    fn validate(&self) -> Result<(), String> {
         for byte_matcher in iter: &self.byte_matchers 
             invariant
                 forall |j: int| 0 <= j < iter.index() ==>
