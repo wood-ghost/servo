@@ -120,28 +120,6 @@ impl MIMECheckerSpec for BinaryOrPlaintextClassifier {
     }
 }
 
-// pub(crate) open spec fn classify_group_from(
-//     classifier: &GroupedClassifier,
-//     data: Seq<u8>,
-//     index: nat,
-// ) -> Option<MimeView>
-//     decreases
-//         classifier.byte_matchers@.len() - index,
-// {
-//     if index == classifier.byte_matchers@.len() {
-//         None
-//     } else {
-//         match classifier.byte_matchers@[index as int].classify_spec(data) {
-//             Some(content_type) => Some(content_type),
-//             None => classify_group_from(
-//                 classifier,
-//                 data,
-//                 index + 1,
-//             ),
-//         }
-//     }
-// }
-
 pub(crate) open spec fn classify_group_from(
     matchers: Seq<Box<dyn ThreadSafeMIMEChecker>>,
     data: Seq<u8>,

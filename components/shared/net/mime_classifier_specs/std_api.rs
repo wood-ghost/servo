@@ -62,26 +62,26 @@ verus! {
 //     T: std::cmp::PartialEq,
 // ;
 
-#[verifier::allow(undeclared_external_trait)]
-pub assume_specification<T, F>
-    [Option::<T>::is_some_and]
-    (
-        option: Option<T>,
-        predicate: F,
-    ) -> (result: bool)
-where
-    F: FnOnce(T) -> bool + std::marker::Destruct,
-    requires
-        match option {
-            Some(value) => call_requires(predicate, (value,)),
-            None => true,
-        },
-    ensures
-        match option {
-            Some(value) => call_ensures(predicate, (value,), result),
-            None => !result,
-        },
-;
+// #[verifier::allow(undeclared_external_trait)]
+// pub assume_specification<T, F>
+//     [Option::<T>::is_some_and]
+//     (
+//         option: Option<T>,
+//         predicate: F,
+//     ) -> (result: bool)
+// where
+//     F: FnOnce(T) -> bool + std::marker::Destruct,
+//     requires
+//         match option {
+//             Some(value) => call_requires(predicate, (value,)),
+//             None => true,
+//         },
+//     ensures
+//         match option {
+//             Some(value) => call_ensures(predicate, (value,), result),
+//             None => !result,
+//         },
+// ;
 
 // #[verifier::reject_recursive_types(T)]
 // #[verifier::external_type_specification]

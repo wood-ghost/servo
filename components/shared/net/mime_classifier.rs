@@ -15,7 +15,6 @@ use crate::mime_classifier_specs::{
     flag as SpecFlag,
     classifier as SpecClassifier,
     byte_matcher as SpecByteMatcher,
-    std_api as SpecStd,
     mime_api as SpecMime,
     mp4_matcher as SpecMP4Matcher,
 };
