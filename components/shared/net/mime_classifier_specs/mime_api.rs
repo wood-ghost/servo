@@ -557,6 +557,143 @@ pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
         call_ensures( <F as FromStr>::from_str, (s,), result),
 ;
 
+// https://mimesniff.spec.whatwg.org/#parsing-a-mime-type
+// To parse a MIME type, given a string input, run these steps: 
+pub open spec fn parse_mime_type_spec(input: Seq<char>) -> Option<MimeView> {
+    // 1. Remove any leading and trailing HTTP whitespace from input. 
+    let input = remove_http_whitespace(input);
+    // 2. Let position be a position variable for input, initially pointing at the start of input.
+    // 3. Let type be the result of collecting a sequence of code points that are not U+002F (/) from input, given position. 
+    let (type_, position) = collect_a_sequence_of_code_points(input, |c: char| c != '/', 0);
+    // 4. If type is the empty string or does not solely contain HTTP token code points, then return failure. 
+    if type_.len() == 0 || !solely_contains_http_token_code_points(type_) {
+        None
+    // 5. If position is past the end of input, then return failure. 
+    } else if position >= input.len() {
+        None
+    } else {
+        // 6. Advance position by 1. (This skips past U+002F (/).) 
+        let position = position + 1;
+        // 7. Let subtype be the result of collecting a sequence of code points that are not U+003B (;) from input, given position. 
+        let (subtype, position) = collect_a_sequence_of_code_points(input, |c: char| c != ';', position);
+        // 8. Remove any trailing HTTP whitespace from subtype. 
+        let subtype = remove_http_whitespace(subtype);
+        // 9. If subtype is the empty string or does not solely contain HTTP token code points, then return failure. 
+        if subtype.len() == 0 || !solely_contains_http_token_code_points(subtype) {
+            None
+        } else {
+            // Let mimeType be a new MIME type record whose type is type, in ASCII lowercase, and subtype is subtype, in ASCII lowercase. 
+            let mime_type = MimeView {
+                type_: type_,
+                subtype: subtype,
+                suffix: None, // TODO:
+                params: Map::empty(),
+            };
+            Some(mime_type) //TODO:
+        }
+    }
+
+}
+
+
+pub open spec fn solely_contains_http_token_code_points(input: Seq<char>) -> bool {
+    forall |i: int| 0 <= i < input.len() ==> #[trigger] is_http_token_code_point(input[i])
+}
+// https://mimesniff.spec.whatwg.org/#http-token-code-point
+// An HTTP token code point is U+0021 (!), U+0023 (#), U+0024 ($), U+0025 (%), U+0026 (&), U+0027 ('), U+002A (*), U+002B (+), 
+// U+002D (-), U+002E (.), U+005E (^), U+005F (_), U+0060 (`), U+007C (|), U+007E (~), or an ASCII alphanumeric.
+pub open spec fn is_http_token_code_point(c: char) -> bool {
+    ||| (c == '\u{0021}') // !
+    ||| (c == '\u{0023}') // #
+    ||| (c == '\u{0024}') // $
+    ||| (c == '\u{0025}') // %
+    ||| (c == '\u{0026}') // &
+    ||| (c == '\u{0027}') // '
+    ||| (c == '\u{002A}') // *
+    ||| (c == '\u{002B}') // +
+    ||| (c == '\u{002D}') // -
+    ||| (c == '\u{002E}') // .
+    ||| (c == '\u{005E}') // ^
+    ||| (c == '\u{005F}') // _
+    ||| (c == '\u{0060}') // `
+    ||| (c == '\u{007C}') // |
+    ||| (c == '\u{007E}') // ~
+    ||| (is_ascii_alphanumeric_(c))
+}
+pub open spec fn is_ascii_alphanumeric_(c: char) -> bool {
+    ('0' <= c && c <= '9')
+        || ('A' <= c && c <= 'Z')
+        || ('a' <= c && c <= 'z')
+}
+
+// https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points
+// To collect a sequence of code points meeting a condition condition from a string input, 
+// given a position variable position tracking the position of the calling algorithm within input:
+pub open spec fn collect_a_sequence_of_code_points_helper(
+    input: Seq<char>,
+    condition: spec_fn(char) -> bool,
+    result: Seq<char>,
+    position: int,
+) -> (Seq<char>, int)
+    recommends
+        0 <= position <= input.len(),
+    decreases input.len() - position,
+{
+    // 2. While position doesn’t point past the end of input and the code point at position within input meets the condition condition: 
+    if position < input.len() && condition(input[position]) {
+        collect_a_sequence_of_code_points_helper(
+            input,
+            condition,
+            // 2.1 Append that code point to the end of result. 
+            result.push(input[position]),
+            // 2.2 Advance position by 1.
+            position + 1,
+        )
+    } else {
+        // 3. Return result. 
+        (result, position)
+    }
+}
+pub open spec fn collect_a_sequence_of_code_points(input: Seq<char>, condition: spec_fn(char) -> bool, position: int) -> (Seq<char>, int)
+    recommends 0 <= position <= input.len(),
+{
+    collect_a_sequence_of_code_points_helper(
+        input,
+        condition,
+        // 1. Let result be the empty string. 
+        Seq::empty(),
+        position,
+    )
+}
+
+// An HTTP tab or space is U+0009 TAB or U+0020 SPACE.
+// HTTP whitespace is U+000A LF, U+000D CR, or an HTTP tab or space. 
+pub open spec fn is_http_whitespace(c: char) -> bool {
+    ||| c == '\u{000A}' // LF
+    ||| c == '\u{000D}' // CR
+    ||| c == '\u{0009}' // TAB
+    ||| c == '\u{0020}' // SPACE
+}
+pub open spec fn remove_http_whitespace(input: Seq<char>) -> Seq<char>
+    decreases input.len(),
+{
+    if input.len() == 0 {
+        input
+    } else if is_http_whitespace(input[0]) {
+        // remove prefix
+        remove_http_whitespace(
+            input.subrange(1, input.len() as int),
+        )
+    } else if is_http_whitespace(input[input.len() - 1]) {
+        // remove suffix
+        remove_http_whitespace(
+            input.subrange(0, input.len() as int - 1),
+        )
+    } else {
+        input
+    }
+}
+
 impl FromStrSpecImpl for Mime {
     open spec fn from_str_ensures(
         input: Seq<char>,

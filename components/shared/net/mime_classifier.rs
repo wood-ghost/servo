@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 use vstd::prelude::*;
-use vstd::std_specs::iter::{IteratorSpec, zip_seq};
+use vstd::std_specs::iter::IteratorSpec;
 use vstd::assert_seqs_equal;
 
 
@@ -158,73 +158,15 @@ impl MimeClassifier {
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
         ensures
-            match context {
-                LoadContext::Browsing =>
-                    SpecClassifier::mime_classify_browsing_result(
-                        self,
-                        no_sniff_flag,
-                        apache_bug_flag,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::Image =>
-                    SpecClassifier::mime_classify_image_result(
-                        self,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::AudioVideo =>
-                    SpecClassifier::mime_classify_audio_video_result(
-                        self,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::Plugin =>
-                    SpecClassifier::mime_classify_plugin_result(
-                        self,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::Style =>
-                    SpecClassifier::mime_classify_style_result(
-                        self,
-                        no_sniff_flag,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::Script =>
-                    SpecClassifier::mime_classify_script_result(
-                        self,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::Font =>
-                    SpecClassifier::mime_classify_font_result(
-                        self,
-                        supplied_type,
-                        data@,
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::TextTrack =>
-                    SpecClassifier::mime_classify_text_track_result(
-                        self,
-                        supplied_type, // for Servo behavior
-                        SpecMime::view(&result),
-                    ),
-                LoadContext::CacheManifest =>
-                    SpecClassifier::mime_classify_cache_manifest_result(
-                        self,
-                        supplied_type, // for Servo behavior
-                        SpecMime::view(&result),
-                    ),
-                _ => true,
-            },
+            SpecClassifier::mime_classifier_classify_spec(
+                self,
+                context,
+                no_sniff_flag,
+                apache_bug_flag,
+                supplied_type,
+                data@,
+                SpecMime::view(&result),
+            ),
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
@@ -1070,9 +1012,7 @@ impl Mp4Matcher {
                 ensures
                     r == (exists |bytes_read: int| 16 <= bytes_read < (box_size as int)
                         && bytes_read % 4 == 0
-                        && #[trigger] input[bytes_read] == 0x6D
-                        && input[bytes_read + 1] == 0x70
-                        && input[bytes_read + 2] == 0x34),
+                        && #[trigger] SpecMP4Matcher::has_mp4_at(input, bytes_read)),
             // Step 11. Increment bytes-read by 4.
             {
                 data.chunks(4).any(|chunk: &[u8]| -> (r:bool)

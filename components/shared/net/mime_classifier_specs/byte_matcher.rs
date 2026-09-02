@@ -20,7 +20,7 @@ pub open spec fn validate_ok(pattern: Seq<u8>, mask:Seq<u8>) -> bool {
 
 // https://mimesniff.spec.whatwg.org/#matching-a-mime-type-pattern
 pub open spec fn pattern_matching_at(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, s: int) -> bool {
-    &&& !(input =~= pattern)
+    &&& !(input == pattern)
     // let s: int = get_first_not_ignored_idx(input, ignored);
     // Assert: pattern’s length is equal to mask’s length. 
     &&& pattern.len() == mask.len()
@@ -104,7 +104,7 @@ pub broadcast proof fn position_not_found_implies_no_pattern_matching(
 pub proof fn match_return_some(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, start: int)
     requires
         pattern.len() == mask.len(),
-        !(data =~= pattern),
+        !(data == pattern),
         start >= 0,
         start + pattern.len() <= data.len(),
 

@@ -52,9 +52,7 @@ pub open spec fn matches_mp4_signature(seq: Seq<u8>) -> bool {
         else {
             exists |bytes_read: int| 16 <= bytes_read < box_size
                 && bytes_read % 4 == 0
-                && #[trigger] seq[bytes_read] == 0x6D
-                && seq[bytes_read + 1] == 0x70
-                && seq[bytes_read + 2] == 0x34
+                && #[trigger] has_mp4_at(seq, bytes_read)
         }
     }
 }
@@ -73,11 +71,15 @@ impl MIMECheckerSpec for Mp4Matcher {
     }
 }
 
+pub open spec fn has_mp4_at(data: Seq<u8>, idx: int) -> bool {
+    data.len() >= idx + 3
+    && data[idx] == 0x6D
+    && data[idx + 1] == 0x70
+    && data[idx + 2] == 0x34
+}
+
 pub open spec fn has_mp4_prefix(chunk: Seq<u8>) -> bool {
-    chunk.len() >= 3
-    && chunk[0] == 0x6D
-    && chunk[1] == 0x70
-    && chunk[2] == 0x34
+    has_mp4_at(chunk, 0)
 }
 
 pub(crate) proof fn lemma_step4_u32_eq_int(box_size: u32, data: Seq<u8>) 
@@ -143,101 +145,53 @@ pub broadcast proof fn lemma_chunks_mp4_equivalence(
         (exists |bytes_read: int|
             16 <= bytes_read < box_size
             && bytes_read % 4 == 0
-            && #[trigger] data[bytes_read] == 0x6D
-            && data[bytes_read + 1] == 0x70
-            && data[bytes_read + 2] == 0x34),
+            && #[trigger] has_mp4_at(data, bytes_read)),
 {
     let source = data.subrange(16, box_size);
-    let n = box_size - 16;
-    let q = n / 4;
 
-    let p = |offset: int| {
-        data[offset] == 0x6D
-            && data[offset + 1] == 0x70
-            && data[offset + 2] == 0x34
-    };
-
+    // chunck idx matches bytes_read
     assert(
-        (exists |i: int|
-            0 <= i < chunks.len()
+        (exists |i: int| 0 <= i < chunks.len()
             && #[trigger] has_mp4_prefix(chunks[i]@))
         ==
-        (exists |i: int|
-            0 <= i
-            && 16 + 4 * i < box_size
-            && #[trigger] p(16 + 4 * i))
+        (exists |i: int| 0 <= i && 16 + 4 * i < box_size
+            && #[trigger] has_mp4_at(data, 16 + 4 * i))
     ) by {
-        if exists |i: int|
-            0 <= i < chunks.len()
+        if exists |i: int| 0 <= i < chunks.len()
             && #[trigger] has_mp4_prefix(chunks[i]@)
         {
-            let i = choose |i: int|
-                0 <= i < chunks.len()
+            let i = choose |i: int| 0 <= i < chunks.len()
                 && #[trigger] has_mp4_prefix(chunks[i]@);
 
-            assert(p(16 + 4 * i));
+            assert(has_mp4_at(data, 16 + 4 * i));
         }
 
-        if exists |i: int|
-            0 <= i
-            && 16 + 4 * i < box_size
-            && #[trigger] p(16 + 4 * i)
+        if exists |i: int| 0 <= i && 16 + 4 * i < box_size
+            && #[trigger] has_mp4_at(data, 16 + 4 * i)
         {
-            let i = choose |i: int|
-                0 <= i
-                && 16 + 4 * i < box_size
-                && #[trigger] p(16 + 4 * i);
+            let i = choose |i: int| 0 <= i && 16 + 4 * i < box_size
+                && #[trigger] has_mp4_at(data, 16 + 4 * i);
 
-            assert(i < chunks.len());
             assert(has_mp4_prefix(chunks[i]@));
         }
     }
 
-    assert(
-        (exists |bytes_read: int|
-            16 <= bytes_read < box_size
-            && bytes_read % 4 == 0
-            && #[trigger] p(bytes_read))
-        ==
-        (exists |bytes_read: int|
-            16 <= bytes_read < box_size
-            && bytes_read % 4 == 0
-            && #[trigger] data[bytes_read] == 0x6D
-            && data[bytes_read + 1] == 0x70
-            && data[bytes_read + 2] == 0x34)
-    ) by {
-        if exists |bytes_read: int|
-            16 <= bytes_read < box_size
-            && bytes_read % 4 == 0
-            && #[trigger] data[bytes_read] == 0x6D
-            && data[bytes_read + 1] == 0x70
-            && data[bytes_read + 2] == 0x34
-        {
-            let bytes_read = choose |bytes_read: int|
-                16 <= bytes_read < box_size
-                && bytes_read % 4 == 0
-                && #[trigger] data[bytes_read] == 0x6D
-                && data[bytes_read + 1] == 0x70
-                && data[bytes_read + 2] == 0x34;
-
-            assert(p(bytes_read));
-        }
-    }
-
+    // byte_read implies chunk idx
     if exists |bytes_read: int|
         16 <= bytes_read < box_size
-        && bytes_read % 4 == 0
-        && #[trigger] p(bytes_read)
+            && bytes_read % 4 == 0
+            && #[trigger] has_mp4_at(data, bytes_read)
     {
         let bytes_read = choose |bytes_read: int|
             16 <= bytes_read < box_size
-            && bytes_read % 4 == 0
-            && #[trigger] p(bytes_read);
+                && bytes_read % 4 == 0
+                && #[trigger] has_mp4_at(data, bytes_read);
 
         let chunk_index = (bytes_read - 16) / 4;
 
         assert(bytes_read == 16 + 4 * chunk_index);
     }
+
 }
 
 } // verus!

@@ -110,7 +110,6 @@ pub open spec fn essence_is_text_xml(mt: &Mime) -> bool {
 }
 
 pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
-    // view(mt).essence =~= "application/ogg"@
     essence_str(mt) == "application/ogg"@
 }
 
@@ -215,7 +214,7 @@ pub open spec fn is_javascript(mt: &Mime) -> bool {
 }
 
 /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
-pub open spec fn is_font(mt: &Mime) -> bool { //TODO:
+pub open spec fn is_font(mt: &Mime) -> bool { 
     ||| view(mt).type_ == font_name()
     ||| essence_str(mt) == "application/font-cff"@
     ||| essence_str(mt) == "application/font-off"@ //TODO: new version is font-otf

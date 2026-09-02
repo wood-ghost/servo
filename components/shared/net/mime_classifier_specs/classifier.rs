@@ -46,16 +46,6 @@ use crate::mime_classifier_specs::predicates::{
     is_explicit_unknown,
 };
 
-// use crate::mime_classifier_specs::{
-//     is_image,
-//     has_xml_suffix,
-//     essence_is_text_xml,
-//     essence_is_application_xml,
-//     is_audio,
-//     is_video,
-//     essence_is_application_ogg,
-// };
-
 verus! {
 
 pub(crate) trait MIMECheckerSpec {
@@ -296,6 +286,38 @@ pub open spec fn get_media_type_spec(
 // ------------------------------------
 // MIME Classifier
 // ------------------------------------
+pub open spec fn mime_classifier_classify_spec(
+    classifier: &MimeClassifier,
+    context: LoadContext,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    supplied_type: &Option<Mime>,
+    data: Seq<u8>,
+    result: MimeView,
+) -> bool {
+    match context {
+        LoadContext::Browsing =>
+            mime_classify_browsing_result(classifier, no_sniff_flag, apache_bug_flag, supplied_type, data, result),
+        LoadContext::Image =>
+            mime_classify_image_result(classifier, supplied_type, data, result),
+        LoadContext::AudioVideo =>
+            mime_classify_audio_video_result(classifier, supplied_type, data, result),
+        LoadContext::Plugin =>
+            mime_classify_plugin_result(classifier, supplied_type, data, result),
+        LoadContext::Style =>
+            mime_classify_style_result(classifier, no_sniff_flag, supplied_type, data, result),
+        LoadContext::Script =>
+            mime_classify_script_result(classifier, supplied_type, data, result),
+        LoadContext::Font =>
+            mime_classify_font_result(classifier, supplied_type, data, result),
+        LoadContext::TextTrack =>
+            mime_classify_text_track_result(classifier, supplied_type,  result), // supplied_type for Servo behavior
+        LoadContext::CacheManifest =>
+            mime_classify_cache_manifest_result(classifier, supplied_type, result), // supplied_type for Servo behavior
+    }
+}
+
+
 pub trait MimeClassifierModel {
     spec fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: Seq<u8>) -> MimeView;
 
