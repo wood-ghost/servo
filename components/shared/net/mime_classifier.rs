@@ -157,6 +157,11 @@ impl MimeClassifier {
     ) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
+            SpecClassifier::image_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecClassifier::audio_or_video_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecClassifier::font_classifier_matches_whatwg(self, data@), // for servo behavior
+            context != LoadContext::Browsing ==> 
+                (supplied_type is Some ==> !Spec::is_html(&supplied_type->Some_0)), // for servo behavior
         ensures
             SpecClassifier::mime_classifier_classify_spec(
                 self,
@@ -170,6 +175,9 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
+            SpecClassifier::lemma_image_classifier_matches_whatwg(self, data@); // for servo behavior
+            SpecClassifier::lemma_audio_or_video_classifier_matches_whatwg(self, data@); // for servo behavior
+            SpecClassifier::lemma_font_classifier_matches_whatwg(self, data@); // for servo behavior
         }
         let supplied_type_or_octet_stream = supplied_type
             .clone()
@@ -441,6 +449,9 @@ impl MimeClassifier {
     fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: &[u8]) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
+            SpecClassifier::image_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecClassifier::audio_or_video_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecClassifier::font_classifier_matches_whatwg(self, data@), // for servo behavior
         ensures
             SpecMime::view(&result)
                 == SpecClassifier::sniff_unknown_type_spec(
@@ -451,6 +462,9 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
+            SpecClassifier::lemma_image_classifier_matches_whatwg(self, data@); // for servo behavior
+            SpecClassifier::lemma_audio_or_video_classifier_matches_whatwg(self, data@); // for servo behavior
+            SpecClassifier::lemma_font_classifier_matches_whatwg(self, data@); // for servo behavior
         }
         let should_sniff_scriptable = no_sniff_flag == NoSniffFlag::Off;
         let sniffed = if should_sniff_scriptable {
@@ -822,6 +836,20 @@ impl ByteMatcher {
                                 self.leading_ignore@.to_set(),
                                 start as int,
                             ) {
+                                // assert forall |p: int| #![auto]
+                                //     0 <= p < self.pattern@.len()
+                                //     implies
+                                //     (
+                                //         *data@.subrange(start as int, data@.len() as int).as_ref()[p]
+                                //             & *self.mask@.as_ref()[p]
+                                //     ) == *self.pattern@.as_ref()[p]
+                                // by {
+                                //     let zipped_refs = data@.subrange(start as int, data@.len() as int).as_ref()
+                                //             .zip_truncate(self.pattern@.as_ref())
+                                //             .zip_truncate(self.mask@.as_ref());
+
+                                //     let _ = zipped_refs[p];
+                                // }
                                 SpecByteMatcher::match_return_some(
                                     data@,
                                     self.pattern@,
@@ -1123,6 +1151,7 @@ struct GroupedClassifier {
 pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
     spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<SpecMime::MimeView>;
     spec fn dyn_validate_spec(&self) -> bool;
+    spec fn dyn_content_type(&self) -> SpecMime::MimeView;
     proof fn bridge_validate_spec(tracked &self)
         ensures 
             self.dyn_validate_spec() == self.validate_spec();
@@ -1162,6 +1191,10 @@ impl ThreadSafeMIMEChecker for ByteMatcher {
         self.classify_spec(data)
     }
 
+    open spec fn dyn_content_type(&self) -> SpecMime::MimeView {
+        SpecMime::view(&self.content_type)
+    }
+
     proof fn bridge_validate_spec(tracked &self) {}
     proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
 }
@@ -1179,6 +1212,10 @@ impl ThreadSafeMIMEChecker for TagTerminatedByteMatcher {
         self.classify_spec(data)
     }
 
+    open spec fn dyn_content_type(&self) -> SpecMime::MimeView {
+        SpecMime::view(&self.matcher.content_type)
+    }
+
     proof fn bridge_validate_spec(tracked &self) {}
     proof fn bridge_classify_spec(tracked &self, data: Seq<u8>) {}
 }
@@ -1194,6 +1231,10 @@ impl ThreadSafeMIMEChecker for Mp4Matcher {
         data: Seq<u8>,
     ) -> Option<SpecMime::MimeView> {
         self.classify_spec(data)
+    }
+
+    open spec fn dyn_content_type(&self) -> SpecMime::MimeView {
+        SpecMime::video_mp4_identity()
     }
 
     proof fn bridge_validate_spec(tracked &self) {}

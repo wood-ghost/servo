@@ -323,6 +323,15 @@ pub open spec fn application_font_woff_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+// "application/font-woff2"
+pub open spec fn application_font_woff2_identity() -> MimeView {
+    MimeView {
+        type_: "application"@,
+        subtype: "font-woff2"@,
+        suffix: None,
+        params: Map::empty(),
+    }
+}
 // "application/font-sfnt"
 pub open spec fn application_font_sfnt_identity() -> MimeView {
     MimeView {
