@@ -8,8 +8,10 @@
 pub mod views;
 pub mod constants;
 pub mod trusted;
+pub mod essence_lemmas;
 
 // Re-export everything — no name conflicts since the module is `views` (plural).
 pub use views::*;
 pub use constants::*;
 pub use trusted::*;
+pub use essence_lemmas::*;

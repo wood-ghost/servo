@@ -33,7 +33,6 @@ use crate::mime_classifier_specs::predicates::{
     is_json,
     is_text,
     is_css,
-    mime_essence_str_lemmas,
     is_explicit_unknown,
     matches_webm_signature,
     matches_mp3_without_id3_signature,

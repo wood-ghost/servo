@@ -51,10 +51,10 @@ macro_rules! prove_valid_byte_literals {
 verus! {
 
 broadcast use {
-    Spec::mime_essence_str_lemmas,
     Spec::lemma_image_audio_video_disjoint,
     Spec::whitespace_lemmas,
     Spec::mime_essence_parts_str_lemmas,
+    SpecMime::mime_essence_str_lemmas,
     SpecMime::group_name_partial_eq_axioms,
     SpecFlag::group_flag_partial_eq_axioms,
 };

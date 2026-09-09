@@ -387,25 +387,21 @@ pub(crate) assume_specification [mime::IMAGE_BMP] -> (result: Mime)
 pub assume_specification [mime::XML] -> (result: Name<'static>)
     ensures
         name_identity(&result) == xml_name(),
-        // name_text(result) == "xml"@,
 ;
 
 pub assume_specification [mime::IMAGE] -> (result: Name<'static>)
     ensures
         name_identity(&result) == image_name(),
-        // name_text(result) == "image"@,
 ;
 
 pub assume_specification [mime::AUDIO] -> (result: Name<'static>)
     ensures
         name_identity(&result) == audio_name(),
-        // name_text(result) == "audio"@,
 ;
 
 pub assume_specification [mime::VIDEO] -> (result: Name<'static>)
     ensures
         name_identity(&result) == video_name(),
-        // name_text(result) == "video"@,
 ;
 
 pub assume_specification [mime::APPLICATION] -> (result: Name<'static>)
