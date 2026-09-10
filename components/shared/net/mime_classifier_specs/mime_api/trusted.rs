@@ -437,14 +437,14 @@ pub assume_specification [mime::TEXT_XML] -> (result: Mime)
 // Mime
 pub assume_specification<'a> [Mime::essence_str](mt: &'a Mime) -> (result: &'a str)
     ensures
-        result@ == essence_str(mt),
+        result@ == view(mt).type_ + "/"@ + view(mt).subtype,
 ;
 pub assume_specification<'a> [Mime::suffix] (mt: &'a Mime) -> (result: Option<Name<'a>>)
     ensures
         match result {
             // Some(name) => suffix_name(mt) == Some(name_text(name)),
-            Some(name) => suffix(mt) == Some(name_identity(&name)),
-            None => suffix(mt).is_none(),
+            Some(name) => view(mt).suffix == Some(name_identity(&name)),
+            None => view(mt).suffix.is_none(),
         },
 ;
 pub assume_specification<'a> [Mime::type_] (mt: &'a Mime) -> (result: Name<'a>)

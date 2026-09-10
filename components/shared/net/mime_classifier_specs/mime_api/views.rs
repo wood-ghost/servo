@@ -54,12 +54,4 @@ pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
     mt.type_ + "/"@ + mt.subtype // for servo behavior
 }
 
-
-pub open spec fn suffix(mt: &Mime) -> Option<Seq<char>> {
-    view(mt).suffix
-}
-pub open spec fn subtype(mt: &Mime) -> Seq<char> {
-    view(mt).subtype
-}
-
 } // verus!

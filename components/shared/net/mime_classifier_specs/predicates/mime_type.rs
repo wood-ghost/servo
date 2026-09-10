@@ -38,6 +38,13 @@ macro_rules! define_mime_essence_parts_lemmas {
                     // Backward: essence implies components.
                     if essence_str(mt) == (concat!($type_, "/", $subtype))@ {
                         assert(essence_str(mt)[type_.len() as int] == '/');
+                        let literal = (concat!($type_, "/", $subtype))@;
+                        assert forall |i: int| 0 <= i < literal.len()
+                            && #[trigger] literal[i] == '/'
+                            implies i == ($type_)@.len()
+                        by {}
+                        assert(type_.len() == ($type_)@.len());
+                        assert(subtype.len() == ($subtype)@.len());
 
                         assert_seqs_equal!(type_ == ($type_)@, i => {
                                 assert(essence_str(mt)[i] == type_[i]);
@@ -85,7 +92,7 @@ pub open spec fn is_video(mt: &Mime) -> bool {
     view(mt).type_ == video_name()
 }
 pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
-    suffix(mt) == Some(xml_name())
+    view(mt).suffix == Some(xml_name())
 }
 
 pub open spec fn is_xml(mt: &Mime) -> bool {
