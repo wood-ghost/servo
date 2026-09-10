@@ -39,12 +39,8 @@ use crate::mime_classifier_specs::classifier::algorithms::mime_type_sniffing::{
 use crate::mime_classifier_specs::classifier::algorithms::{
     sniff_unknown_type_spec,
     sniff_text_or_data_spec,
-    image_classifier_matches_whatwg,
-    audio_or_video_classifier_matches_whatwg,
-    font_classifier_matches_whatwg,
-    lemma_image_classifier_matches_whatwg,
-    lemma_audio_or_video_classifier_matches_whatwg,
 };
+use crate::mime_classifier_specs::requires as SpecRequires;
 
 verus! {
 
@@ -410,9 +406,9 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
         !is_explicit_unknown(supplied_type),
         no_sniff_flag == NoSniffFlag::Off,
         apache_bug_flag == ApacheBugFlag::Off,
-        image_classifier_matches_whatwg(classifier, data), // for servo behavior
-        audio_or_video_classifier_matches_whatwg(classifier, data), // for servo behavior
-        font_classifier_matches_whatwg(classifier, data), // for servo behavior
+        SpecRequires::image_classifier_matches_whatwg(classifier, data), // for servo behavior
+        SpecRequires::audio_or_video_classifier_matches_whatwg(classifier, data), // for servo behavior
+        SpecRequires::font_classifier_matches_whatwg(classifier, data), // for servo behavior
     ensures
         mime_classify_browsing_result(
             classifier,
@@ -433,8 +429,8 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
 
     lemma_model_image_type_matches_spec(classifier, data);
     lemma_model_audio_video_type_matches_spec(classifier, data);
-    lemma_image_classifier_matches_whatwg(classifier, data);
-    lemma_audio_or_video_classifier_matches_whatwg(classifier, data);
+    SpecRequires::lemma_image_classifier_matches_whatwg(classifier, data);
+    SpecRequires::lemma_audio_or_video_classifier_matches_whatwg(classifier, data);
 
     let state0 =
         MimeClassifierAutomaton::take_step::initialize(

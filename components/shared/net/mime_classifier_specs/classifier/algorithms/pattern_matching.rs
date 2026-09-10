@@ -131,25 +131,6 @@ pub(crate) open spec fn image_type_pattern_matching_algo(
     } 
 }
 
-pub closed spec fn image_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-) -> bool {
-    classifier.image_classifier.classify_spec(data)
-        == image_type_pattern_matching_algo(classifier, data)
-}
-
-pub(crate) proof fn lemma_image_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-)
-    requires
-        image_classifier_matches_whatwg(classifier, data),
-    ensures
-        classifier.image_classifier.classify_spec(data)
-            == image_type_pattern_matching_algo(classifier, data),
-{}
-
 // https://mimesniff.spec.whatwg.org/#audio-or-video-type-pattern-matching-algorithm
 pub(crate) open spec fn audio_or_video_type_pattern_matching_algo(
     classifier: &MimeClassifier, 
@@ -220,25 +201,6 @@ pub(crate) open spec fn audio_or_video_type_pattern_matching_algo(
     }
 }
 
-pub closed spec fn audio_or_video_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-) -> bool {
-    classifier.audio_video_classifier.classify_spec(data)
-        == audio_or_video_type_pattern_matching_algo(classifier, data)
-}
-
-pub(crate) proof fn lemma_audio_or_video_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-)
-    requires
-        audio_or_video_classifier_matches_whatwg(classifier, data),
-    ensures
-        classifier.audio_video_classifier.classify_spec(data)
-            == audio_or_video_type_pattern_matching_algo(classifier, data),
-{}
-
 // https://mimesniff.spec.whatwg.org/#font-type-pattern-matching-algorithm
 pub(crate) open spec fn font_type_pattern_matching_algo(
     classifier: &MimeClassifier, 
@@ -299,24 +261,5 @@ pub(crate) open spec fn font_type_pattern_matching_algo(
         None
     }
 }
-
-pub closed spec fn font_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-) -> bool {
-    classifier.font_classifier.classify_spec(data)
-        == font_type_pattern_matching_algo(classifier, data)
-}
-
-pub(crate) proof fn lemma_font_classifier_matches_whatwg(
-    classifier: &MimeClassifier,
-    data: Seq<u8>,
-)
-    requires
-        font_classifier_matches_whatwg(classifier, data),
-    ensures
-        classifier.font_classifier.classify_spec(data)
-            == font_type_pattern_matching_algo(classifier, data),
-{}
 
 } // verus!

@@ -7,6 +7,7 @@ pub mod flag;
 pub mod byte_matcher;
 pub mod classifier;
 pub mod mp4_matcher;
+pub mod requires;
 
 // Keep experimental protocol work separate.
 // pub mod supplied_type;

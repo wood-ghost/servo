@@ -17,9 +17,13 @@ use crate::mime_classifier_specs::{
     byte_matcher as SpecByteMatcher,
     mime_api as SpecMime,
     mp4_matcher as SpecMP4Matcher,
+    requires as SpecRequires,
 };
 
 use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
+pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::MIMEChecker;
+#[cfg(verus_only)]
+pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::ThreadSafeMIMEChecker;
 
 macro_rules! prove_valid_byte_literals {
     ($pattern:literal, $mask:literal) => {
@@ -51,6 +55,7 @@ macro_rules! prove_valid_byte_literals {
 verus! {
 
 broadcast use {
+    SpecRequires::lemma_classifiers_match_whatwg,
     Spec::lemma_image_audio_video_disjoint,
     Spec::whitespace_lemmas,
     Spec::mime_essence_parts_str_lemmas,
@@ -157,9 +162,8 @@ impl MimeClassifier {
     ) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
-            SpecClassifier::image_classifier_matches_whatwg(self, data@), // for servo behavior
-            SpecClassifier::audio_or_video_classifier_matches_whatwg(self, data@), // for servo behavior
-            SpecClassifier::font_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecRequires::classifiers_match_whatwg(self, data@), // for servo behavior
+            SpecRequires::classify_suffix_requires(context, supplied_type),
             context != LoadContext::Browsing ==> 
                 (supplied_type is Some ==> !Spec::is_html(&supplied_type->Some_0)), // for servo behavior
         ensures
@@ -175,9 +179,6 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
-            SpecClassifier::lemma_image_classifier_matches_whatwg(self, data@); // for servo behavior
-            SpecClassifier::lemma_audio_or_video_classifier_matches_whatwg(self, data@); // for servo behavior
-            SpecClassifier::lemma_font_classifier_matches_whatwg(self, data@); // for servo behavior
         }
         let supplied_type_or_octet_stream = supplied_type
             .clone()
@@ -449,9 +450,7 @@ impl MimeClassifier {
     fn sniff_unknown_type(&self, no_sniff_flag: NoSniffFlag, data: &[u8]) -> (result: Mime)
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
-            SpecClassifier::image_classifier_matches_whatwg(self, data@), // for servo behavior
-            SpecClassifier::audio_or_video_classifier_matches_whatwg(self, data@), // for servo behavior
-            SpecClassifier::font_classifier_matches_whatwg(self, data@), // for servo behavior
+            SpecRequires::classifiers_match_whatwg(self, data@), // for servo behavior
         ensures
             SpecMime::view(&result)
                 == SpecClassifier::sniff_unknown_type_spec(
@@ -462,9 +461,6 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
-            SpecClassifier::lemma_image_classifier_matches_whatwg(self, data@); // for servo behavior
-            SpecClassifier::lemma_audio_or_video_classifier_matches_whatwg(self, data@); // for servo behavior
-            SpecClassifier::lemma_font_classifier_matches_whatwg(self, data@); // for servo behavior
         }
         let should_sniff_scriptable = no_sniff_flag == NoSniffFlag::Off;
         let sniffed = if should_sniff_scriptable {
@@ -651,7 +647,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
     fn is_font(mt: &Mime) -> (result: bool)
         requires
-            // SpecMime::suffix(mt).is_none(),
+            SpecRequires::is_font_requires(mt),
         ensures
             result == Spec::is_font(mt),
     {
@@ -685,7 +681,7 @@ impl MimeClassifier {
 
     pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
         requires
-            // Spec::is_font(mime) ==> SpecMime::suffix(mime).is_none(),
+            SpecRequires::get_media_type_requires(mime),
         ensures
             SpecClassifier::get_media_type_spec(mime, result),
     {
@@ -713,6 +709,8 @@ impl MimeClassifier {
     }
 
     fn maybe_get_media_type(supplied_type: &Option<Mime>) -> (result: Option<MediaType>) 
+        requires
+            SpecRequires::maybe_get_media_type_requires(supplied_type),
         ensures
             match supplied_type {
                 Some(mt) => SpecClassifier::get_media_type_spec(mt, result),
@@ -723,21 +721,6 @@ impl MimeClassifier {
             .as_ref()
             .and_then(MimeClassifier::get_media_type)
     }
-}
-
-// Interface used for composite types
-pub(crate) trait MIMEChecker: MIMECheckerSpec {
-    fn classify(&self, data: &[u8]) -> (r: Option<Mime>)
-        requires
-            self.validate_spec(),
-        ensures
-            SpecMime::option_view(&r) == self.classify_spec(data@),
-    ;
-    /// Validate the MIME checker configuration
-    fn validate(&self) -> (r: Result<(), String>)
-        ensures
-            r.is_ok() == self.validate_spec()
-    ;
 }
 
 #[cfg(not(verus_only))]
@@ -1147,19 +1130,6 @@ impl MIMEChecker for BinaryOrPlaintextClassifier {
 #[cfg(not(verus_only))]
 struct GroupedClassifier {
     byte_matchers: Vec<Box<dyn MIMEChecker + Send + Sync>>,
-}
-
-#[cfg(verus_only)]
-pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
-    spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<SpecMime::MimeView>;
-    spec fn dyn_validate_spec(&self) -> bool;
-    spec fn dyn_content_type(&self) -> SpecMime::MimeView;
-    proof fn bridge_validate_spec(tracked &self)
-        ensures 
-            self.dyn_validate_spec() == self.validate_spec();
-    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>)
-        ensures
-            self.dyn_classify_spec(data) == self.classify_spec(data);
 }
 
 // #[cfg(verus_only)]

@@ -16,7 +16,6 @@ use crate::mime_classifier::{
     BinaryOrPlaintextClassifier,
     GroupedClassifier,
     MimeClassifier,
-    ThreadSafeMIMEChecker,
 };
 
 // use crate::mime_classifier::MIMEChecker;
@@ -50,6 +49,35 @@ verus! {
 pub(crate) trait MIMECheckerSpec {
     spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView>;
     spec fn validate_spec(&self) -> bool;
+}
+
+// Interface used for composite types. Keep the trait declarations outside the
+// module that broadcasts classifier lemmas to avoid cyclic proof dependencies.
+pub(crate) trait MIMEChecker: MIMECheckerSpec {
+    fn classify(&self, data: &[u8]) -> (r: Option<Mime>)
+        requires
+            self.validate_spec(),
+        ensures
+            option_view(&r) == self.classify_spec(data@),
+    ;
+    /// Validate the MIME checker configuration
+    fn validate(&self) -> (r: Result<(), String>)
+        ensures
+            r.is_ok() == self.validate_spec()
+    ;
+}
+
+#[cfg(verus_only)]
+pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
+    spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<MimeView>;
+    spec fn dyn_validate_spec(&self) -> bool;
+    spec fn dyn_content_type(&self) -> MimeView;
+    proof fn bridge_validate_spec(tracked &self)
+        ensures
+            self.dyn_validate_spec() == self.validate_spec();
+    proof fn bridge_classify_spec(tracked &self, data: Seq<u8>)
+        ensures
+            self.dyn_classify_spec(data) == self.classify_spec(data);
 }
 
 pub trait MimeClassifierModel {
