@@ -589,6 +589,8 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
     fn is_audio_video(mt: &Mime) -> (result: bool)
+        requires
+            // SpecMime::essence_str(mt) == "application/ogg" ==> mt.suffix().is_none(),
         ensures
             result == Spec::is_audio_video(mt),
     {
@@ -598,6 +600,8 @@ impl MimeClassifier {
     }
 
     fn is_explicit_unknown(mt: &Mime) -> (result: bool)
+        requires
+            // mt.suffix().is_none(), // servo issue #47605
         ensures
             result == Spec::is_explicit_unknown(mt),
     {
@@ -608,6 +612,8 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
     pub fn is_javascript(mt: &Mime) -> (result: bool)
+        requires
+            // mt.suffix().is_none(),
         ensures
             result == Spec::is_javascript(mt),
     {
@@ -635,7 +641,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#json-mime-type>
     pub fn is_json(mt: &Mime) -> (result: bool)
         ensures
-            result == Spec::is_json(mt),
+            result == Spec::is_json(mt), //TODO:
     {
         mt.suffix() == Some(mime::JSON) ||
             mt.essence_str() == "application/json" ||
@@ -644,6 +650,8 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
     fn is_font(mt: &Mime) -> (result: bool)
+        requires
+            // SpecMime::suffix(mt).is_none(),
         ensures
             result == Spec::is_font(mt),
     {
@@ -676,6 +684,8 @@ impl MimeClassifier {
     }
 
     pub fn get_media_type(mime: &Mime) -> (result: Option<MediaType>) 
+        requires
+            // Spec::is_font(mime) ==> SpecMime::suffix(mime).is_none(),
         ensures
             SpecClassifier::get_media_type_spec(mime, result),
     {
@@ -916,13 +926,11 @@ impl MIMEChecker for ByteMatcher {
             .pattern
             .iter()
             .zip(self.mask.iter())
-            // .any(|(&pattern, &mask)| pattern & mask != pattern)
-            .any(|x: (&u8, &u8)| -> (r: bool)
+            .any(|(&pattern, &mask)| -> (r: bool)
                 ensures
-                    r == (*x.0 & *x.1 != *x.0), 
+                    r == (pattern & mask != pattern),
             {
-                let (pattern_p, mask_p) = x;
-                *pattern_p & *mask_p != *pattern_p
+                pattern & mask != pattern
             })
         {
             return Err(format!(
@@ -1104,20 +1112,14 @@ impl BinaryOrPlaintextClassifier {
             data.starts_with(&[0xEFu8, 0xBBu8, 0xBFu8])
         {
             mime::TEXT_PLAIN
-        // TODO: recover the original code
-        // } else if data.iter().any(|&x| {
-        //     x <= 0x08u8 ||
-        //         x == 0x0Bu8 ||
-        //         (0x0Eu8..=0x1Au8).contains(&x) ||
-        //         (0x1Cu8..=0x1Fu8).contains(&x)
-        } else if data.iter().any(|xp: &u8| -> (r: bool) 
+        } else if data.iter().any(|&x| -> (r: bool)
             ensures
-                r == SpecClassifier::is_binary_data_byte(*xp)
+                r == SpecClassifier::is_binary_data_byte(x)
         {
-            *xp <= 0x08u8 ||
-                *xp == 0x0Bu8 ||
-                (0x0Eu8..=0x1Au8).contains(xp) ||
-                (0x1Cu8..=0x1Fu8).contains(xp)
+            x <= 0x08u8 ||
+                x == 0x0Bu8 ||
+                (0x0Eu8..=0x1Au8).contains(&x) ||
+                (0x1Cu8..=0x1Fu8).contains(&x)
         }) {
             // Step 5. The computed MIME type is "application/octet-stream".
             mime::APPLICATION_OCTET_STREAM
