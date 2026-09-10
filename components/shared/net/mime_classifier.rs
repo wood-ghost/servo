@@ -597,7 +597,7 @@ impl MimeClassifier {
 
     fn is_explicit_unknown(mt: &Mime) -> (result: bool)
         requires
-            // mt.suffix().is_none(), // servo issue #47605
+            SpecRequires::is_explicit_unknown_requires(mt), // servo issue #47605
         ensures
             result == Spec::is_explicit_unknown(mt),
     {
@@ -609,7 +609,7 @@ impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
     pub fn is_javascript(mt: &Mime) -> (result: bool)
         requires
-            // mt.suffix().is_none(),
+            SpecRequires::is_javascript_requires(mt),
         ensures
             result == Spec::is_javascript(mt),
     {
