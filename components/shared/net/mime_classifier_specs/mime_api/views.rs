@@ -39,6 +39,7 @@ pub open spec fn font_name() -> Seq<char> { "font"@ }
 // pub uninterp spec fn mime_identity(mt: &Mime) -> MimeView;
 
 // https://docs.rs/mime/latest/mime/struct.Mime.html#method.essence_str
+#[verifier::auto_reveal_literals(strlit)]
 pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
     // match(view(mt).suffix) {
     //     Some(suffix) => view(mt).type_ + "/"@ + view(mt).subtype + "+"@ + suffix,

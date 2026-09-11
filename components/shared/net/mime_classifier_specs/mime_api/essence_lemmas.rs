@@ -1,6 +1,5 @@
 use mime::Mime;
 use vstd::prelude::*;
-use vstd::assert_seqs_equal;
 
 use super::views::*;
 
@@ -14,6 +13,7 @@ macro_rules! define_mime_essence_lemmas {
     ) => {
         verus! {
             $(
+                #[verifier::auto_reveal_literals(strlit)]
                 pub(crate) broadcast proof fn $lemma_name(mt: &Mime)
                     requires
                         view(mt).type_ =~= ($type_)@,
@@ -21,16 +21,7 @@ macro_rules! define_mime_essence_lemmas {
                         // view(mt).suffix is None, // for servo behavior
                     ensures
                         #[trigger] essence_str(mt) =~= (concat!($type_, "/", $subtype))@,
-                {
-                    reveal_strlit($type_);
-                    reveal_strlit("/");
-                    reveal_strlit($subtype);
-                    reveal_strlit(concat!($type_, "/", $subtype));
-
-                    assert(
-                        (view(mt).type_ + "/"@ + view(mt).subtype) == (concat!($type_, "/", $subtype))@
-                    );
-                }
+                {}
             )*
 
             pub(crate) broadcast group $group_name {
