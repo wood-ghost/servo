@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 use vstd::prelude::*;
+#[cfg(verus_only)]
 use vstd::std_specs::iter::IteratorSpec;
+#[cfg(verus_only)]
 use vstd::assert_seqs_equal;
 
 
@@ -10,6 +12,7 @@ use mime::{self, Mime, Name};
 
 use crate::LoadContext;
 
+#[cfg(verus_only)]
 use crate::mime_classifier_specs::{
     predicates as Spec,
     flag as SpecFlag,
@@ -20,7 +23,9 @@ use crate::mime_classifier_specs::{
     requires as SpecRequires,
 };
 
+#[cfg(verus_only)]
 use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
+#[cfg(verus_only)]
 pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::MIMEChecker;
 #[cfg(verus_only)]
 pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::ThreadSafeMIMEChecker;
@@ -312,7 +317,7 @@ impl MimeClassifier {
                 },
             },
             LoadContext::Image => {
-                let result =  self.image_classifier.classify(data)
+                let ghost result =  self.image_classifier.classify(data)
                     .unwrap_or(supplied_type_or_octet_stream);
 
                 proof {
@@ -333,7 +338,7 @@ impl MimeClassifier {
                 .unwrap_or(supplied_type_or_octet_stream)
             },
             LoadContext::AudioVideo => {
-                let result = self.audio_video_classifier.classify(data)
+                let ghost result = self.audio_video_classifier.classify(data)
                     .unwrap_or(supplied_type_or_octet_stream);
                 proof {
                     SpecClassifier::lemma_mime_classify_audio_video_result(
@@ -395,7 +400,7 @@ impl MimeClassifier {
                 }
             },
             LoadContext::Font => {
-                let result = self.font_classifier.classify(data)
+                let ghost result = self.font_classifier.classify(data)
                     .unwrap_or(supplied_type_or_octet_stream);
                 proof {
                     SpecClassifier::lemma_mime_classify_font_result(
@@ -725,6 +730,13 @@ impl MimeClassifier {
             .as_ref()
             .and_then(MimeClassifier::get_media_type)
     }
+}
+
+// Native interface; the verification build imports its annotated counterpart.
+#[cfg(not(verus_only))]
+trait MIMEChecker {
+    fn classify(&self, data: &[u8]) -> Option<Mime>;
+    fn validate(&self) -> Result<(), String>;
 }
 
 #[cfg(not(verus_only))]

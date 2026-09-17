@@ -50,6 +50,7 @@ pub mod blob_url_store;
 pub mod filemanager_thread;
 pub mod http_status;
 pub mod image_cache;
+#[cfg(verus_only)]
 pub mod mime_classifier_specs;
 // pub(crate) mod mime_classifier_helper;
 pub mod mime_classifier;
