@@ -317,15 +317,17 @@ impl MimeClassifier {
                 },
             },
             LoadContext::Image => {
-                let ghost result =  self.image_classifier.classify(data)
-                    .unwrap_or(supplied_type_or_octet_stream);
+                let ghost result = match self.image_classifier.classify_spec(data@) {
+                    Some(mt) => mt,
+                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                };
 
                 proof {
                     SpecClassifier::lemma_mime_classify_image_result(
                         self,
                         supplied_type,
                         data@,
-                        SpecMime::view(&result),
+                        result,
                     );
                 } 
 
@@ -338,14 +340,16 @@ impl MimeClassifier {
                 .unwrap_or(supplied_type_or_octet_stream)
             },
             LoadContext::AudioVideo => {
-                let ghost result = self.audio_video_classifier.classify(data)
-                    .unwrap_or(supplied_type_or_octet_stream);
+                let ghost result = match self.audio_video_classifier.classify_spec(data@) {
+                    Some(mt) => mt,
+                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                };
                 proof {
                     SpecClassifier::lemma_mime_classify_audio_video_result(
                         self,
                         supplied_type,
                         data@,
-                        SpecMime::view(&result),
+                        result,
                     );
                 }
 
@@ -400,14 +404,16 @@ impl MimeClassifier {
                 }
             },
             LoadContext::Font => {
-                let ghost result = self.font_classifier.classify(data)
-                    .unwrap_or(supplied_type_or_octet_stream);
+                let ghost result = match self.font_classifier.classify_spec(data@) {
+                    Some(mt) => mt,
+                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                };
                 proof {
                     SpecClassifier::lemma_mime_classify_font_result(
                         self,
                         supplied_type,
                         data@,
-                        SpecMime::view(&result),
+                        result,
                     );
                 }
                 // 8.7 Sniffing in a font context
