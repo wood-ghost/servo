@@ -34,6 +34,7 @@ pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::ThreadSa
 verus! {
 
 broadcast use {
+    crate::mime_classifier_specs::iter::iterator_bridges,
     SpecByteMatcher::lemma_byte_matcher_valid,
     SpecRequires::lemma_classifiers_match_whatwg,
     Spec::lemma_image_audio_video_disjoint,
@@ -1318,6 +1319,8 @@ impl GroupedClassifier {
     }
 }
 impl MIMEChecker for GroupedClassifier {
+    // servo-stable needs additional instantiations for the reference/value bridge.
+    #[verifier::rlimit(30)]
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         broadcast use {
             SpecClassifier::lemma_classify_group_from_first_some,
