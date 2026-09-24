@@ -4,71 +4,39 @@ use vstd::assert_seqs_equal;
 
 use crate::mime_classifier_specs::mime_api::*;
 
-macro_rules! define_mime_essence_parts_lemmas {
-    (
-        $group_name:ident {
-            $(
-                $lemma_name:ident => ($type_:literal, $subtype:literal, $subtype_start:literal)
-            ),* $(,)?
-        }
-    ) => {
-        verus! {
-            $(
-                pub(crate) broadcast proof fn $lemma_name(mt: &Mime)
-                    // requires view(mt).suffix is None, // for servo behavior
-                    ensures
-                        (#[trigger] essence_str(mt) == (concat!($type_, "/", $subtype))@) ==
-                        (view(mt).type_ == ($type_)@ && view(mt).subtype == ($subtype)@),
-                {
-                    reveal_strlit($type_);
-                    reveal_strlit("/");
-                    reveal_strlit($subtype);
-                    reveal_strlit(concat!($type_, "/", $subtype));
+verus! {
 
-                    let type_ = view(mt).type_;
-                    let subtype = view(mt).subtype;
-
-                    assert(($type_)@.len() as int + 1 == $subtype_start as int);
-
-                    // Forward: components imply essence.
-                    if type_ == ($type_)@ && subtype == ($subtype)@ {
-                        assert(essence_str(mt) == (concat!($type_, "/", $subtype))@);
-                    }
-
-                    // Backward: essence implies components.
-                    if essence_str(mt) == (concat!($type_, "/", $subtype))@ {
-                        assert(essence_str(mt)[type_.len() as int] == '/');
-                        let literal = (concat!($type_, "/", $subtype))@;
-                        assert forall |i: int| 0 <= i < literal.len()
-                            && #[trigger] literal[i] == '/'
-                            implies i == ($type_)@.len()
-                        by {}
-                        assert(type_.len() == ($type_)@.len());
-                        assert(subtype.len() == ($subtype)@.len());
-
-                        assert_seqs_equal!(type_ == ($type_)@, i => {
-                                assert(essence_str(mt)[i] == type_[i]);
-                            }
-                        );
-
-                        assert_seqs_equal!(subtype == ($subtype)@, i => {
-                                assert(essence_str(mt)[$subtype_start as int + i] == subtype[i]);
-                            }
-                        );
-                    }
-                }
-            )*
-
-            pub(crate) broadcast group $group_name {
-                $(
-                    $lemma_name,
-                )*
-            }
-        }
-    };
+/// Characterize either component using its position in the current essence
+/// model. The component string is arbitrary; no MIME table or fixed offset
+/// is needed to instantiate this lemma.
+pub(crate) broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: &str)
+    ensures
+        #![trigger essence_str(mt), part@]
+        essence_str(mt).len() == view(mt).type_.len() + 1 + view(mt).subtype.len(),
+        essence_str(mt)[view(mt).type_.len() as int] == '/',
+        (view(mt).type_.len() == part@.len()
+            && (forall|i: int| 0 <= i < part@.len() ==>
+                #[trigger] part@[i] == essence_str(mt)[i])) ==> view(mt).type_ == part@,
+        (view(mt).subtype.len() == part@.len()
+            && (forall|i: int| 0 <= i < part@.len() ==>
+                #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]))
+            ==> view(mt).subtype == part@,
+{
+    if view(mt).type_.len() == part@.len()
+        && (forall|i: int| 0 <= i < part@.len() ==>
+            #[trigger] part@[i] == essence_str(mt)[i]) {
+        assert_seqs_equal!(view(mt).type_ == part@);
+    }
+    if view(mt).subtype.len() == part@.len()
+        && (forall|i: int| 0 <= i < part@.len() ==>
+            #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]) {
+        assert_seqs_equal!(view(mt).subtype == part@);
+    }
 }
 
-verus! {
+pub(crate) broadcast group mime_essence_parts_str_lemmas {
+    lemma_mime_essence_parts_str,
+}
 
 pub open spec fn essence_is_text_xml(mt: &Mime) -> bool {
     essence_str(mt) == "text/xml"@
@@ -117,12 +85,6 @@ pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
         #[trigger] is_image(mt) ==> !is_audio_video(mt),
         #[trigger] is_audio_video(mt) ==> !is_image(mt),
 {
-    reveal_strlit("image");
-    reveal_strlit("audio");
-    reveal_strlit("video");
-    reveal_strlit("/");
-    reveal_strlit("application/ogg");
-
     assert("image"@ != "audio"@) by {
         if "image"@ == "audio"@ {
             assert("image"@[0] == "audio"@[0]);
@@ -214,38 +176,5 @@ pub open spec fn is_explicit_unknown(mt: &Mime) -> bool {
     ||| essence_str(mt) == "*/*"@
 }
 
-
-define_mime_essence_parts_lemmas! {
-    mime_essence_parts_str_lemmas {
-        lemma_unknown_unknown_essence_parts_str => ("unknown", "unknown", 8),
-        lemma_application_unknown_essence_parts_str => ("application", "unknown", 12),
-        lemma_star_star_essence_parts_str => ("*", "*", 2),
-
-        lemma_application_ecmascript_essence_parts_str => ("application", "ecmascript", 12),
-        lemma_application_javascript_essence_parts_str => ("application", "javascript", 12),
-        lemma_application_x_ecmascript_essence_parts_str => ("application", "x-ecmascript", 12),
-        lemma_application_x_javascript_essence_parts_str => ("application", "x-javascript", 12),
-        lemma_text_ecmascript_essence_parts_str => ("text", "ecmascript", 5),
-        lemma_text_javascript_essence_parts_str => ("text", "javascript", 5),
-        lemma_text_javascript0_essence_parts_str => ("text", "javascript1.0", 5),
-        lemma_text_javascript1_essence_parts_str => ("text", "javascript1.1", 5),
-        lemma_text_javascript2_essence_parts_str => ("text", "javascript1.2", 5),
-        lemma_text_javascript3_essence_parts_str => ("text", "javascript1.3", 5),
-        lemma_text_javascript4_essence_parts_str => ("text", "javascript1.4", 5),
-        lemma_text_javascript5_essence_parts_str => ("text", "javascript1.5", 5),
-        lemma_text_jscript_essence_parts_str => ("text", "jscript", 5),
-        lemma_text_livescript_essence_parts_str => ("text", "livescript", 5),
-        lemma_text_x_ecmascript_essence_parts_str => ("text", "x-ecmascript", 5),
-        lemma_text_x_javascript_essence_parts_str => ("text", "x-javascript", 5),
-
-        lemma_application_font_cff_essence_parts_str => ("application", "font-cff", 12),
-        lemma_application_font_off_essence_parts_str => ("application", "font-off", 12),
-        lemma_application_font_sfnt_essence_parts_str => ("application", "font-sfnt", 12),
-        lemma_application_font_ttf_essence_parts_str => ("application", "font-ttf", 12),
-        lemma_application_font_woff_essence_parts_str => ("application", "font-woff", 12),
-        lemma_application_font_vnd_ms_fontobject_essence_parts_str => ("application", "vnd.ms-fontobject", 12),
-        lemma_application_font_vnd_ms_opentype_essence_parts_str => ("application", "vnd.ms-opentype", 12),
-    }
-}
 
 } // verus!
