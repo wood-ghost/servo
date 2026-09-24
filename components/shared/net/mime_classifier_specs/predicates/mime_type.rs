@@ -80,7 +80,6 @@ pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
 
 pub uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
 
-#[verifier::auto_reveal_literals(strlit)]
 pub open spec fn is_text_plain(mt: &Mime) -> bool {
     essence_str(mt) == "text/plain"@
 }

@@ -17,7 +17,6 @@ verus! {
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
 // TEXT_PLAIN, "text/plain", 4;
-#[verifier::auto_reveal_literals(strlit)]
 pub open spec fn text_plain_identity() -> MimeView {
     MimeView {
         type_: "text"@,
@@ -29,7 +28,6 @@ pub open spec fn text_plain_identity() -> MimeView {
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#751
 // TEXT_PLAIN_UTF_8, "text/plain; charset=utf-8", 4, None, 10;
-#[verifier::auto_reveal_literals(strlit)]
 pub open spec fn text_plain_utf_8_identity() -> MimeView {
     MimeView {
         type_: "text"@,
@@ -124,7 +122,6 @@ pub open spec fn image_bmp_identity() -> MimeView {
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#779
 // APPLICATION_OCTET_STREAM, "application/octet-stream", 11;
-#[verifier::auto_reveal_literals(strlit)]
 pub open spec fn application_octet_stream_identity() -> MimeView {
     MimeView {
         type_: "application"@,
