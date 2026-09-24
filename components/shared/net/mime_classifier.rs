@@ -543,8 +543,6 @@ impl MimeClassifier {
     /// SVG is worth distinguishing from other XML MIME types:
     /// <https://mimesniff.spec.whatwg.org/#mime-type-miscellaneous>
     fn is_xml(mt: &Mime) -> (result: bool) 
-        requires
-            SpecRequires::is_xml_requires(mt),
         ensures
             result == Spec::is_xml(mt),
     {
@@ -556,8 +554,6 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#html-mime-type>
     fn is_html(mt: &Mime) -> (result: bool)
-        requires
-            SpecRequires::is_html_requires(mt),
         ensures
             result == Spec::is_html(mt),
     {
@@ -574,8 +570,6 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#audio-or-video-mime-type>
     fn is_audio_video(mt: &Mime) -> (result: bool)
-        requires
-            SpecRequires::is_audio_video_requires(mt),
         ensures
             result == Spec::is_audio_video(mt),
     {
@@ -596,6 +590,7 @@ impl MimeClassifier {
     }
 
     /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
+    #[verifier::rlimit(20)]
     pub fn is_javascript(mt: &Mime) -> (result: bool)
         requires
             SpecRequires::is_javascript_requires(mt),
@@ -625,8 +620,6 @@ impl MimeClassifier {
 
     /// <https://mimesniff.spec.whatwg.org/#json-mime-type>
     pub fn is_json(mt: &Mime) -> (result: bool)
-        requires
-            SpecRequires::is_json_requires(mt),
         ensures
             result == Spec::is_json(mt), //TODO:
     {

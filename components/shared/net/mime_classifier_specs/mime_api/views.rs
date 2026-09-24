@@ -8,6 +8,8 @@ verus! {
 // abstract Mime
 pub struct MimeView {
     pub type_: Seq<char>,
+    // mime 0.3's subtype() excludes the separately stored structured suffix.
+    // WHATWG's subtype includes both, joined by '+'.
     pub subtype: Seq<char>,
     pub suffix: Option<Seq<char>>,
     // pub essence: Seq<char>,
@@ -40,18 +42,13 @@ pub open spec fn font_name() -> Seq<char> { "font"@ }
 
 // https://docs.rs/mime/latest/mime/struct.Mime.html#method.essence_str
 pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
-    // match(view(mt).suffix) {
-    //     Some(suffix) => view(mt).type_ + "/"@ + view(mt).subtype + "+"@ + suffix,
-    //     None => view(mt).type_ + "/"@ + view(mt).subtype,
-    // }
-    view(mt).type_ + "/"@ + view(mt).subtype // for servo behavior
+    essence_str_view(&view(mt))
 }
 pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
-    // match(mt.suffix) {
-    //     Some(suffix) => mt.type_ + "/"@ + mt.subtype + "+"@ + suffix,
-    //     None => mt.type_ + "/"@ + mt.subtype,
-    // }
-    mt.type_ + "/"@ + mt.subtype // for servo behavior
+    match(mt.suffix) {
+        Some(suffix) => mt.type_ + "/"@ + mt.subtype + "+"@ + suffix,
+        None => mt.type_ + "/"@ + mt.subtype,
+    }
 }
 
 } // verus!

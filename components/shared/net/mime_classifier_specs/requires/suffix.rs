@@ -3,24 +3,12 @@ use vstd::prelude::*;
 
 use crate::LoadContext;
 use crate::mime_classifier_specs::mime_api::view;
-use crate::mime_classifier_specs::predicates::{
-    is_xml, is_html, is_image, is_audio_video, is_javascript, is_font,
-};
+use crate::mime_classifier_specs::predicates::*;
 
 verus! {
 
-pub open spec fn is_xml_requires(mime: &Mime) -> bool {
-    &&& view(mime).type_ == "text"@ && view(mime).subtype == "xml"@
-        ==> view(mime).suffix.is_none()
-    &&& view(mime).type_ == "application"@ && view(mime).subtype == "xml"@
-        ==> view(mime).suffix.is_none()
-}
-
-pub open spec fn is_html_requires(mime: &Mime) -> bool {
-    view(mime).type_ == "text"@ && view(mime).subtype == "html"@
-        ==> view(mime).suffix.is_none()
-}
-
+// These executable predicates compare mime 0.3's suffix-free subtype(),
+// rather than the full essence. Keep their conformance restrictions explicit.
 pub open spec fn is_font_requires(mime: &Mime) -> bool {
     view(mime).type_ == "application"@
         && (view(mime).subtype == "font-cff"@
@@ -65,32 +53,14 @@ pub open spec fn is_explicit_unknown_requires(mime: &Mime) -> bool {
         ==> view(mime).suffix.is_none()
 }
 
-pub open spec fn is_audio_video_requires(mime: &Mime) -> bool {
-    view(mime).type_ == "application"@ && view(mime).subtype == "ogg"@ ==> view(mime).suffix.is_none()
-}
-
-pub open spec fn is_json_requires(mime: &Mime) -> bool {
-    &&& view(mime).type_ == "application"@ && view(mime).subtype == "json"@
-        ==> view(mime).suffix.is_none()
-    &&& view(mime).type_ == "text"@ && view(mime).subtype == "json"@
-        ==> view(mime).suffix.is_none()
-}
-
 // Apply each predicate's suffix requirement when its branch is reached.
 pub open spec fn get_media_type_requires(mime: &Mime) -> bool {
-    &&& is_xml_requires(mime)
-    &&& !is_xml(mime) ==> is_html_requires(mime)
-    &&& (!is_xml(mime) && !is_html(mime) && !is_image(mime))
-        ==> is_audio_video_requires(mime)
     &&& (!is_xml(mime) && !is_html(mime) && !is_image(mime)
         && !is_audio_video(mime))
         ==> is_javascript_requires(mime)
     &&& (!is_xml(mime) && !is_html(mime) && !is_image(mime)
         && !is_audio_video(mime) && !is_javascript(mime))
         ==> is_font_requires(mime)
-    &&& (!is_xml(mime) && !is_html(mime) && !is_image(mime)
-        && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime))
-        ==> is_json_requires(mime)
 }
 
 pub open spec fn maybe_get_media_type_requires(supplied_type: &Option<Mime>) -> bool {
@@ -103,12 +73,6 @@ pub open spec fn maybe_get_media_type_requires(supplied_type: &Option<Mime>) -> 
 pub open spec fn classify_suffix_requires(
     context: LoadContext, supplied_type: &Option<Mime>,
 ) -> bool {
-    // Every context checks XML, then HTML if XML does not match.
-    &&& match supplied_type {
-        Some(mt) => is_xml_requires(mt)
-            && (!is_xml(mt) ==> is_html_requires(mt)),
-        None => true,
-    }
     &&& (context == LoadContext::Browsing || context == LoadContext::Image
         || context == LoadContext::AudioVideo || context == LoadContext::Font)
         ==> maybe_get_media_type_requires(supplied_type)

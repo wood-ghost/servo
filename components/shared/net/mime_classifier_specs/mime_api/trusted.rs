@@ -437,7 +437,7 @@ pub assume_specification [mime::TEXT_XML] -> (result: Mime)
 // Mime
 pub assume_specification<'a> [Mime::essence_str](mt: &'a Mime) -> (result: &'a str)
     ensures
-        result@ == view(mt).type_ + "/"@ + view(mt).subtype,
+        result@ == essence_str(mt),
 ;
 pub assume_specification<'a> [Mime::suffix] (mt: &'a Mime) -> (result: Option<Name<'a>>)
     ensures

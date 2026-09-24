@@ -6,13 +6,17 @@ use crate::mime_classifier_specs::mime_api::*;
 
 verus! {
 
-/// Characterize either component using its position in the current essence
-/// model. The component string is arbitrary; no MIME table or fixed offset
-/// is needed to instantiate this lemma.
+/// Characterize the type, base subtype, and optional structured suffix using
+/// their positions in the full essence. The component string is arbitrary;
+/// no MIME table or fixed offset is needed to instantiate this lemma.
 pub(crate) broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: &str)
     ensures
         #![trigger essence_str(mt), part@]
-        essence_str(mt).len() == view(mt).type_.len() + 1 + view(mt).subtype.len(),
+        essence_str(mt).len() == view(mt).type_.len() + 1 + view(mt).subtype.len()
+            + match view(mt).suffix {
+                Some(suffix) => 1 + suffix.len(),
+                None => 0,
+            },
         essence_str(mt)[view(mt).type_.len() as int] == '/',
         (view(mt).type_.len() == part@.len()
             && (forall|i: int| 0 <= i < part@.len() ==>
@@ -21,6 +25,17 @@ pub(crate) broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: &str
             && (forall|i: int| 0 <= i < part@.len() ==>
                 #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]))
             ==> view(mt).subtype == part@,
+        match view(mt).suffix {
+            Some(suffix) => {
+                &&& essence_str(mt)[(view(mt).type_.len() + 1 + view(mt).subtype.len()) as int] == '+'
+                &&& (suffix.len() == part@.len()
+                    && (forall|i: int| 0 <= i < part@.len() ==>
+                        #[trigger] part@[i] == essence_str(mt)[
+                            view(mt).type_.len() + 2 + view(mt).subtype.len() + i]))
+                    ==> suffix == part@
+            },
+            None => true,
+        },
 {
     if view(mt).type_.len() == part@.len()
         && (forall|i: int| 0 <= i < part@.len() ==>
@@ -31,6 +46,14 @@ pub(crate) broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: &str
         && (forall|i: int| 0 <= i < part@.len() ==>
             #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]) {
         assert_seqs_equal!(view(mt).subtype == part@);
+    }
+    if let Some(suffix) = view(mt).suffix {
+        if suffix.len() == part@.len()
+            && (forall|i: int| 0 <= i < part@.len() ==>
+                #[trigger] part@[i] == essence_str(mt)[
+                    view(mt).type_.len() + 2 + view(mt).subtype.len() + i]) {
+            assert_seqs_equal!(suffix == part@);
+        }
     }
 }
 
