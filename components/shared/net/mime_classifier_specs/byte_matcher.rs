@@ -18,6 +18,32 @@ pub open spec fn validate_ok(pattern: Seq<u8>, mask:Seq<u8>) -> bool {
     &&& forall |i: int| #![trigger pattern[i]] 0 <= i < pattern.len() ==> (pattern[i] & mask[i]) == pattern[i]  
 }
 
+/// Full-byte, wildcard, and ASCII case-folding masks preserve these pattern
+/// bytes. Callers establish the premises from the matcher fields.
+pub(crate) broadcast proof fn lemma_byte_matcher_valid(bm: &ByteMatcher)
+    requires
+        bm.pattern@.len() > 0,
+        bm.pattern@.len() == bm.mask@.len(),
+        forall|i: int| #![trigger bm.pattern@[i]] 0 <= i < bm.pattern@.len() ==>
+            bm.mask@[i] == 0xFFu8
+            || (bm.mask@[i] == 0x00u8 && bm.pattern@[i] == 0x00u8)
+            || (bm.mask@[i] == 0xDFu8 && 0x40u8 <= bm.pattern@[i] && bm.pattern@[i] < 0x60u8),
+    ensures
+        #[trigger] bm.validate_spec(),
+{
+    assert forall|i: int| #![trigger bm.pattern@[i]] 0 <= i < bm.pattern@.len()
+        implies (bm.pattern@[i] & bm.mask@[i]) == bm.pattern@[i] by {
+        let p = bm.pattern@[i];
+        let m = bm.mask@[i];
+        assert((p & m) == p) by (bit_vector)
+            requires
+                m == 0xFFu8
+                || (m == 0x00u8 && p == 0x00u8)
+                || (m == 0xDFu8 && 0x40u8 <= p && p < 0x60u8),
+        ;
+    }
+}
+
 // https://mimesniff.spec.whatwg.org/#matching-a-mime-type-pattern
 pub open spec fn pattern_matching_at(input: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, ignored: Set<u8>, s: int) -> bool {
     &&& !(input == pattern)
