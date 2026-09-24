@@ -56,6 +56,7 @@ rustls = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
+vstd = { path = "../../../../verus/source/vstd" }
 webrender_api = { workspace = true }
 
 [dev-dependencies]
@@ -63,3 +64,6 @@ servo-default-resources = { workspace = true }
 
 [lints]
 workspace = true
+
+[package.metadata.verus]
+verify = true

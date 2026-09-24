@@ -14,11 +14,14 @@ use servo_base::generic_channel::{self, GenericSend, GenericSender};
 use servo_url::{ImmutableOrigin, ServoUrl};
 use url::Url;
 use uuid::Uuid;
+use vstd::prelude::*;
 
 use crate::{
     BlobTokenRefreshRequest, BlobTokenRevocationRequest, CoreResourceMsg, FileManagerThreadMsg,
     ResourceThreads,
 };
+
+verus! {
 
 /// Errors returned to Blob URL Store request
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -337,3 +340,5 @@ impl fmt::Debug for BlobToken {
             .finish()
     }
 }
+
+} // verus!

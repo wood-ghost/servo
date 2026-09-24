@@ -13,9 +13,12 @@ use serde::{Deserialize, Serialize};
 use servo_base::generic_channel::GenericSender;
 use servo_url::ImmutableOrigin;
 use uuid::Uuid;
+use vstd::prelude::*;
 
 use crate::CoreResourceMsg;
 use crate::blob_url_store::{BlobBuf, BlobURLStoreError};
+
+verus! {
 
 /// A token modulating access to a file for a blob URL.
 #[derive(Clone, Debug)]
@@ -198,3 +201,5 @@ pub enum FileManagerThreadError {
     /// Blob URL Store error
     BlobURLStoreError(BlobURLStoreError),
 }
+
+} // verus!
