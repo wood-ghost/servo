@@ -11118,11 +11118,11 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "verus_builtin"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-16-0054"
 
 [[package]]
 name = "verus_builtin_macros"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-20-0158"
 dependencies = [
  "convert_case 0.4.0",
  "proc-macro2",
@@ -11130,15 +11130,15 @@ dependencies = [
  "syn",
  "synstructure",
  "verus_prettyplease",
- "verus_syn 0.0.0-2026-08-02-0125",
+ "verus_syn 0.0.0-2026-09-06-0133",
 ]
 
 [[package]]
 name = "verus_prettyplease"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-06-0133"
 dependencies = [
  "proc-macro2",
- "verus_syn 0.0.0-2026-08-02-0125",
+ "verus_syn 0.0.0-2026-09-06-0133",
 ]
 
 [[package]]
@@ -11155,12 +11155,12 @@ dependencies = [
 
 [[package]]
 name = "verus_state_machines_macros"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-06-0133"
 dependencies = [
  "indexmap 2.14.0",
  "proc-macro2",
  "quote",
- "verus_syn 0.0.0-2026-08-02-0125",
+ "verus_syn 0.0.0-2026-09-06-0133",
 ]
 
 [[package]]
@@ -11176,7 +11176,7 @@ dependencies = [
 
 [[package]]
 name = "verus_syn"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-06-0133"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11191,11 +11191,11 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vstd"
-version = "0.0.0-2026-08-02-0125"
+version = "0.0.0-2026-09-20-0158"
 dependencies = [
  "verus_builtin",
  "verus_builtin_macros",
- "verus_state_machines_macros 0.0.0-2026-08-02-0125",
+ "verus_state_machines_macros 0.0.0-2026-09-06-0133",
 ]
 
 [[package]]
