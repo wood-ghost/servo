@@ -17,3 +17,4 @@ pub use views::*;
 pub use constants::*;
 pub use trusted::*;
 pub use essence_lemmas::*;
+pub use parser::*;
