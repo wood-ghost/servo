@@ -15,6 +15,10 @@ path = "lib.rs"
 test = false
 doctest = false
 
+[[test]]
+name = "mime_parse"
+path = "tests/mime_classifier_specs/mime_parse.rs"
+
 [features]
 test-util = []
 
@@ -57,7 +61,9 @@ webrender_api = { workspace = true }
 verus_state_machines_macros = "=0.0.0-2026-06-14-0213"
 
 [dev-dependencies]
+serde_json = { workspace = true }
 servo-default-resources = { workspace = true }
+tempfile = { workspace = true }
 
 [package.metadata.verus]
 verify = true
