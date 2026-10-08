@@ -19,6 +19,10 @@ doctest = false
 name = "mime_parse"
 path = "tests/mime_classifier_specs/mime_parse.rs"
 
+[[test]]
+name = "mime_api"
+path = "tests/mime_classifier_specs/mime_api.rs"
+
 [features]
 test-util = []
 

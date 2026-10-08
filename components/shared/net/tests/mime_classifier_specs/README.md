@@ -1,6 +1,6 @@
 # MIME specification regression tests
 
-`mime_parse.rs` follows Verus's regression-test convention:
+`mime_parse.rs` and `mime_api.rs` follow Verus's regression-test convention:
 
 ```rust
 test_verify_one_file! {
@@ -13,10 +13,10 @@ test_verify_one_file! {
             let subtype = mime.subtype().as_str();
             let suffix = mime.suffix();
             let essence = mime.essence_str();
-            assert(type_ == "text");
-            assert(subtype == "html");
+            assert(type_@ == "text"@);
+            assert(subtype@ == "html"@);
             assert(suffix.is_none());
-            assert(essence == "text/html");
+            assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
             assert(mime_view.params =~= map![]);
         }
@@ -32,7 +32,10 @@ library to accept the input.
 
 MIME accessor results are bound in executable statements before being used in
 assertions: these external methods currently lack specification-mode call
-redirection. The harness injects the existing `mime_api/mod.rs` umbrella as
+redirection. String contents are compared through `@`, rather than logical
+equality of `&str` values. When testing `PartialEq`, the comparison itself runs
+in an executable `let` statement and its boolean result is asserted. The harness
+injects the existing `mime_api/mod.rs` umbrella as
 `crate::mime_api`, including its external contracts.
 
 ## Cases and current specification work
@@ -58,6 +61,29 @@ failing assertion, and Rust type error `E0308`. Only the latter two controls
 expect an error. Missing tools, crashes, timeouts, and arbitrary compiler errors
 do not count as an expected assertion failure.
 
+### Other MIME API functions
+
+`mime_api.rs` contains 48 additional cases:
+
+| Area | Observations checked |
+| --- | --- |
+| Accessors and cloning | Constant and parsed components, suffixes, preserved parameter values, `Mime::clone`, `Name::clone`/copy |
+| Parameter lookup | Present/missing keys, string and `Name` arguments, case-insensitive lookup, first duplicate |
+| Parameter iteration | `next`, `size_hint` before and after advancement, order, duplicate entries, repeated exhaustion, `Debug` |
+| Equality | `Mime` and `Name`, strings in both operand orders, sensitivity, parameter spelling/order/value edge cases |
+| Conversion and formatting | `AsRef<str>`, `Name::as_str`, `Name` into `&str`, `Display` through `to_string`, `Debug` |
+| Ordering and hashing | `Ord`/`PartialOrd`, representation-sensitive ordering, bytes delivered to a recording `Hasher` |
+| Direct parsing and errors | `Mime::from_str`, error display/debug output, `Error::source` |
+| MIME-list iteration | `MimeIter::new`, `next`, `size_hint`, advancement, cloning at a noninitial position, error slices, exhaustion, `Debug` |
+
+Constants isolate available accessor/clone contracts from parsing requirements.
+The two constant-component tests use `#[verifier::auto_reveal_strlit]` and
+sequence extensionality for essence contents. The generated crate also sets
+`#![verifier::auto_reveal_strlit]` at its root for imported specification modules.
+This requires a verifier build supporting the attribute (see the follow-up
+below). The hash tests use a small recording hasher and assert bytes, not
+toolchain-dependent `DefaultHasher` numeric digests.
+
 ## Running
 
 From the Servo root:
@@ -66,6 +92,14 @@ From the Servo root:
 # The full suite currently fails on the unfinished MIME specifications.
 cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse \
   -- --test-threads=2
+
+# Run the additional API cases.
+cargo +1.95.0 test --locked -p servo-net-traits --test mime_api \
+  -- --test-threads=2
+
+# Run both targets even if one still has failing contracts.
+cargo +1.95.0 test --locked -p servo-net-traits \
+  --test mime_parse --test mime_api --no-fail-fast -- --test-threads=2
 
 # Check the verifier runner independently of the unfinished contracts.
 cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse harness_
@@ -142,3 +176,91 @@ No resource-limit failures occurred. The default SMT resource limit and enabled
 lifetime/trait-conflict checks were retained. Formatting and diff checks passed.
 This records the starting point for implementing the specifications, rather than
 a passing MIME verification baseline.
+
+## Additional API reference observations: 2026-10-08
+
+A standalone ordinary-Rust probe was compiled and executed with both Rust
+`1.95.0` and `1.98.1` against `mime = "=0.3.17"`. The output agreed exactly on
+both toolchains, including formatting, iterator traces, and recorded hash-byte
+writes. This supplies the hardcoded values in `mime_api.rs` independently of
+the trusted MIME specifications.
+
+Some pinned-library observations are particularly important for model fidelity:
+
+| Operation and inputs | Ordinary-Rust result |
+| --- | --- |
+| Equality: `text/plain;foo=first` vs `text/plain;foo=second` | `true` in both directions |
+| Equality: `text/plain;foo=first` vs `text/plain;foo=first;bar=last` | `true` in both directions |
+| Equality after reordering `foo=first;bar=last` to `bar=last;foo=first` | `false` in both directions |
+| `TEXT_PLAIN_UTF_8 == "text/plain; charset=abcde".parse::<Mime>().unwrap()` | `false`; reversing the operands gives `true` |
+| `mime::TEXT` vs the `foo=text` parameter value from the probe | Both expose `"text"`, but `Name == Name` is `false` in both directions |
+| Name hashing of those two `"text"` values | Concatenated writes are `b"text\xff\x01"` and `b"text\xff\x00"` respectively |
+| Parameter iteration for `foo=first;FOO=second;bar=last` | Three entries retained; size hints advance from 3 to 2 to 1 to 0 |
+
+These expectations deliberately describe the pinned implementation, including
+its surprising equality behavior. In particular, asymmetric `Mime` equality
+cannot be modeled by symmetric equality of views. Likewise, text alone does
+not capture `Name` equality's sensitivity flag. The existing equality contracts
+in `mime_api/trusted.rs` need review against these observations. This is distinct
+from a failed proof caused only by a missing library contract or solver hint.
+
+The new tests retain `=> Ok(())`; they neither change these contracts nor assume
+the desired outcomes. A successful future implementation of the specifications
+must address their fidelity as well as the currently missing APIs.
+
+## API verification evidence: 2026-10-08
+
+- Servo base: `4fbecda3e06a0b9d235213c67a383592ce633ffd`, with this test patch.
+- Verus source: `ddfb159f0e4917614801167c99d71697942fb29b`.
+- Selected verifier: `0.2026.10.05.4558d3d.dirty`, release, Linux x86_64,
+  using its bundled libraries and Rust `1.98.1-x86_64-unknown-linux-gnu`.
+- Dependency: `mime 0.3.17`; Cargo test driver: Rust `1.95.0`.
+
+Executed from the Servo root with `TMPDIR=/tmp/opencode`:
+
+```bash
+cargo +1.95.0 test --locked --offline -p servo-net-traits \
+  --test mime_api --test mime_parse --no-fail-fast -- --test-threads=2
+```
+
+Results, counted as Rust test cases:
+
+| Target | Passed | Failed |
+| --- | ---: | ---: |
+| `mime_api` | 4 | 44 |
+| `mime_parse` | 3 harness controls | 24 MIME contract cases |
+
+At that revision, the four passing API cases were `mime_constant_components`,
+`mime_clone_constant_components`, `mime_eq_constants`, and `name_as_str`.
+Of the other API cases, 22 reach proof checking and fail on current parsing,
+comparison, cloning, conversion, or formatting contracts. Another 22 stop on
+missing function/type/trait support, including `get_param`, `params`, `Params`,
+`MimeIter`, `AsRef`, `Hash`, `Error`, and some constants. These are different
+failure stages, not 44 demonstrated defects in Rust's implementation.
+
+The parser target still reports 23 proof failures and the missing `get_param`
+contract in the duplicate-lookup case. Its string-result assertions were
+corrected to content equality (`s@ == "..."@`); the required runtime values and
+`=> Ok(())` expectations are retained.
+
+No resource limits or lifetime/trait-conflict checks were relaxed, and no
+assumptions were added. Formatting and diff checks passed. The full command
+returns 101 until the outstanding specification work is completed.
+
+### Attribute-only literal revealing follow-up: 2026-10-08
+
+The constant-component cases now use `#[verifier::auto_reveal_strlit]` on their
+snippet functions in place of explicit literal-revealing calls. Their earlier
+passing results above precede this change.
+
+Focused check:
+
+```bash
+cargo +1.95.0 test --locked --offline -p servo-net-traits --test mime_api \
+  constant_components -- --test-threads=2
+```
+
+Both cases currently stop with **`unrecognized verifier attribute`** at the
+function annotation, using the installed `0.2026.10.05.4558d3d.dirty` build.
+This is a verifier-feature/toolchain blocker, before proof checking. A verifier
+build with auto-reveal support is required to check these attribute-only cases.
