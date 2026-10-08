@@ -80,8 +80,8 @@ Constants isolate available accessor/clone contracts from parsing requirements.
 The two constant-component tests use `#[verifier::auto_reveal_strlit]` and
 sequence extensionality for essence contents. The generated crate also sets
 `#![verifier::auto_reveal_strlit]` at its root for imported specification modules.
-This requires a verifier build supporting the attribute (see the follow-up
-below). The hash tests use a small recording hasher and assert bytes, not
+Use the local `servo-stable` verifier build for this attribute (see the branch
+validation below). The hash tests use a small recording hasher and assert bytes, not
 toolchain-dependent `DefaultHasher` numeric digests.
 
 ## Running
@@ -109,7 +109,16 @@ cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse \
   parse_plain_mime -- --exact --nocapture
 ```
 
-Use `verus` on `PATH`, or set `VERUS_PATH` to its executable. The runner obtains
+Use the release verifier built from the local `servo-stable` branch on `PATH`,
+or select it explicitly for a command:
+
+```bash
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+  cargo +1.95.0 test --locked -p servo-net-traits --test mime_api \
+  constant_components -- --test-threads=2
+```
+
+The runner obtains
 the verifier's Rust toolchain from `--version --output-json` and uses `rustup`
 to build the pinned `mime` and state-machine macro dependencies with that
 toolchain. The toolchain must already be installed. Dependency builds run
@@ -260,7 +269,44 @@ cargo +1.95.0 test --locked --offline -p servo-net-traits --test mime_api \
   constant_components -- --test-threads=2
 ```
 
-Both cases currently stop with **`unrecognized verifier attribute`** at the
-function annotation, using the installed `0.2026.10.05.4558d3d.dirty` build.
-This is a verifier-feature/toolchain blocker, before proof checking. A verifier
-build with auto-reveal support is required to check these attribute-only cases.
+At this stage, both cases stopped with **`unrecognized verifier attribute`** at
+the function annotation using `0.2026.10.05.4558d3d.dirty`. This was a
+verifier-feature/toolchain blocker before proof checking, resolved by the
+`servo-stable` build below.
+
+### Local `servo-stable` validation: 2026-10-08
+
+The local Verus checkout was switched to `servo-stable` at
+`3a347310d098e784cdfbea97294315b079bb409e` and rebuilt with `vargo build --release`.
+The resulting executable identifies as **`0.2026.09.24.3a34731`**, release,
+Linux x86_64, using Rust `1.98.1-x86_64-unknown-linux-gnu`. The build's `vstd`
+verification reported **2059 verified, 0 errors**. Z3 was `4.16.0`.
+
+Servo was at `acc228da4d33ff49b8a4be2cf14457748c71e4b4`. Its path-patched `vstd`
+lock entry was aligned to this branch's `0.0.0-2026-09-20-0158` package version.
+The test driver remained Rust `1.95.0`, with `mime 0.3.17` and the pinned
+`verus_state_machines_macros 0.0.0-2026-06-14-0213` dependency.
+
+The focused `constant_components` run, with `--locked --offline` and
+`--test-threads=2 --nocapture`, passed **both constant-component cases**, using
+only the auto-reveal attributes and no explicit literal-revealing calls.
+The complete regression run was then executed from the Servo root:
+
+```bash
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+  cargo +1.95.0 test --locked --offline -p servo-net-traits \
+  --test mime_api --test mime_parse --no-fail-fast -- --test-threads=2
+```
+
+| Target | Passed | Failed |
+| --- | ---: | ---: |
+| `mime_api` | 4 | 44 |
+| `mime_parse` | 3 harness controls | 24 MIME contract cases |
+
+The API failures remain 22 proof failures and 22 missing-support failures.
+The attribute-recognition error is gone; the remaining failures concern the
+unfinished contracts documented above. The full command returns 101. Both
+lifetime and trait-conflict checks remain enabled, and the SMT resource limit
+was not changed. These focused client tests do not establish whole-classifier
+or dependency-implementation verification.

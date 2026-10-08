@@ -13,8 +13,6 @@ mod common;
 
 // Accessors and cloning. Constants isolate these cases from parsing requirements.
 
-// FIXME (support): Verus 0.2026.10.05.4558d3d.dirty rejects auto_reveal_strlit;
-// this case needs a verifier build with literal auto-reveal support.
 test_verify_one_file! {
     #[test] mime_constant_components verus_code! {
         use vstd::prelude::*;
@@ -55,8 +53,6 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): Verus 0.2026.10.05.4558d3d.dirty rejects auto_reveal_strlit;
-// this case needs a verifier build with literal auto-reveal support.
 test_verify_one_file! {
     #[test] mime_clone_constant_components verus_code! {
         use vstd::prelude::*;
