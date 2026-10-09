@@ -3,9 +3,12 @@
 //! The external type/operation specifications and formatting axiom are trusted.
 //! The pure view definitions and proof lemmas are grouped separately below.
 
-use ::mime::{Mime, Name};
+use ::mime::{Mime, Name, Params};
 use vstd::prelude::*;
+use vstd::std_specs::char::to_ascii_lowercase;
+use vstd::std_specs::cmp::PartialEqSpec;
 use vstd::std_specs::fmt::fmt_req_all;
+use vstd::std_specs::iter::IteratorSpec;
 
 // use super::model::*;
 use super::name::name_identity;
@@ -29,10 +32,34 @@ pub struct MimeView {
     pub subtype: Seq<char>,
     pub suffix: Option<Seq<char>>,
     // pub essence: Seq<char>,
-    pub params: Map<Seq<char>, Seq<char>>,
+    pub params: Seq<(Seq<char>, Seq<char>)>,
 }
 
 pub uninterp spec fn view(mt: &Mime) -> MimeView;
+
+/// Parameter entries in the order returned by mime 0.3.17, including duplicates.
+/// The text pairs in `MimeView` do not include `Name`'s comparison metadata.
+/// TODO: Connect this ordered view to the parsing and constant contracts.
+pub uninterp spec fn parameter_entries<'a>(mt: &'a Mime) -> Seq<(Name<'a>, Name<'a>)>;
+
+pub open spec fn parameter_name_matches(query: Seq<char>, name: Seq<char>) -> bool {
+    &&& query.len() == name.len()
+    &&& forall|i: int| #![trigger query[i], name[i]] 0 <= i < query.len() ==>
+        to_ascii_lowercase(query[i]) == to_ascii_lowercase(name[i])
+}
+
+/// Bridge string comparison to the stored parameter names, which all have
+/// `Name::insensitive == true`. This does not claim that parameter values, or
+/// arbitrary Names, compare without case. These external facts remain trusted.
+pub open spec fn parameter_entries_well_formed<'a>(mt: &'a Mime) -> bool {
+    let entries = parameter_entries(mt);
+    &&& entries.len() <= usize::MAX
+    &&& <&str as PartialEqSpec<Name<'a>>>::obeys_eq_spec()
+    &&& forall|i: int, query: &str| #![auto] 0 <= i < entries.len() ==>
+        <&str as PartialEqSpec<Name<'a>>>::eq_spec(&query, &entries[i].0)
+            == parameter_name_matches(query@, name_identity(&entries[i].0))
+}
+
 pub open spec fn option_view(value: &Option<Mime>) -> Option<MimeView> {
     match value {
         Some(mt) => Some(view(mt)),
@@ -60,6 +87,11 @@ pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
 #[verifier::external_body]
 pub struct ExMime(Mime);
 
+// https://docs.rs/mime/latest/mime/struct.Params.html
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExParams<'a>(Params<'a>);
+
 pub broadcast axiom fn axiom_fmt_req_all_mime()
     ensures
         #[trigger] fmt_req_all::<Mime>(),
@@ -78,11 +110,52 @@ pub assume_specification[ <Mime as Clone>::clone ](mt: &Mime) -> (result: Mime)
         view(&result) == view(mt),
 ;
 
-// Mime
+// Struct Mime Methods
 pub assume_specification<'a> [Mime::essence_str](mt: &'a Mime) -> (result: &'a str)
     ensures
         result@ == essence_str(mt),
 ;
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#200-203
+pub assume_specification<'a, N: PartialEq<Name<'a>>> [Mime::get_param::<N>](
+    mt: &'a Mime,
+    attr: N,
+) -> (result: Option<Name<'a>>)
+    ensures
+        parameter_entries_well_formed(mt),
+        parameter_entries(mt).len() == 0 ==> result.is_none(),
+        // As in vstd's comparison-based APIs, a deterministic eq_spec is needed
+        // to describe which entry an arbitrary user-defined comparator accepts.
+        N::obeys_eq_spec() ==> {
+            let entries = parameter_entries(mt);
+            match result {
+                Some(value) => exists|i: int| #![auto] {
+                    &&& 0 <= i < entries.len()
+                    &&& value == entries[i].1
+                    &&& attr.eq_spec(&entries[i].0)
+                    &&& forall|j: int| #![trigger entries[j]]
+                        0 <= j < i ==> !attr.eq_spec(&entries[j].0)
+                },
+                None => forall|i: int| #![trigger entries[i]]
+                    0 <= i < entries.len() ==> !attr.eq_spec(&entries[i].0),
+            }
+        },
+;
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#207-220
+pub assume_specification<'a> [Mime::params](mt: &'a Mime) -> (result: Params<'a>)
+    ensures
+        parameter_entries_well_formed(mt),
+        result.obeys_prophetic_iter_laws(),
+        result.remaining() == parameter_entries(mt),
+        result.will_return_none(),
+        result.decrease() == Some(parameter_entries(mt).len()),
+;
+
+pub assume_specification<'a> [Mime::subtype] (mt: &'a Mime) -> (result: Name<'a>)
+    ensures
+        name_identity(&result) == view(mt).subtype,
+;
+
 pub assume_specification<'a> [Mime::suffix] (mt: &'a Mime) -> (result: Option<Name<'a>>)
     ensures
         match result {
@@ -91,13 +164,10 @@ pub assume_specification<'a> [Mime::suffix] (mt: &'a Mime) -> (result: Option<Na
             None => view(mt).suffix.is_none(),
         },
 ;
+
 pub assume_specification<'a> [Mime::type_] (mt: &'a Mime) -> (result: Name<'a>)
     ensures
         name_identity(&result) == view(mt).type_,
-;
-pub assume_specification<'a> [Mime::subtype] (mt: &'a Mime) -> (result: Name<'a>)
-    ensures
-        name_identity(&result) == view(mt).subtype,
 ;
 
 // Proof lemmas over the abstract view.

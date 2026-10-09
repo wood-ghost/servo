@@ -29,7 +29,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ =~= "text/plain"@);
             let ghost view = crate::mime_api::view(&mime);
-            assert(view.params =~= map!["charset"@ => "utf-8"@]);
+            assert(view.params =~= seq![("charset"@, "utf-8"@)]);
         }
     } => Ok(())
 }
@@ -69,7 +69,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ =~= "text/plain"@);
             let ghost view = crate::mime_api::view(&cloned);
-            assert(view.params =~= map!["charset"@ => "utf-8"@]);
+            assert(view.params =~= seq![("charset"@, "utf-8"@)]);
         }
     } => Ok(())
 }
@@ -92,7 +92,7 @@ test_verify_one_file! {
             assert(suffix@ == "xml"@);
             assert(essence@ == "image/svg+xml"@);
             let ghost view = crate::mime_api::view(&cloned);
-            assert(view.params =~= map!["foo"@ => "AbC"@]);
+            assert(view.params =~= seq![("foo"@, "AbC"@)]);
         }
     } => Ok(())
 }
@@ -335,7 +335,7 @@ test_verify_one_file! {
 }
 
 // FIXME (proof): Parse/unwrap requirements and the equality assertion are unproved.
-// Fidelity: the observed Rust equality is not equality of complete parameter maps.
+// Fidelity: the observed Rust equality is not equality of complete parameter sequences.
 test_verify_one_file! {
     #[test] mime_eq_parameter_values_pinned_behavior verus_code! {
         use vstd::prelude::*;
@@ -353,7 +353,7 @@ test_verify_one_file! {
 }
 
 // FIXME (proof): Parse/unwrap requirements and inequality assertions are unproved.
-// Fidelity: an unordered parameter map cannot capture the observed order effect.
+// Fidelity: the parameter representation must preserve the observed order effect.
 test_verify_one_file! {
     #[test] mime_eq_parameter_names_and_order verus_code! {
         use vstd::prelude::*;
@@ -770,7 +770,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/plain"@);
             let ghost view = crate::mime_api::view(&mime);
-            assert(view.params =~= map![]);
+            assert(view.params =~= seq![]);
         }
     } => Ok(())
 }

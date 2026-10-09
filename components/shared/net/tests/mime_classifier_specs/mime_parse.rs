@@ -61,7 +61,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }
@@ -83,7 +83,7 @@ test_verify_one_file! {
             assert(suffix@ == "xml"@);
             assert(essence@ == "image/svg+xml"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["charset"@ => "utf-8"@]);
+            assert(mime_view.params =~= seq![("charset"@, "utf-8"@)]);
         }
     } => Ok(())
 }
@@ -105,7 +105,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }
@@ -127,7 +127,7 @@ test_verify_one_file! {
             assert(suffix@ == "xml"@);
             assert(essence@ == "image/svg+xml"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }
@@ -149,12 +149,12 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "multipart/form-data"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["boundary"@ => "AbC123"@, "foo"@ => "MiXeD"@]);
+            assert(mime_view.params =~= seq![("boundary"@, "AbC123"@), ("foo"@, "MiXeD"@)]);
         }
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and the component/parameter-map
+// FIXME (proof): Parse/unwrap requirements and the component/parameter-sequence
 // assertions are unproved; the general parsing-result relation is unfinished.
 test_verify_one_file! {
     #[test] parse_multiple_unquoted_parameters verus_code! {
@@ -171,7 +171,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => "ab"@, "bar"@ => "cd"@]);
+            assert(mime_view.params =~= seq![("foo"@, "ab"@), ("bar"@, "cd"@)]);
         }
     } => Ok(())
 }
@@ -193,7 +193,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => "ab"@]);
+            assert(mime_view.params =~= seq![("foo"@, "ab"@)]);
         }
     } => Ok(())
 }
@@ -215,7 +215,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => "\""@]);
+            assert(mime_view.params =~= seq![("foo"@, "\""@)]);
         }
     } => Ok(())
 }
@@ -237,12 +237,12 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => r"a\b"@]);
+            assert(mime_view.params =~= seq![("foo"@, r"a\b"@)]);
         }
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and the result map are unproved;
+// FIXME (proof): Parse/unwrap requirements and the result sequence are unproved;
 // FromStr does not yet relate quoted scanning and subsequent parameters to its result.
 test_verify_one_file! {
     #[test] parse_quoted_semicolon_and_following_parameter verus_code! {
@@ -259,7 +259,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => "a;b"@, "bar"@ => "c"@]);
+            assert(mime_view.params =~= seq![("foo"@, "a;b"@), ("bar"@, "c"@)]);
         }
     } => Ok(())
 }
@@ -281,7 +281,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => "é🦀"@]);
+            assert(mime_view.params =~= seq![("foo"@, "é🦀"@)]);
         }
     } => Ok(())
 }
@@ -303,7 +303,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["pre"@ => "é"@, "foo"@ => "ab"@]);
+            assert(mime_view.params =~= seq![("pre"@, "é"@), ("foo"@, "ab"@)]);
         }
     } => Ok(())
 }
@@ -325,7 +325,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             // Rust params() retains both entries; get_param observes the first.
-            // A Map cannot express the complete duplicate-bearing iterator.
+            // The parameter sequence can represent both entries in order.
             let first = mime.get_param("foo").unwrap().as_str();
             assert(first@ == "first"@);
         }
@@ -349,7 +349,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map!["foo"@ => ""@]);
+            assert(mime_view.params =~= seq![("foo"@, ""@)]);
         }
     } => Ok(())
 }
@@ -371,7 +371,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "application/+json"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }
@@ -393,7 +393,7 @@ test_verify_one_file! {
             assert(suffix@ == "c"@);
             assert(essence@ == "application/a+b+c"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }

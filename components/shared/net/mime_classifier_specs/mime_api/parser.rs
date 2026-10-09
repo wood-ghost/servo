@@ -1604,7 +1604,7 @@ pub open spec fn parse_mime_type_spec(input: Seq<char>) -> Option<MimeView> {
                 type_: type_,
                 subtype: subtype,
                 suffix: None, // TODO:
-                params: Map::empty(),
+                params: Seq::empty(),
             };
             Some(mime_type) //TODO:
         }

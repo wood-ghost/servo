@@ -263,7 +263,7 @@ pub open spec fn text_plain_identity() -> MimeView {
         type_: "text"@,
         subtype: "plain"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -279,7 +279,7 @@ pub open spec fn text_plain_utf_8_identity() -> MimeView {
         type_: "text"@,
         subtype: "plain"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -295,7 +295,7 @@ pub open spec fn text_html_identity() -> MimeView {
         type_: "text"@,
         subtype: "html"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -312,7 +312,7 @@ pub open spec fn text_html_utf_8_identity() -> MimeView {
         type_: "text"@,
         subtype: "html"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -329,7 +329,7 @@ pub open spec fn text_css_identity() -> MimeView {
         type_: "text"@,
         subtype: "css"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -346,7 +346,7 @@ pub open spec fn text_css_utf_8_identity() -> MimeView {
         type_: "text"@,
         subtype: "css"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -363,7 +363,7 @@ pub open spec fn text_javascript_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -389,7 +389,7 @@ pub open spec fn text_xml_identity() -> MimeView {
         type_: "text"@,
         subtype: "xml"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -405,7 +405,7 @@ pub open spec fn text_event_stream_identity() -> MimeView {
         type_: "text"@,
         subtype: "event-stream"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -419,7 +419,7 @@ pub open spec fn text_csv_identity() -> MimeView {
         type_: "text"@,
         subtype: "csv"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -433,7 +433,7 @@ pub open spec fn text_csv_utf_8_identity() -> MimeView {
         type_: "text"@,
         subtype: "csv"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -447,7 +447,7 @@ pub open spec fn text_tab_separated_values_identity() -> MimeView {
         type_: "text"@,
         subtype: "tab-separated-values"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -461,7 +461,7 @@ pub open spec fn text_tab_separated_values_utf_8_identity() -> MimeView {
         type_: "text"@,
         subtype: "tab-separated-values"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -475,7 +475,7 @@ pub open spec fn text_vcard_identity() -> MimeView {
         type_: "text"@,
         subtype: "vcard"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -492,7 +492,7 @@ pub open spec fn image_jpeg_identity() -> MimeView {
         type_: "image"@,
         subtype: "jpeg"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -508,7 +508,7 @@ pub open spec fn image_gif_identity() -> MimeView {
         type_: "image"@,
         subtype: "gif"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -524,7 +524,7 @@ pub open spec fn image_png_identity() -> MimeView {
         type_: "image"@,
         subtype: "png"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -540,7 +540,7 @@ pub open spec fn image_bmp_identity() -> MimeView {
         type_: "image"@,
         subtype: "bmp"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -557,7 +557,7 @@ pub open spec fn image_svg_identity() -> MimeView {
         type_: "image"@,
         subtype: "svg"@,
         suffix: Some("xml"@),
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -572,7 +572,7 @@ pub open spec fn star_star_identity() -> MimeView {
         type_: "*"@,
         subtype: "*"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -586,7 +586,7 @@ pub open spec fn text_star_identity() -> MimeView {
         type_: "text"@,
         subtype: "*"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -600,7 +600,7 @@ pub open spec fn image_star_identity() -> MimeView {
         type_: "image"@,
         subtype: "*"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -615,7 +615,7 @@ pub open spec fn font_woff_identity() -> MimeView {
         type_: "font"@,
         subtype: "woff"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -629,7 +629,7 @@ pub open spec fn font_woff2_identity() -> MimeView {
         type_: "font"@,
         subtype: "woff2"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -644,7 +644,7 @@ pub open spec fn application_json_identity() -> MimeView {
         type_: "application"@,
         subtype: "json"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -661,7 +661,7 @@ pub open spec fn application_javascript_identity() -> MimeView {
         type_: "application"@,
         subtype: "javascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -676,7 +676,7 @@ pub open spec fn application_javascript_utf_8_identity() -> MimeView {
         type_: "application"@,
         subtype: "javascript"@,
         suffix: None,
-        params: Map::empty().insert("charset"@, "utf-8"@),
+        params: seq![("charset"@, "utf-8"@)],
     }
 }
 
@@ -690,7 +690,7 @@ pub open spec fn application_www_form_urlencoded_identity() -> MimeView {
         type_: "application"@,
         subtype: "x-www-form-urlencoded"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -707,7 +707,7 @@ pub open spec fn application_octet_stream_identity() -> MimeView {
         type_: "application"@,
         subtype: "octet-stream"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -723,7 +723,7 @@ pub open spec fn application_msgpack_identity() -> MimeView {
         type_: "application"@,
         subtype: "msgpack"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -740,7 +740,7 @@ pub open spec fn application_pdf_identity() -> MimeView {
         type_: "application"@,
         subtype: "pdf"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -756,7 +756,7 @@ pub open spec fn multipart_form_data_identity() -> MimeView {
         type_: "multipart"@,
         subtype: "form-data"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -774,7 +774,7 @@ pub open spec fn image_x_icon_identity() -> MimeView {
         type_: "image"@,
         subtype: "x-icon"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "image/webp"
@@ -783,7 +783,7 @@ pub open spec fn image_webp_identity() -> MimeView {
         type_: "image"@,
         subtype: "webp"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "video/webm"
@@ -792,7 +792,7 @@ pub open spec fn video_webm_identity() -> MimeView {
         type_: "video"@,
         subtype: "webm"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "audio/basic"
@@ -801,7 +801,7 @@ pub open spec fn audio_basic_identity() -> MimeView {
         type_: "audio"@,
         subtype: "basic"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "audio/aiff"
@@ -810,7 +810,7 @@ pub open spec fn audio_aiff_identity() -> MimeView {
         type_: "audio"@,
         subtype: "aiff"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "audio/mpeg"
@@ -819,7 +819,7 @@ pub open spec fn audio_mpeg_identity() -> MimeView {
         type_: "audio"@,
         subtype: "mpeg"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/ogg"
@@ -828,7 +828,7 @@ pub open spec fn application_ogg_identity() -> MimeView {
         type_: "application"@,
         subtype: "ogg"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "audio/midi"
@@ -837,7 +837,7 @@ pub open spec fn audio_midi_identity() -> MimeView {
         type_: "audio"@,
         subtype: "midi"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "video/avi"
@@ -846,7 +846,7 @@ pub open spec fn video_avi_identity() -> MimeView {
         type_: "video"@,
         subtype: "avi"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "audio/wave"
@@ -855,7 +855,7 @@ pub open spec fn audio_wave_identity() -> MimeView {
         type_: "audio"@,
         subtype: "wave"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 
@@ -865,7 +865,7 @@ pub open spec fn application_postscript_identity() -> MimeView {
         type_: "application"@,
         subtype: "postscript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/x-gzip"
@@ -874,7 +874,7 @@ pub open spec fn application_x_gzip_identity() -> MimeView {
         type_: "application"@,
         subtype: "x-gzip"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/zip"
@@ -883,7 +883,7 @@ pub open spec fn application_zip_identity() -> MimeView {
         type_: "application"@,
         subtype: "zip"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/x-rar-compressed"
@@ -892,7 +892,7 @@ pub open spec fn application_x_rar_compressed_identity() -> MimeView {
         type_: "application"@,
         subtype: "x-rar-compressed"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/font-woff"
@@ -901,7 +901,7 @@ pub open spec fn application_font_woff_identity() -> MimeView {
         type_: "application"@,
         subtype: "font-woff"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/font-woff2"
@@ -910,7 +910,7 @@ pub open spec fn application_font_woff2_identity() -> MimeView {
         type_: "application"@,
         subtype: "font-woff2"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/font-sfnt"
@@ -919,7 +919,7 @@ pub open spec fn application_font_sfnt_identity() -> MimeView {
         type_: "application"@,
         subtype: "font-sfnt"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/vnd.ms-fontobject"
@@ -928,7 +928,7 @@ pub open spec fn application_vnd_ms_fontobject_identity() -> MimeView {
         type_: "application"@,
         subtype: "vnd.ms-fontobject"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "video/mp4"
@@ -937,7 +937,7 @@ pub open spec fn video_mp4_identity() -> MimeView {
         type_: "video"@,
         subtype: "mp4"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/vtt"
@@ -946,7 +946,7 @@ pub open spec fn text_vtt_identity() -> MimeView {
         type_: "text"@,
         subtype: "vtt"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/cache-manifest"
@@ -955,7 +955,7 @@ pub open spec fn text_cache_manifest_identity() -> MimeView {
         type_: "text"@,
         subtype: "cache-manifest"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/ecmascript"
@@ -964,7 +964,7 @@ pub open spec fn application_ecmascript_identity() -> MimeView {
         type_: "application"@,
         subtype: "ecmascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/x-ecmascript"
@@ -973,7 +973,7 @@ pub open spec fn application_x_ecmascript_identity() -> MimeView {
         type_: "application"@,
         subtype: "x-ecmascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "application/x-javascript"
@@ -982,7 +982,7 @@ pub open spec fn application_x_javascript_identity() -> MimeView {
         type_: "application"@,
         subtype: "x-javascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/ecmascript"
@@ -991,7 +991,7 @@ pub open spec fn text_ecmascript_identity() -> MimeView {
         type_: "text"@,
         subtype: "ecmascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.0"
@@ -1000,7 +1000,7 @@ pub open spec fn text_javascript1_0_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.0"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.1"
@@ -1009,7 +1009,7 @@ pub open spec fn text_javascript1_1_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.1"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.2"
@@ -1018,7 +1018,7 @@ pub open spec fn text_javascript1_2_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.2"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.3"
@@ -1027,7 +1027,7 @@ pub open spec fn text_javascript1_3_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.3"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.4"
@@ -1036,7 +1036,7 @@ pub open spec fn text_javascript1_4_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.4"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/javascript1.5"
@@ -1045,7 +1045,7 @@ pub open spec fn text_javascript1_5_identity() -> MimeView {
         type_: "text"@,
         subtype: "javascript1.5"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/jscript"
@@ -1054,7 +1054,7 @@ pub open spec fn text_jscript_identity() -> MimeView {
         type_: "text"@,
         subtype: "jscript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/livescript"
@@ -1063,7 +1063,7 @@ pub open spec fn text_livescript_identity() -> MimeView {
         type_: "text"@,
         subtype: "livescript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/x-ecmascript"
@@ -1072,7 +1072,7 @@ pub open spec fn text_x_ecmascript_identity() -> MimeView {
         type_: "text"@,
         subtype: "x-ecmascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 // "text/x-javascript"
@@ -1081,7 +1081,7 @@ pub open spec fn text_x_javascript_identity() -> MimeView {
         type_: "text"@,
         subtype: "x-javascript"@,
         suffix: None,
-        params: Map::empty(),
+        params: Seq::empty(),
     }
 }
 

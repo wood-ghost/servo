@@ -42,7 +42,7 @@ test_verify_one_file! {
             assert(suffix.is_none());
             assert(essence@ == "text/html"@);
             let ghost mime_view = crate::mime_api::view(&mime);
-            assert(mime_view.params =~= map![]);
+            assert(mime_view.params =~= seq![]);
         }
     } => Ok(())
 }
@@ -64,16 +64,15 @@ injects the existing `mime_api/mod.rs` umbrella as
 
 ## Cases and current specification work
 
-The cases check type, base subtype, suffix, essence, and exact parameter-map
+The cases check type, base subtype, suffix, essence, and exact parameter-sequence
 contents for unique parameter names. Inputs cover normalization, quoted values,
 backslashes, Unicode, multiple parameters, suffix boundaries, and rejection.
 Rejection tests still require `Ok(())`: Verus must prove that parsing returns
 `Err` for the hardcoded input.
 
 The duplicate-name case checks the executable `get_param("foo")` result against
-`"first"`. Ordinary Rust `params()` retains both duplicate entries in order; the
-current `MimeView.params: Map` cannot represent that full sequence. This case
-does not silently choose a new duplicate-to-map projection.
+`"first"`. Ordinary Rust `params()` retains both duplicate entries in order;
+`MimeView.params: Seq<(Seq<char>, Seq<char>)>` can represent that full sequence.
 
 These are specifications-to-be-satisfied tests. `mime_parse_requires` is still
 uninterpreted, and the general parsing-result relation remains unfinished.
@@ -91,7 +90,7 @@ do not count as an expected assertion failure.
 constants, 32 primary `Mime` constants, and the deprecated `TEXT_JAVSCRIPT` alias.
 Small table macros expand to `test_verify_one_file!` / `verus_code!` cases with
 hardcoded expectations and `=> Ok(())`. Name cases check `as_str`; Mime cases
-check type, base subtype, suffix, exact parameter map, and essence. They use the
+check type, base subtype, suffix, exact parameter sequence, and essence. They use the
 auto-reveal attribute, not explicit literal-revealing calls.
 
 All constants are checked independently against ordinary-Rust accessor results.

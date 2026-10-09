@@ -107,15 +107,15 @@ name_constant!(name_charset, CHARSET, "charset");
 name_constant!(name_boundary, BOUNDARY, "boundary");
 name_constant!(name_utf_8, UTF_8, "utf-8");
 
-// Mime constants: type, base subtype, suffix, exact parameter map, and essence.
-mime_constant!(mime_star_star, STAR_STAR, "*", "*", None, map![], "*/*");
+// Mime constants: type, base subtype, suffix, exact parameter sequence, and essence.
+mime_constant!(mime_star_star, STAR_STAR, "*", "*", None, seq![], "*/*");
 mime_constant!(
     mime_text_star,
     TEXT_STAR,
     "text",
     "*",
     None,
-    map![],
+    seq![],
     "text/*"
 );
 mime_constant!(
@@ -124,7 +124,7 @@ mime_constant!(
     "text",
     "plain",
     None,
-    map![],
+    seq![],
     "text/plain"
 );
 mime_constant!(
@@ -133,7 +133,7 @@ mime_constant!(
     "text",
     "plain",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "text/plain"
 );
 mime_constant!(
@@ -142,7 +142,7 @@ mime_constant!(
     "text",
     "html",
     None,
-    map![],
+    seq![],
     "text/html"
 );
 mime_constant!(
@@ -151,7 +151,7 @@ mime_constant!(
     "text",
     "html",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "text/html"
 );
 mime_constant!(
@@ -160,7 +160,7 @@ mime_constant!(
     "text",
     "css",
     None,
-    map![],
+    seq![],
     "text/css"
 );
 mime_constant!(
@@ -169,7 +169,7 @@ mime_constant!(
     "text",
     "css",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "text/css"
 );
 mime_constant!(
@@ -178,7 +178,7 @@ mime_constant!(
     "text",
     "javascript",
     None,
-    map![],
+    seq![],
     "text/javascript"
 );
 mime_constant!(
@@ -187,7 +187,7 @@ mime_constant!(
     "text",
     "xml",
     None,
-    map![],
+    seq![],
     "text/xml"
 );
 mime_constant!(
@@ -196,7 +196,7 @@ mime_constant!(
     "text",
     "event-stream",
     None,
-    map![],
+    seq![],
     "text/event-stream"
 );
 mime_constant!(
@@ -205,7 +205,7 @@ mime_constant!(
     "text",
     "csv",
     None,
-    map![],
+    seq![],
     "text/csv"
 );
 mime_constant!(
@@ -214,7 +214,7 @@ mime_constant!(
     "text",
     "csv",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "text/csv"
 );
 mime_constant!(
@@ -223,7 +223,7 @@ mime_constant!(
     "text",
     "tab-separated-values",
     None,
-    map![],
+    seq![],
     "text/tab-separated-values"
 );
 mime_constant!(
@@ -232,7 +232,7 @@ mime_constant!(
     "text",
     "tab-separated-values",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "text/tab-separated-values"
 );
 mime_constant!(
@@ -241,7 +241,7 @@ mime_constant!(
     "text",
     "vcard",
     None,
-    map![],
+    seq![],
     "text/vcard"
 );
 mime_constant!(
@@ -250,7 +250,7 @@ mime_constant!(
     "image",
     "*",
     None,
-    map![],
+    seq![],
     "image/*"
 );
 mime_constant!(
@@ -259,7 +259,7 @@ mime_constant!(
     "image",
     "jpeg",
     None,
-    map![],
+    seq![],
     "image/jpeg"
 );
 mime_constant!(
@@ -268,7 +268,7 @@ mime_constant!(
     "image",
     "gif",
     None,
-    map![],
+    seq![],
     "image/gif"
 );
 mime_constant!(
@@ -277,7 +277,7 @@ mime_constant!(
     "image",
     "png",
     None,
-    map![],
+    seq![],
     "image/png"
 );
 mime_constant!(
@@ -286,7 +286,7 @@ mime_constant!(
     "image",
     "bmp",
     None,
-    map![],
+    seq![],
     "image/bmp"
 );
 mime_constant!(
@@ -295,7 +295,7 @@ mime_constant!(
     "image",
     "svg",
     Some("xml"),
-    map![],
+    seq![],
     "image/svg+xml"
 );
 mime_constant!(
@@ -304,7 +304,7 @@ mime_constant!(
     "font",
     "woff",
     None,
-    map![],
+    seq![],
     "font/woff"
 );
 mime_constant!(
@@ -313,7 +313,7 @@ mime_constant!(
     "font",
     "woff2",
     None,
-    map![],
+    seq![],
     "font/woff2"
 );
 mime_constant!(
@@ -322,7 +322,7 @@ mime_constant!(
     "application",
     "json",
     None,
-    map![],
+    seq![],
     "application/json"
 );
 mime_constant!(
@@ -331,7 +331,7 @@ mime_constant!(
     "application",
     "javascript",
     None,
-    map![],
+    seq![],
     "application/javascript"
 );
 mime_constant!(
@@ -340,7 +340,7 @@ mime_constant!(
     "application",
     "javascript",
     None,
-    map!["charset"@ => "utf-8"@],
+    seq![("charset"@, "utf-8"@)],
     "application/javascript"
 );
 mime_constant!(
@@ -349,7 +349,7 @@ mime_constant!(
     "application",
     "x-www-form-urlencoded",
     None,
-    map![],
+    seq![],
     "application/x-www-form-urlencoded"
 );
 mime_constant!(
@@ -358,7 +358,7 @@ mime_constant!(
     "application",
     "octet-stream",
     None,
-    map![],
+    seq![],
     "application/octet-stream"
 );
 mime_constant!(
@@ -367,7 +367,7 @@ mime_constant!(
     "application",
     "msgpack",
     None,
-    map![],
+    seq![],
     "application/msgpack"
 );
 mime_constant!(
@@ -376,7 +376,7 @@ mime_constant!(
     "application",
     "pdf",
     None,
-    map![],
+    seq![],
     "application/pdf"
 );
 mime_constant!(
@@ -385,7 +385,7 @@ mime_constant!(
     "multipart",
     "form-data",
     None,
-    map![],
+    seq![],
     "multipart/form-data"
 );
 mime_constant!(
@@ -394,6 +394,6 @@ mime_constant!(
     "text",
     "javascript",
     None,
-    map![],
+    seq![],
     "text/javascript"
 );
