@@ -23,6 +23,10 @@ path = "tests/mime_classifier_specs/mime_parse.rs"
 name = "mime_api"
 path = "tests/mime_classifier_specs/mime_api.rs"
 
+[[test]]
+name = "mime_constants"
+path = "tests/mime_classifier_specs/mime_constants.rs"
+
 [features]
 test-util = []
 

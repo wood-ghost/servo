@@ -8,7 +8,7 @@ The production specification modules are under
 | File | Responsibility |
 | --- | --- |
 | `mod.rs` | Existing umbrella exports, including the `SpecMime` import alias used by the classifier |
-| `constants.rs` | Existing `Mime` and `Name` constant values paired with their trusted external bindings; a separate section for parsing-literal identities |
+| `constants.rs` | All 38 `Name` and 33 `Mime` constants from mime 0.3.17, paired with their trusted external bindings; a separate section for parsing-literal identities |
 | `mime.rs` | `MimeView`, view/essence functions, the `Mime` external type and operation contracts, and the essence proof lemmas |
 | `name.rs` | `name_identity`, the `Name` external type and operation contracts, and equality axioms |
 | `parser.rs` | `FromStr`/`str::parse` contracts, `FromStrError`, parsing requirements/results, automata and the existing legacy model |
@@ -85,6 +85,19 @@ failing assertion, and Rust type error `E0308`. Only the latter two controls
 expect an error. Missing tools, crashes, timeouts, and arbitrary compiler errors
 do not count as an expected assertion failure.
 
+### Library constants
+
+`mime_constants.rs` covers every public constant in the pinned crate: 38 `Name`
+constants, 32 primary `Mime` constants, and the deprecated `TEXT_JAVSCRIPT` alias.
+Small table macros expand to `test_verify_one_file!` / `verus_code!` cases with
+hardcoded expectations and `=> Ok(())`. Name cases check `as_str`; Mime cases
+check type, base subtype, suffix, exact parameter map, and essence. They use the
+auto-reveal attribute, not explicit literal-revealing calls.
+
+All constants are checked independently against ordinary-Rust accessor results.
+Their Verus bindings are still **trusted** `assume_specification` declarations:
+the passing model checks do not verify the external library implementation.
+
 ### Other MIME API functions
 
 `mime_api.rs` contains 48 additional cases:
@@ -119,6 +132,10 @@ cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse \
 
 # Run the additional API cases.
 cargo +1.95.0 test --locked -p servo-net-traits --test mime_api \
+  -- --test-threads=2
+
+# Check every library constant.
+cargo +1.95.0 test --locked -p servo-net-traits --test mime_constants \
   -- --test-threads=2
 
 # Run both targets even if one still has failing contracts.
@@ -380,3 +397,40 @@ Formatting checks passed for the umbrella, constants, and new type modules.
 The parser's existing model/legacy body formatting was retained; a whole-file
 format check still proposes pre-existing whitespace and legacy indentation
 changes there. `git diff --check` passed.
+
+### Complete constant bindings: 2026-10-09
+
+On Servo base `c18673b79e5a6f9cae807cf78a252efee11d9975`, the constant specifications
+were extended from 21 to 71 bindings: 29 additional `Name` constants and 21
+additional `Mime` constants. This includes all UTF-8 variants, wildcards,
+`IMAGE_SVG`, font/application constants, parameter names, and the deprecated
+alias. The existing `application_javascript_identity` was reused in the library
+constant section. The binding inventory matches the pinned crate's public
+constant declarations exactly, with no omissions or duplicate bindings.
+
+A standalone ordinary-Rust checker directly read every constant and asserted
+its expected components using the public accessors. It passed on both Rust
+`1.95.0` and `1.98.1`: **38 Name values and 33 complete Mime results checked**.
+
+Verification used the same local `servo-stable` build
+`0.2026.09.24.3a34731` (`3a347310d098e784cdfbea97294315b079bb409e`):
+
+```bash
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+  cargo +1.95.0 test --locked --offline -p servo-net-traits \
+  --test mime_constants --test mime_api --test mime_parse --no-fail-fast \
+  -- --test-threads=2
+```
+
+| Target | Passed | Failed |
+| --- | ---: | ---: |
+| `mime_constants` | 71 | 0 |
+| `mime_api` | 5 | 43 |
+| `mime_parse` | 3 harness controls | 24 MIME contract cases |
+
+The existing `mime_constant_suffix` case now passes with the `IMAGE_SVG` binding.
+The `get_param` cases still need method contracts, even though `CHARSET` is now
+specified. The isolated specification/proof-module check still reports
+**47 verified, 0 errors**. Lifetime and trait-conflict checks remain enabled,
+and the default SMT resource limit was retained. Formatting and diff checks passed.

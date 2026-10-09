@@ -34,7 +34,6 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `mime::IMAGE_SVG` lacks an external constant specification.
 test_verify_one_file! {
     #[test] mime_constant_suffix verus_code! {
         use vstd::prelude::*;
@@ -147,7 +146,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): Both `Mime::get_param` and the `mime::CHARSET` constant need specs.
+// FIXME (support): `Mime::get_param` still needs a specification for these lookups.
 test_verify_one_file! {
     #[test] get_param_string_and_name verus_code! {
         use vstd::prelude::*;
