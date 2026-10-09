@@ -1,19 +1,79 @@
+//! Named model values and trusted bindings for `mime` library constants.
+//!
+//! Each library constant's external contract accompanies its model value.
+//! The final section contains identities for parsing literals, which are not
+//! all public constants of the Rust library.
+
+use ::mime::{self, Mime, Name};
 use vstd::prelude::*;
 
-use super::views::MimeView;
+use super::mime::{MimeView, view};
+use super::name::name_identity;
 
 verus! {
 
 // ----------------
 // Constant Identity
 // -----------------
-// The Rust Mime type https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#43
-// pub struct Mime {
-//     source: Source,
-//     slash: usize,
-//     plus: Option<usize>,
-//     params: ParamSource,
-// }
+
+// NAME
+pub open spec fn image_name() -> Seq<char> { "image"@ }
+pub assume_specification [mime::IMAGE] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == image_name(),
+;
+
+pub open spec fn audio_name() -> Seq<char> { "audio"@ }
+pub assume_specification [mime::AUDIO] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == audio_name(),
+;
+
+pub open spec fn video_name() -> Seq<char> { "video"@ }
+pub assume_specification [mime::VIDEO] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == video_name(),
+;
+
+pub open spec fn xml_name() -> Seq<char> { "xml"@ }
+pub assume_specification [mime::XML] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == xml_name(),
+;
+
+pub open spec fn application_name() -> Seq<char> { "application"@ }
+pub assume_specification [mime::APPLICATION] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == application_name(),
+;
+
+pub open spec fn star_name() -> Seq<char> { "*"@ }
+pub assume_specification [mime::STAR] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == star_name(),
+;
+
+pub open spec fn text_name() -> Seq<char> { "text"@ }
+pub assume_specification [mime::TEXT] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == text_name(),
+;
+
+pub open spec fn json_name() -> Seq<char> { "json"@ }
+pub assume_specification [mime::JSON] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == json_name(),
+;
+
+pub open spec fn font_name() -> Seq<char> { "font"@ }
+pub assume_specification [mime::FONT] -> (result: Name<'static>)
+    ensures
+        name_identity(&result) == font_name(),
+;
+
+// ----------------
+// Constant
+// -----------------
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
 // TEXT_PLAIN, "text/plain", 4;
@@ -26,6 +86,11 @@ pub open spec fn text_plain_identity() -> MimeView {
     }
 }
 
+pub(crate) assume_specification [mime::TEXT_PLAIN] -> (result: Mime)
+    ensures
+        view(&result) == text_plain_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#751
 // TEXT_PLAIN_UTF_8, "text/plain; charset=utf-8", 4, None, 10;
 pub open spec fn text_plain_utf_8_identity() -> MimeView {
@@ -36,6 +101,12 @@ pub open spec fn text_plain_utf_8_identity() -> MimeView {
         params: Map::empty().insert("charset"@, "utf-8"@),
     }
 }
+
+pub(crate) assume_specification [mime::TEXT_PLAIN_UTF_8] -> (result: Mime)
+    ensures
+        view(&result) == text_plain_utf_8_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#752
 // TEXT_HTML, "text/html", 4;
 pub open spec fn text_html_identity() -> MimeView {
@@ -46,6 +117,11 @@ pub open spec fn text_html_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::TEXT_HTML] -> (result: Mime)
+    ensures
+        view(&result) == text_html_identity(),
+;
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#754
 // TEXT_CSS, "text/css", 4;
@@ -58,6 +134,11 @@ pub open spec fn text_css_identity() -> MimeView {
     }
 }
 
+pub(crate) assume_specification [mime::TEXT_CSS] -> (result: Mime)
+    ensures
+        view(&result) == text_css_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#756
 // TEXT_JAVASCRIPT, "text/javascript", 4;
 pub open spec fn text_javascript_identity() -> MimeView {
@@ -68,6 +149,12 @@ pub open spec fn text_javascript_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
+    ensures
+        view(&result) == text_javascript_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#757
 // TEXT_XML, "text/xml", 4;
 pub open spec fn text_xml_identity() -> MimeView {
@@ -79,6 +166,11 @@ pub open spec fn text_xml_identity() -> MimeView {
     }
 }
 
+pub assume_specification [mime::TEXT_XML] -> (result: Mime)
+    ensures
+        view(&result) == text_xml_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#766
 // IMAGE_JPEG, "image/jpeg", 5;
 pub open spec fn image_jpeg_identity() -> MimeView {
@@ -89,6 +181,12 @@ pub open spec fn image_jpeg_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::IMAGE_JPEG] -> (result: Mime)
+    ensures
+        view(&result) == image_jpeg_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#767
 // IMAGE_GIF, "image/gif", 5;
 pub open spec fn image_gif_identity() -> MimeView {
@@ -99,6 +197,12 @@ pub open spec fn image_gif_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::IMAGE_GIF] -> (result: Mime)
+    ensures
+        view(&result) == image_gif_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#768
 // IMAGE_PNG, "image/png", 5;
 pub open spec fn image_png_identity() -> MimeView {
@@ -109,6 +213,12 @@ pub open spec fn image_png_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::IMAGE_PNG] -> (result: Mime)
+    ensures
+        view(&result) == image_png_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#769
 // IMAGE_BMP, "image/bmp", 5;
 pub open spec fn image_bmp_identity() -> MimeView {
@@ -119,6 +229,11 @@ pub open spec fn image_bmp_identity() -> MimeView {
         params: Map::empty(),
     }
 }
+
+pub(crate) assume_specification [mime::IMAGE_BMP] -> (result: Mime)
+    ensures
+        view(&result) == image_bmp_identity(),
+;
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#779
 // APPLICATION_OCTET_STREAM, "application/octet-stream", 11;
@@ -131,6 +246,11 @@ pub open spec fn application_octet_stream_identity() -> MimeView {
     }
 }
 
+pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mime)
+    ensures
+        view(&result) == application_octet_stream_identity(),
+;
+
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#781
 // APPLICATION_PDF, "application/pdf", 11;
 pub open spec fn application_pdf_identity() -> MimeView {
@@ -142,7 +262,13 @@ pub open spec fn application_pdf_identity() -> MimeView {
     }
 }
 
+pub(crate) assume_specification [mime::APPLICATION_PDF] -> (result: Mime)
+    ensures
+        view(&result) == application_pdf_identity(),
+;
+
 // parse from string
+// Canonical values for supported parsing literals, not additional library constants.
 // "image/x-icon"
 pub open spec fn image_x_icon_identity() -> MimeView {
     MimeView {

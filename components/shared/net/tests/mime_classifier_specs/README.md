@@ -1,5 +1,29 @@
 # MIME specification regression tests
 
+## Library specification layout
+
+The production specification modules are under
+`components/shared/net/mime_classifier_specs/mime_api/`:
+
+| File | Responsibility |
+| --- | --- |
+| `mod.rs` | Existing umbrella exports, including the `SpecMime` import alias used by the classifier |
+| `constants.rs` | Existing `Mime` and `Name` constant values paired with their trusted external bindings; a separate section for parsing-literal identities |
+| `mime.rs` | `MimeView`, view/essence functions, the `Mime` external type and operation contracts, and the essence proof lemmas |
+| `name.rs` | `name_identity`, the `Name` external type and operation contracts, and equality axioms |
+| `parser.rs` | `FromStr`/`str::parse` contracts, `FromStrError`, parsing requirements/results, automata and the existing legacy model |
+
+The `mime` and `name` implementation modules are private, with their public
+items re-exported through `mime_api`. In particular, a glob import of `mime_api`
+does not introduce a module named `mime` that shadows the external Rust crate.
+External library imports within these modules use the explicit `::mime` path.
+
+Contracts and axioms remain visibly marked as trusted in their API-owning
+modules. The layout refactor retains the existing predicates and assumptions,
+including the unfinished parsing relation and known equality-model gaps.
+
+## Test format
+
 `mime_parse.rs` and `mime_api.rs` follow Verus's regression-test convention:
 
 ```rust
@@ -177,7 +201,8 @@ expectations. The failures divide into:
   insufficient success/suffix guarantees for `unwrap`, and unproved hardcoded
   component or rejection assertions. These reach proof checking; they are not
   syntax or mode errors. See `parser.rs`'s `mime_parse_requires` and
-  `FromStrSpecImpl`, and the parsing declarations in `trusted.rs`.
+   `FromStrSpecImpl`, and the parsing declarations then in `trusted.rs`
+   (now co-located in `parser.rs`).
 - **1 missing library contract:** `parse_duplicate_parameter_lookup` stops at
   unsupported `mime::Mime::get_param`, before proving its first-match assertion.
 
@@ -209,8 +234,9 @@ Some pinned-library observations are particularly important for model fidelity:
 These expectations deliberately describe the pinned implementation, including
 its surprising equality behavior. In particular, asymmetric `Mime` equality
 cannot be modeled by symmetric equality of views. Likewise, text alone does
-not capture `Name` equality's sensitivity flag. The existing equality contracts
-in `mime_api/trusted.rs` need review against these observations. This is distinct
+not capture `Name` equality's sensitivity flag. The existing equality contracts,
+formerly in `mime_api/trusted.rs` and now in `mime_api/mime.rs` and
+`mime_api/name.rs`, need review against these observations. This is distinct
 from a failed proof caused only by a missing library contract or solver hint.
 
 The new tests retain `=> Ok(())`; they neither change these contracts nor assume
@@ -310,3 +336,47 @@ unfinished contracts documented above. The full command returns 101. Both
 lifetime and trait-conflict checks remain enabled, and the SMT resource limit
 was not changed. These focused client tests do not establish whole-classifier
 or dependency-implementation verification.
+
+### Type-oriented specification layout validation: 2026-10-09
+
+The specification layout was reorganized on Servo base
+`06c732921d18ac77964d2cccc05e0a10740508bf`. Both checks used the local
+`servo-stable` verifier `0.2026.09.24.3a34731` at
+`3a347310d098e784cdfbea97294315b079bb409e`, its bundled `vstd`, Rust `1.98.1`,
+and the same pinned MIME/state-machine dependencies as the test runner.
+
+The before/after regression command, from the Servo root, was:
+
+```bash
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+  cargo +1.95.0 test --locked --offline -p servo-net-traits \
+  --test mime_api --test mime_parse --no-fail-fast -- --test-threads=2
+```
+
+| Check | Before | After |
+| --- | --- | --- |
+| `mime_api` regression target | 4 passed, 44 failed | Same passing/failing cases; 22 proof failures and 22 missing-support failures |
+| `mime_parse` regression target | 3 controls passed, 24 failed | Same passing/failing cases |
+| All source modules of the isolated `mime_api` specification crate | 47 verified, 0 errors | 47 verified, 0 errors |
+
+The isolated check used a temporary Rust entry point importing the actual
+`mime_api/mod.rs`, with crate-level `auto_reveal_strlit`, and the dependency
+artifacts supplied by the regression runner. It used `--internal-test-mode`,
+`--crate-type=lib`, `--edition=2021`, `--output-json`, `--error-format=json`,
+`--multiple-errors 20`, and `--num-threads 2`, without module filters. This checks
+the parser-model proofs and the moved essence lemma, rather than only clients
+of their contracts. A follow-up also checked `SpecMime`, wildcard imports,
+unqualified `mime::Mime` resolution, and both re-exported broadcast groups using
+the classifier's `broadcast use` syntax.
+
+No lifetime/trait-conflict checks or SMT resource limits were relaxed. The
+external specifications and axioms were moved with their formulas and trust
+annotations; their existing fidelity gaps remain. The 47-verification result
+concerns this isolated specification crate, not the external MIME implementation
+or the whole classifier.
+
+Formatting checks passed for the umbrella, constants, and new type modules.
+The parser's existing model/legacy body formatting was retained; a whole-file
+format check still proposes pre-existing whitespace and legacy indentation
+changes there. `git diff --check` passed.

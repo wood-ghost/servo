@@ -1,20 +1,24 @@
-//! MIME API abstraction layer.
+//! Specifications for the external `mime` library.
 //!
 //! Sub-modules:
-//! - [`views`] — the abstract `MimeView` model and derived accessors
-//! - [`constants`] — concrete `MimeView` identity values for known MIME types
-//! - [`trusted`] — external contracts, axioms, and the `FromStr` bridge (the trusted boundary)
-//! - [`parser`] — MIME parser model and specifications
+//! - [`constants`] — named model values and trusted bindings for library constants
+//! - `mime` — the `MimeView` abstraction, `Mime` contracts, and essence lemmas
+//! - `name` — the `Name` abstraction, contracts, and equality axioms
+//! - [`parser`] — `FromStr` contracts, parsing requirements, and parser models
+//!
+//! External type specifications, `assume_specification` declarations, and
+//! broadcast axioms are trusted boundaries, co-located with the API they model.
+//! Parser correspondence and the existing equality-model fidelity gaps remain
+//! separate specification obligations; organization does not discharge them.
 
-pub mod views;
 pub mod constants;
-pub mod trusted;
-pub mod essence_lemmas;
+mod mime;
+mod name;
 pub mod parser;
 
-// Re-export everything — no name conflicts since the module is `views` (plural).
-pub use views::*;
-pub use constants::*;
-pub use trusted::*;
-pub use essence_lemmas::*;
-pub use parser::*;
+// Preserve the umbrella API used as SpecMime and by existing glob imports.
+// Keep the implementation module `mime` private so it cannot shadow ::mime.
+pub use self::constants::*;
+pub use self::mime::*;
+pub use self::name::*;
+pub use self::parser::*;

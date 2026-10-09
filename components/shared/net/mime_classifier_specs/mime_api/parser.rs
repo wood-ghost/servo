@@ -1,12 +1,16 @@
 //! MIME parser model and specifications.
+//!
+//! The FromStr/str::parse declarations below are trusted external contracts.
+//! The automata and their proofs supply models; their general correspondence
+//! with the external parser remains an explicit TODO.
 
+use ::mime::{self, Mime};
 use core::str::FromStr;
-use mime::Mime;
-use vstd::prelude::*;
 use verus_state_machines_macros::{case_on_next, state_machine};
+use vstd::prelude::*;
 
 use super::constants::*;
-use super::views::*;
+use super::mime::{MimeView, view};
 
 pub use legacy::{
     collect_a_sequence_of_code_points,
@@ -134,6 +138,26 @@ impl FromStrSpecImpl for Mime {
         &&& (input == "text/x-javascript"@) ==> view(&result->Ok_0) == text_x_javascript_identity()
     }
 }
+
+// --------------------
+// str::parse for Mime
+// --------------------
+pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
+    result: Result<F, <F as FromStr>::Err>
+)
+    requires
+        call_requires(<F as FromStr>::from_str, (s,)),
+    ensures
+        call_ensures( <F as FromStr>::from_str, (s,), result),
+;
+
+// The precondition is inherited from FromStrSpec::from_str_requires in parser.rs.
+pub assume_specification[ <Mime as FromStr>::from_str ](input: &str) -> (
+    result: Result<Mime, <Mime as FromStr>::Err>
+)
+    ensures
+        true // TODO:
+;
 
 // https://fetch.spec.whatwg.org/#http-whitespace
 pub open spec fn is_http_whitespace(c: char) -> bool {
