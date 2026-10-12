@@ -372,16 +372,6 @@ pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
         view(&result) == text_javascript_identity(),
 ;
 
-// =====================> Not used in mime_classifier
-// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#786-788
-// Deprecated compatibility spelling: TEXT_JAVSCRIPT = TEXT_JAVASCRIPT.
-#[allow(deprecated)]
-pub(crate) assume_specification [mime::TEXT_JAVSCRIPT] -> (result: Mime)
-    ensures
-        view(&result) == text_javascript_identity(),
-;
-// <===================== Not used in mime_classifier
-
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#757
 // TEXT_XML, "text/xml", 4;
 pub open spec fn text_xml_identity() -> MimeView {
@@ -763,6 +753,14 @@ pub open spec fn multipart_form_data_identity() -> MimeView {
 pub(crate) assume_specification [mime::MULTIPART_FORM_DATA] -> (result: Mime)
     ensures
         view(&result) == multipart_form_data_identity(),
+;
+
+// https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#786-788
+// Deprecated compatibility spelling: TEXT_JAVSCRIPT = TEXT_JAVASCRIPT.
+#[allow(deprecated)]
+pub(crate) assume_specification [mime::TEXT_JAVSCRIPT] -> (result: Mime)
+    ensures
+        view(&result) == text_javascript_identity(),
 ;
 // <===================== Not used in mime_classifier
 

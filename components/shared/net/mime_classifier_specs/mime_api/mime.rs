@@ -31,7 +31,6 @@ pub struct MimeView {
     // WHATWG's subtype includes both, joined by '+'.
     pub subtype: Seq<char>,
     pub suffix: Option<Seq<char>>,
-    // pub essence: Seq<char>,
     pub params: Seq<(Seq<char>, Seq<char>)>,
 }
 
