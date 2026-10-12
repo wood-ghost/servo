@@ -5,13 +5,13 @@
 
 use ::mime::{Mime, Name, Params};
 use vstd::prelude::*;
-use vstd::std_specs::char::to_ascii_lowercase;
 use vstd::std_specs::cmp::PartialEqSpec;
 use vstd::std_specs::fmt::fmt_req_all;
 use vstd::std_specs::iter::IteratorSpec;
 
 // use super::model::*;
 use super::name::name_identity;
+use super::parser::ascii_lowercase;
 
 verus! {
 
@@ -44,7 +44,7 @@ pub uninterp spec fn parameter_entries<'a>(mt: &'a Mime) -> Seq<(Name<'a>, Name<
 pub open spec fn parameter_name_matches(query: Seq<char>, name: Seq<char>) -> bool {
     &&& query.len() == name.len()
     &&& forall|i: int| #![trigger query[i], name[i]] 0 <= i < query.len() ==>
-        to_ascii_lowercase(query[i]) == to_ascii_lowercase(name[i])
+        ascii_lowercase(query)[i] == ascii_lowercase(name)[i]
 }
 
 /// Bridge string comparison to the stored parameter names, which all have

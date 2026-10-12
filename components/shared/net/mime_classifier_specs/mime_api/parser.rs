@@ -3,13 +3,15 @@
 //! The FromStr/str::parse declarations below are trusted external contracts.
 //! The automata and their proofs supply models; their general correspondence
 //! with the external parser remains an explicit TODO.
+//! The parser-backed contract currently leaves execution and subtype/suffix
+//! decomposition as uninterpreted placeholders.
 
 use ::mime::{self, Mime};
 use core::str::FromStr;
 use verus_state_machines_macros::{case_on_next, state_machine};
 use vstd::prelude::*;
 
-use super::constants::*;
+// use super::constants::*; // Used by the commented-out literal-specific contract.
 use super::mime::{MimeView, view};
 
 pub use legacy::{
@@ -22,8 +24,43 @@ pub use legacy::{
 
 verus! {
 
-// TODO: Define the input requirements under which the Rust MIME parsing contract applies.
-pub uninterp spec fn mime_parse_requires(input: Seq<char>) -> bool;
+// Currently no input requirements are checked.
+// TODO: Add further requirements later.
+pub open spec fn mime_parse_requires(input: Seq<char>) -> bool {
+    true
+}
+
+// Parser-contract structure:
+// input -> completed MimeParseAutomaton state -> Done/MimeView or Failure.
+//
+// TODO: Define this using State::initialize(trace[0], input) and State::next
+// on adjacent trace states. Prove completed-run existence under mime_parse_requires
+// and agreement of the observable result across completed runs before selecting
+// a final state. This placeholder does not yet assert reachability or termination.
+// Also reconcile the remaining WHATWG-shaped transitions (e.g. duplicate-name
+// filtering) with mime 0.3.17 before establishing general library correspondence.
+pub uninterp spec fn mime_parse_final_state(input: Seq<char>) -> MimeParseAutomaton::State;
+
+// TODO: Split the state's collected subtype according to mime 0.3.17's rules.
+// For example, "svg+xml" becomes ("svg", Some("xml")); "html" has no suffix.
+// Keep the last/non-leading '+' rules explicit when replacing this placeholder.
+pub uninterp spec fn mime_parse_subtype_and_suffix(
+    subtype: Seq<char>,
+) -> (Seq<char>, Option<Seq<char>>);
+
+// Project a successful state into the shared view. Parameters are already an
+// ordered sequence; an empty sequence represents a successful parse with no parameters.
+pub open spec fn mime_parse_done_view(final_state: MimeParseAutomaton::State) -> MimeView
+    recommends final_state.state == MimeParseState::Done,
+{
+    let (subtype, suffix) = mime_parse_subtype_and_suffix(final_state.subtype);
+    MimeView {
+        type_: final_state.type_,
+        subtype,
+        suffix,
+        params: final_state.parameters,
+    }
+}
 
 #[verifier::external_trait_specification]
 #[verifier::external_trait_extension(FromStrSpec via FromStrSpecImpl)]
@@ -55,8 +92,17 @@ impl FromStrSpecImpl for Mime {
         input: Seq<char>,
         result: Result<Mime, <Mime as FromStr>::Err>,
     ) -> bool {
-        // TODO: Relate general parsing results to the automaton under mime_parse_requires.
         // Successful parsing does not imply essence == input: case and parameters can differ.
+        // The external call is related to the parser's terminal outcome. Error
+        // payloads remain abstract, and a nonterminal state is not a parse failure.
+        let final_state = mime_parse_final_state(input);
+        match (final_state.state, result) {
+            (MimeParseState::Done, Ok(mt)) => view(&mt) == mime_parse_done_view(final_state),
+            (MimeParseState::Failure, Err(_)) => true,
+            _ => false,
+        }
+
+        /* Previous literal-specific guarantees, retained as a reference only.
         // hardcode
         // &&& result is Ok
         &&& (input == "image/x-icon"@) ==> result is Ok
@@ -136,6 +182,7 @@ impl FromStrSpecImpl for Mime {
         &&& (input == "text/livescript"@) ==> view(&result->Ok_0) == text_livescript_identity()
         &&& (input == "text/x-ecmascript"@) ==> view(&result->Ok_0) == text_x_ecmascript_identity()
         &&& (input == "text/x-javascript"@) ==> view(&result->Ok_0) == text_x_javascript_identity()
+        */
     }
 }
 
@@ -149,14 +196,6 @@ pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
         call_requires(<F as FromStr>::from_str, (s,)),
     ensures
         call_ensures( <F as FromStr>::from_str, (s,), result),
-;
-
-// The precondition is inherited from FromStrSpec::from_str_requires in parser.rs.
-pub assume_specification[ <Mime as FromStr>::from_str ](input: &str) -> (
-    result: Result<Mime, <Mime as FromStr>::Err>
-)
-    ensures
-        true // TODO:
 ;
 
 // https://fetch.spec.whatwg.org/#http-whitespace
