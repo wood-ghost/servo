@@ -70,19 +70,79 @@ backslashes, Unicode, multiple parameters, suffix boundaries, and rejection.
 Rejection tests still require `Ok(())`: Verus must prove that parsing returns
 `Err` for the hardcoded input.
 
-The duplicate-name case checks the executable `get_param("foo")` result against
-`"first"`. Ordinary Rust `params()` retains both duplicate entries in order;
-`MimeView.params: Seq<(Seq<char>, Seq<char>)>` can represent that full sequence.
+The duplicate-name case expects both ordered entries in `MimeView.params` and
+checks the executable `get_param("foo")` result against `"first"`. Ordinary Rust
+`params()` retains both duplicate entries; the current automaton filters the
+second entry, so the Rust-expected sequence is a pending fidelity regression.
 
-These are specifications-to-be-satisfied tests. `mime_parse_requires` is still
-uninterpreted, and the general parsing-result relation remains unfinished.
-The MIME cases keep `=> Ok(())` even while they fail. Implementing the contracts
-is the next step; the tests add no assumptions, external bodies, or exemptions.
+These are specifications-to-be-satisfied tests. `mime_parse_requires` currently
+checks nothing (`true`), and the parsing contract uses the state-machine result.
+Correspondence between that model and the Rust library remains unfinished.
+The MIME cases keep `=> Ok(())` even while they fail; the tests add no assumptions,
+external bodies, or exemptions.
 
 Three `harness_*` controls distinguish a verified assertion, a deliberately
 failing assertion, and Rust type error `E0308`. Only the latter two controls
 expect an error. Missing tools, crashes, timeouts, and arbitrary compiler errors
 do not count as an expected assertion failure.
+
+### Parent-parser execution: 2026-10-13
+
+`mime_parse_final_state` now runs from the initial state until `Done` or `Failure`.
+Initialization and successor selection reuse `State::initialize` and `State::next`.
+The generated `take_step` proof helpers supply initialization and transition
+witnesses. Uniqueness, invariant preservation, and progress are proved over these
+relations. Termination uses a lexicographic measure: the initial
+trimming phase, remaining input, and phase rank. A constructive proof supplies
+a completed trace whose last state is the returned result.
+
+The `model_*` cases cover suffix splitting, the `text/html` path, malformed
+headers, and two ordered parameters. The plain-MIME case also verifies an
+executable `.parse::<Mime>()` client under a precondition fixing only the input's
+character sequence. Its parsing-result facts are proved from the model.
+
+Checked on Servo base `c76752ce50a` plus this change, using Verus
+`0.2026.10.09.d4e03ec` (`verus-smoke`, Rust 1.98.1):
+
+- `--verify-module mime_api::parser`: **56 verified, 0 errors**; sibling modules
+  and the external Rust parser implementation are outside this proof scope.
+- `mime_parse model_`: **4 passed, 0 failed**, using the Rust 1.95.0 Cargo driver.
+- The original literal-based `parse_plain_mime` still fails its unwrap/component
+  obligations. The current verifier lacks `auto_reveal_strlit`; the model cases
+  use character sequences and explicit, proved evaluation steps.
+
+Lifetime and trait-conflict checking remain enabled, with the default SMT
+resource limit. Model proofs do not establish Rust-library correspondence:
+the automaton still contains the documented WHATWG/Rust differences.
+
+### Fixed-behavior regressions and SVG proofs: 2026-10-13
+
+State-machine behavior is held fixed while its Rust/model differences are recorded
+for later manual correction. The following cases keep their Rust-expected results
+and `=> Ok(())`; they are neither ignored nor converted to expected-error tests:
+
+| Case | Rust mime 0.3.17 | Current model difference |
+| --- | --- | --- |
+| Duplicate `foo` / `FOO` names | Both entries remain, in order | Later entry is discarded |
+| Unquoted `foo=` at EOF | Stores the empty value | Reaches Done without storing it |
+| `foo`, `foo;`, or `foo=;bar=baz` | Parsing returns Err | Skips the incomplete/empty parameter and reaches Done |
+| `CHARSET=UTF-8` | Stores lowercase `utf-8` | Retains `UTF-8` |
+| Quoted `é🦀` | Retains the Unicode value | Drops the entry during the parent's value validation |
+
+`model_mime_parse_final_state_svg` proves the model result and an executable
+parsing client for known input contents `image/svg+xml` and `IMAGE/SVG+XML`.
+It checks type `image`, base subtype `svg`, suffix `xml`, and empty parameters.
+
+Using the installed verifier `0.2026.10.12.033ca5e.dirty` (Rust 1.98.1), with the
+Rust 1.95.0 Cargo driver:
+
+- `mime_parse model_`: **5 passed, 0 failed**.
+- The five fidelity-regression test functions above: **5 failed**, reaching proof
+  checking rather than syntax/mode errors. Other unproved literal-evaluation,
+  unwrap, and API-bridging obligations still appear in these diagnostics; these
+  are not yet isolated proofs of just the behavioral differences.
+- Independent ordinary-Rust execution against `mime 0.3.17`: **9 reference inputs
+  passed**, comprising the seven mismatch inputs and the two SVG inputs.
 
 ### Library constants
 

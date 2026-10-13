@@ -74,7 +74,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parsing/unwrap requirements and the cloned component assertions
+// FIXME: (proof): Parsing/unwrap requirements and the cloned component assertions
 // are unproved; cloning cannot supply the missing facts about the parsed input.
 test_verify_one_file! {
     #[test] mime_clone_dynamic_components verus_code! {
@@ -97,7 +97,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): `cloned_text@ == "text"@` is unproved after `Name::clone`.
+// FIXME: (proof): `cloned_text@ == "text"@` is unproved after `Name::clone`.
 test_verify_one_file! {
     #[test] name_clone_and_copy verus_code! {
         use vstd::prelude::*;
@@ -118,7 +118,7 @@ test_verify_one_file! {
 
 // Parameter lookup and iterator state, including duplicates and exhaustion.
 
-// FIXME (support): `Mime::get_param` lacks a specification; absence is not checked.
+// FIXME: (support): `Mime::get_param` lacks a specification; absence is not checked.
 test_verify_one_file! {
     #[test] get_param_absent verus_code! {
         use vstd::prelude::*;
@@ -133,7 +133,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` lacks a specification; lookup is not checked.
+// FIXME: (support): `Mime::get_param` lacks a specification; lookup is not checked.
 test_verify_one_file! {
     #[test] get_param_present_constant verus_code! {
         use vstd::prelude::*;
@@ -146,7 +146,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` still needs a specification for these lookups.
+// FIXME: (support): `Mime::get_param` still needs a specification for these lookups.
 test_verify_one_file! {
     #[test] get_param_string_and_name verus_code! {
         use vstd::prelude::*;
@@ -164,7 +164,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` blocks translation before first-match checking.
+// FIXME: (support): `Mime::get_param` blocks translation before first-match checking.
 test_verify_one_file! {
     #[test] get_param_first_duplicate verus_code! {
         use vstd::prelude::*;
@@ -180,7 +180,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Params`, `Mime::params`, and `Params::size_hint` need specs
+// FIXME: (support): `Params`, `Mime::params`, and `Params::size_hint` need specs
 // before the empty-iterator and exhaustion assertions can be checked.
 test_verify_one_file! {
     #[test] params_empty_next_and_size_hint verus_code! {
@@ -201,7 +201,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Params`, `Mime::params`, and `Params::size_hint` need specs
+// FIXME: (support): `Params`, `Mime::params`, and `Params::size_hint` need specs
 // before the singleton's state changes and exhaustion can be checked.
 test_verify_one_file! {
     #[test] params_utf8_advances_and_exhausts verus_code! {
@@ -227,7 +227,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Params`, `Mime::params`, and `Params::size_hint` need specs;
+// FIXME: (support): `Params`, `Mime::params`, and `Params::size_hint` need specs;
 // the ordered duplicate entries and remaining-length assertions are not reached.
 test_verify_one_file! {
     #[test] params_order_duplicates_and_size_hint verus_code! {
@@ -267,7 +267,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Params` and `Mime::params` block translation before formatting.
+// FIXME: (support): `Params` and `Mime::params` block translation before formatting.
 test_verify_one_file! {
     #[test] params_debug verus_code! {
         use vstd::prelude::*;
@@ -299,7 +299,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The MIME/string comparison contracts do not establish the
+// FIXME: (proof): The MIME/string comparison contracts do not establish the
 // expected forward, reverse, or mismatch results.
 test_verify_one_file! {
     #[test] mime_eq_strings_both_orders verus_code! {
@@ -317,7 +317,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and equality with the constant are
+// FIXME: (proof): Parse/unwrap requirements and equality with the constant are
 // unproved until the parsed MIME's result is specified.
 test_verify_one_file! {
     #[test] mime_eq_parsed_and_constant verus_code! {
@@ -334,7 +334,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and the equality assertion are unproved.
+// FIXME: (proof): Parse/unwrap requirements and the equality assertion are unproved.
 // Fidelity: the observed Rust equality is not equality of complete parameter sequences.
 test_verify_one_file! {
     #[test] mime_eq_parameter_values_pinned_behavior verus_code! {
@@ -352,7 +352,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and inequality assertions are unproved.
+// FIXME: (proof): Parse/unwrap requirements and inequality assertions are unproved.
 // Fidelity: the parameter representation must preserve the observed order effect.
 test_verify_one_file! {
     #[test] mime_eq_parameter_names_and_order verus_code! {
@@ -373,7 +373,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and the equality assertion are unproved.
+// FIXME: (proof): Parse/unwrap requirements and the equality assertion are unproved.
 // Fidelity: Rust ignores the extra parameter here, unlike equality of full views.
 test_verify_one_file! {
     #[test] mime_eq_extra_parameters_pinned_behavior verus_code! {
@@ -390,7 +390,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and equality of the two parsed values
+// FIXME: (proof): Parse/unwrap requirements and equality of the two parsed values
 // are unproved with the current general parsing contract.
 test_verify_one_file! {
     #[test] mime_eq_quoted_and_unquoted verus_code! {
@@ -407,7 +407,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and both comparison assertions fail.
+// FIXME: (proof): Parse/unwrap requirements and both comparison assertions fail.
 // Fidelity: symmetric view equality cannot model the measured Rust asymmetry.
 test_verify_one_file! {
     #[test] mime_eq_utf8_fast_path_asymmetry verus_code! {
@@ -425,7 +425,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The Name/string comparison contracts do not establish the
+// FIXME: (proof): The Name/string comparison contracts do not establish the
 // expected case-insensitive forward, reverse, or mismatch results.
 test_verify_one_file! {
     #[test] name_eq_strings_both_orders verus_code! {
@@ -443,7 +443,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` blocks translation before the case-sensitive
+// FIXME: (support): `Mime::get_param` blocks translation before the case-sensitive
 // Name/string comparisons can be verified.
 test_verify_one_file! {
     #[test] name_eq_case_sensitive_parameter_value verus_code! {
@@ -465,7 +465,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` blocks translation before charset-value
+// FIXME: (support): `Mime::get_param` blocks translation before charset-value
 // case-insensitive comparisons can be verified.
 test_verify_one_file! {
     #[test] name_eq_charset_value_ignores_case verus_code! {
@@ -483,7 +483,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` blocks translation before the equality checks.
+// FIXME: (support): `Mime::get_param` blocks translation before the equality checks.
 // Fidelity: text-only `name_identity` equality omits the observed sensitivity flag.
 test_verify_one_file! {
     #[test] name_eq_same_text_different_sensitivity verus_code! {
@@ -508,7 +508,7 @@ test_verify_one_file! {
 
 // Conversion, formatting, and ordering return concrete observations as well.
 
-// FIXME (support): `<Mime as AsRef<str>>::as_ref` lacks an external specification.
+// FIXME: (support): `<Mime as AsRef<str>>::as_ref` lacks an external specification.
 test_verify_one_file! {
     #[test] mime_as_ref_preserves_serialization verus_code! {
         use vstd::prelude::*;
@@ -533,7 +533,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `<Name as AsRef<str>>::as_ref` lacks an external specification.
+// FIXME: (support): `<Name as AsRef<str>>::as_ref` lacks an external specification.
 test_verify_one_file! {
     #[test] name_as_ref verus_code! {
         use vstd::prelude::*;
@@ -546,7 +546,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The Name-to-str conversion does not establish `text@ == "text"@`.
+// FIXME: (proof): The Name-to-str conversion does not establish `text@ == "text"@`.
 test_verify_one_file! {
     #[test] name_into_str verus_code! {
         use vstd::prelude::*;
@@ -559,7 +559,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): `to_string` does not establish the expected serialized MIME text.
+// FIXME: (proof): `to_string` does not establish the expected serialized MIME text.
 test_verify_one_file! {
     #[test] mime_display verus_code! {
         use vstd::prelude::*;
@@ -572,7 +572,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The Debug formatting precondition and quoted output are unproved.
+// FIXME: (proof): The Debug formatting precondition and quoted output are unproved.
 test_verify_one_file! {
     #[test] mime_debug verus_code! {
         use vstd::prelude::*;
@@ -585,7 +585,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): `to_string` does not establish the expected Name text.
+// FIXME: (proof): `to_string` does not establish the expected Name text.
 test_verify_one_file! {
     #[test] name_display verus_code! {
         use vstd::prelude::*;
@@ -598,7 +598,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The Debug formatting precondition and quoted Name text are unproved.
+// FIXME: (proof): The Debug formatting precondition and quoted Name text are unproved.
 test_verify_one_file! {
     #[test] name_debug verus_code! {
         use vstd::prelude::*;
@@ -611,7 +611,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Current Ord/PartialOrd contracts do not establish any of the
+// FIXME: (proof): Current Ord/PartialOrd contracts do not establish any of the
 // three expected ordering results, including self-comparison.
 test_verify_one_file! {
     #[test] mime_order_constants verus_code! {
@@ -631,7 +631,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Parse/unwrap requirements and serialization-based ordering
+// FIXME: (proof): Parse/unwrap requirements and serialization-based ordering
 // assertions are unproved with the current parsing and ordering contracts.
 test_verify_one_file! {
     #[test] mime_order_uses_serialization verus_code! {
@@ -649,7 +649,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): Current Name Ord/PartialOrd contracts do not establish the
+// FIXME: (proof): Current Name Ord/PartialOrd contracts do not establish the
 // expected ordering results, including self-comparison.
 test_verify_one_file! {
     #[test] name_order_constants verus_code! {
@@ -669,7 +669,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `Mime::get_param` blocks translation before sensitivity-aware
+// FIXME: (support): `Mime::get_param` blocks translation before sensitivity-aware
 // ordering can be checked.
 test_verify_one_file! {
     #[test] name_order_includes_sensitivity verus_code! {
@@ -691,7 +691,7 @@ test_verify_one_file! {
 
 // Record bytes rather than asserting unstable DefaultHasher numeric digests.
 
-// FIXME (support): `<Mime as Hash>::hash` lacks a specification for its writes.
+// FIXME: (support): `<Mime as Hash>::hash` lacks a specification for its writes.
 test_verify_one_file! {
     #[test] mime_hash_writes_source_bytes verus_code! {
         use vstd::prelude::*;
@@ -719,7 +719,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `<Name as Hash>::hash` and `Mime::get_param` lack specs;
+// FIXME: (support): `<Name as Hash>::hash` and `Mime::get_param` lack specs;
 // neither recorded-byte assertion reaches proof checking.
 test_verify_one_file! {
     #[test] name_hash_includes_sensitivity verus_code! {
@@ -752,7 +752,7 @@ test_verify_one_file! {
 
 // Direct FromStr, errors, and the MIME-list iterator's public API.
 
-// FIXME (proof): `from_str_requires`, the Ok guarantee for unwrap, and the
+// FIXME: (proof): `from_str_requires`, the Ok guarantee for unwrap, and the
 // general parsed-component relation are unfinished.
 test_verify_one_file! {
     #[test] mime_from_str_direct verus_code! {
@@ -775,7 +775,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): The FromStr precondition is unproved and its contract does not
+// FIXME: (proof): The FromStr precondition is unproved and its contract does not
 // establish Err for this input.
 test_verify_one_file! {
     #[test] mime_from_str_direct_rejects verus_code! {
@@ -789,7 +789,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): FromStr/unwrap_err requirements and the rendered error-message
+// FIXME: (proof): FromStr/unwrap_err requirements and the rendered error-message
 // assertions are unproved.
 test_verify_one_file! {
     #[test] error_display verus_code! {
@@ -807,7 +807,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (proof): FromStr/unwrap_err and Debug formatting preconditions fail;
+// FIXME: (proof): FromStr/unwrap_err and Debug formatting preconditions fail;
 // the rendered diagnostic assertion is also unproved.
 test_verify_one_file! {
     #[test] error_debug verus_code! {
@@ -822,7 +822,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): The `std::error::Error` trait is not declared to Verus.
+// FIXME: (support): The `std::error::Error` trait is not declared to Verus.
 test_verify_one_file! {
     #[test] error_source_is_none verus_code! {
         use vstd::prelude::*;
@@ -837,7 +837,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `MimeIter`, `MimeIter::new`, and its default `size_hint` need
+// FIXME: (support): `MimeIter`, `MimeIter::new`, and its default `size_hint` need
 // specs before the item and exhaustion assertions can be checked.
 test_verify_one_file! {
     #[test] mime_iter_empty_and_single verus_code! {
@@ -863,7 +863,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `MimeIter` and `MimeIter::new` block translation before
+// FIXME: (support): `MimeIter` and `MimeIter::new` block translation before
 // advancement and cloning of iterator state can be checked.
 test_verify_one_file! {
     #[test] mime_iter_advancement_and_clone verus_code! {
@@ -889,7 +889,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `MimeIter` and `MimeIter::new` block translation before
+// FIXME: (support): `MimeIter` and `MimeIter::new` block translation before
 // the error-slice, continuation, and incomplete-input results can be checked.
 test_verify_one_file! {
     #[test] mime_iter_invalid_prefix_and_incomplete_input verus_code! {
@@ -913,7 +913,7 @@ test_verify_one_file! {
     } => Ok(())
 }
 
-// FIXME (support): `MimeIter` and `MimeIter::new` block translation before Debug.
+// FIXME: (support): `MimeIter` and `MimeIter::new` block translation before Debug.
 test_verify_one_file! {
     #[test] mime_iter_debug verus_code! {
         use vstd::prelude::*;
