@@ -38,7 +38,6 @@ broadcast use {
     SpecByteMatcher::lemma_byte_matcher_valid,
     SpecRequires::lemma_classifiers_match_whatwg,
     Spec::lemma_image_audio_video_disjoint,
-    Spec::whitespace_lemmas,
     Spec::mime_essence_parts_str_lemmas,
     SpecMime::mime_essence_str_lemmas,
     SpecMime::group_name_partial_eq_axioms,

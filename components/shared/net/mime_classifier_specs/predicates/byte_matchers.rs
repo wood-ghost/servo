@@ -144,11 +144,14 @@ pub(crate) open spec fn is_audio_wave(bm: &ByteMatcher) -> bool {
     &&& view(&bm.content_type) == audio_wave_identity()
 }
 
-// https://mimesniff.spec.whatwg.org/#whitespace-byte
+// Byte specialization matters for proof performance: inlining Seq::contains
+// into contains_all_whitespace exhausted MimeClassifier::classify's budget
+// on servo-stable (2026-10-14).
 pub open spec fn contains_byte(bytes: Seq<u8>, byte: u8) -> bool {
-    exists |i: int| 0 <= i < bytes.len() && #[trigger] bytes[i] == byte
+    bytes.contains(byte)
 }
 
+// https://mimesniff.spec.whatwg.org/#whitespace-byte
 // A whitespace byte (abbreviated 0xWS) is any one of the following bytes: 
 // 0x09 (HT), 0x0A (LF), 0x0C (FF), 0x0D (CR), 0x20 (SP). 
 pub open spec fn contains_all_whitespace(leading_ignore: Seq<u8>) -> bool {
@@ -158,19 +161,6 @@ pub open spec fn contains_all_whitespace(leading_ignore: Seq<u8>) -> bool {
     &&& contains_byte(leading_ignore, 0x0Cu8) // FF
     &&& contains_byte(leading_ignore, 0x0Du8) // CR  \r
     &&& contains_byte(leading_ignore, 0x20u8) // SP
-}
-
-pub(crate) broadcast proof fn lemma_contains_all_whitespace(bstr: Seq<u8>)
-    requires
-        bstr == b"\t\n\x0C\r "@,
-    ensures
-        #[trigger] contains_all_whitespace(bstr),
-{
-    reveal_byteslit(b"\t\n\x0C\r ");
-}
-
-pub(crate) broadcast group whitespace_lemmas {
-    lemma_contains_all_whitespace,
 }
 
 // https://mimesniff.spec.whatwg.org/#identifying-a-resource-with-an-unknown-mime-type
