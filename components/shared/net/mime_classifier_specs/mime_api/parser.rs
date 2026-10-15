@@ -12,7 +12,7 @@ use verus_state_machines_macros::{case_on_next, state_machine};
 use vstd::prelude::*;
 
 // use super::constants::*; // Used by the commented-out literal-specific contract.
-use super::mime::{MimeView, view};
+use super::mime::{MimeView, essence_str_view, view};
 
 pub use legacy::{
     collect_a_sequence_of_code_points,
@@ -38,6 +38,7 @@ pub open spec fn mime_parse_requires(input: Seq<char>) -> bool {
 // a completed trace. No arbitrary terminal state or fixed fuel limit is assumed.
 // TODO: Reconcile the remaining WHATWG-shaped transitions (e.g. duplicate-name
 // filtering) with mime 0.3.17 before establishing general library correspondence.
+#[verifier::opaque]
 pub open spec fn mime_parse_final_state(input: Seq<char>) -> MimeParseAutomaton::State {
     // Reuse the DSL's initialization relation as the single source of field values.
     // The generated initializer supplies a witness. mime_parse_initialize_properties
@@ -76,6 +77,27 @@ pub open spec fn mime_parse_done_view(final_state: MimeParseAutomaton::State) ->
         suffix,
         params: final_state.parameters,
     }
+}
+
+// A parameter-free MIME string: nonempty HTTP-token components separated by one
+// slash, with no surrounding whitespace. This is a syntactic success criterion,
+// not a restriction on the external parsing contract or on the automaton.
+pub open spec fn mime_parse_plain_input(input: Seq<char>) -> bool {
+    let slash = input.index_of('/');
+    &&& input.contains('/')
+    &&& 0 < slash < input.len() - 1
+    &&& forall|i: int| #![auto] 0 <= i < input.len() && i != slash
+        ==> is_http_token_code_point(input[i])
+}
+
+pub open spec fn mime_parse_plain_view(input: Seq<char>) -> MimeView
+    recommends mime_parse_plain_input(input),
+{
+    let slash = input.index_of('/');
+    let type_ = ascii_lowercase(input.subrange(0, slash));
+    let full_subtype = ascii_lowercase(input.subrange(slash + 1, input.len() as int));
+    let (subtype, suffix) = mime_parse_subtype_and_suffix(full_subtype);
+    MimeView { type_, subtype, suffix, params: Seq::empty() }
 }
 
 #[verifier::external_trait_specification]
@@ -583,9 +605,7 @@ state_machine! {
         fn skip_past_delimiter_inductive(pre: Self, post: Self) {}
 
         #[inductive(finish)]
-        fn finish_inductive(pre: Self, post: Self) {
-            assert(pre.input[pre.position - 1] == '\u{0022}');
-        }
+        fn finish_inductive(pre: Self, post: Self) {}
     }
 }
 
@@ -800,9 +820,7 @@ pub proof fn http_quoted_string_trace_from_properties(pre: HttpQuotedStringAutom
         let trace = seq![pre] + rest;
         assert forall|i: int| 0 <= i && i + 1 < trace.len() implies
             #[trigger] HttpQuotedStringAutomaton::State::next(trace[i], trace[i + 1]) by {
-            if i == 0 {
-                assert(trace[1] == post);
-            } else {
+            if i > 0 {
                 http_quoted_string_step_at(rest, i - 1);
             }
         }
@@ -822,20 +840,13 @@ pub proof fn http_quoted_string_complete_trace_unique(
     ensures trace.last() == http_quoted_string_trace_from(pre).last(),
     decreases trace.len(),
 {
-    if trace.len() == 1 {
-        assert(trace.last() == pre);
-    } else {
+    if trace.len() > 1 {
         http_quoted_string_step_at(trace, 0);
         http_quoted_string_next_is_deterministic(pre, trace[1]);
         http_quoted_string_step_correct(pre);
         let rest = trace.subrange(1, trace.len() as int);
-        assert forall|i: int| 0 <= i && i + 1 < rest.len() implies
-            #[trigger] HttpQuotedStringAutomaton::State::next(rest[i], rest[i + 1]) by {
-            http_quoted_string_step_at(trace, i + 1);
-        }
         http_quoted_string_complete_trace_unique(trace[1], rest);
         http_quoted_string_trace_from_properties(trace[1]);
-        assert(rest.last() == trace.last());
     }
 }
 
@@ -875,14 +886,12 @@ pub proof fn collect_http_quoted_string_properties(
         },
 {
     let initial = http_quoted_string_initial_state(input, position);
-    assert(initial.invariant());
     http_quoted_string_trace_from_properties(initial);
     let witness = http_quoted_string_trace_from(initial);
+    // Supply an explicit witness for the completed-trace choice.
     assert(http_quoted_string_complete_trace(input, position, witness));
     let trace = choose|trace: Seq<HttpQuotedStringAutomaton::State>|
         http_quoted_string_complete_trace(input, position, trace);
-    assert(http_quoted_string_complete_trace(input, position, trace));
-    assert(trace.first() == initial);
     http_quoted_string_complete_trace_unique(initial, trace);
 }
 
@@ -1478,9 +1487,7 @@ state_machine! {
         fn trim_unquoted_parameter_value_inductive(pre: Self, post: Self) {}
 
         #[inductive(continue_after_empty_unquoted_value)]
-        fn continue_after_empty_unquoted_value_inductive(pre: Self, post: Self) {
-            assert(pre.parameter_value =~= Seq::<char>::empty());
-        }
+        fn continue_after_empty_unquoted_value_inductive(pre: Self, post: Self) {}
 
         #[inductive(store_parameter_if_valid)]
         fn store_parameter_if_valid_inductive(pre: Self, post: Self) {}
@@ -1503,10 +1510,7 @@ pub proof fn mime_parse_initialize_properties(
         mime_parse_final_state(input) == mime_parse_run(initial),
 {
     hide(mime_parse_run);
-    let selected = choose|state: MimeParseAutomaton::State|
-        MimeParseAutomaton::State::initialize(state, input);
-    assert(MimeParseAutomaton::State::initialize(selected, input));
-    assert(selected == initial);
+    reveal(mime_parse_final_state);
 }
 
 pub open spec fn mime_parse_terminal(state: MimeParseState) -> bool {
@@ -1733,9 +1737,8 @@ pub broadcast proof fn mime_parse_step_correct(pre: MimeParseAutomaton::State)
                 mime_parse_phase_rank(post.state) < mime_parse_phase_rank(pre.state)
         },
 {
-    let witness = mime_parse_next_exists(pre);
+    mime_parse_next_exists(pre);
     let post = mime_parse_step(pre);
-    assert(MimeParseAutomaton::State::next(pre, post));
     mime_parse_next_properties(pre, post);
 }
 
@@ -1826,9 +1829,7 @@ pub proof fn mime_parse_run_trace(pre: MimeParseAutomaton::State) -> (trace: Seq
         let trace = seq![pre] + rest;
         assert forall|i: int| 0 <= i && i + 1 < trace.len() implies
             #[trigger] MimeParseAutomaton::State::next(trace[i], trace[i + 1]) by {
-            if i == 0 {
-                assert(trace[1] == post);
-            } else {
+            if i > 0 {
                 mime_parse_step_at(rest, i - 1);
             }
         }
@@ -1847,7 +1848,191 @@ pub proof fn mime_parse_final_state_properties(input: Seq<char>)
     let initial = MimeParseAutomaton::take_step::initialize(input);
     mime_parse_initialize_properties(input, initial);
     let trace = mime_parse_run_trace(initial);
+    // Expose the constructed trace as the existential postcondition's witness.
     assert(mime_parse_complete_trace(input, trace));
+}
+
+// Prove collection of any range whose characters meet the condition, stopping
+// at the first nonmatching character or EOF. No literal-dependent fuel is needed.
+pub proof fn collect_code_points_range(
+    input: Seq<char>,
+    start: int,
+    end: int,
+    condition: spec_fn(char) -> bool,
+)
+    requires
+        0 <= start <= end <= input.len(),
+        forall|i: int| start <= i < end ==> #[trigger] condition(input[i]),
+        end < input.len() ==> !condition(input[end]),
+    ensures
+        collect_code_points(input, start, condition) == (input.subrange(start, end), end),
+    decreases end - start,
+{
+    if start < end {
+        collect_code_points_range(input, start + 1, end, condition);
+    }
+}
+
+// The parsing contract introduces final_state(input), triggering this theorem
+// for any input satisfying the syntax predicate, regardless of its length.
+pub broadcast proof fn lemma_mime_parse_plain(input: Seq<char>)
+    requires mime_parse_plain_input(input),
+    ensures
+        #![trigger mime_parse_final_state(input)]
+        mime_parse_final_state(input).state == MimeParseState::Done,
+        mime_parse_final_state(input).type_ == ascii_lowercase(input.subrange(0, input.index_of('/'))),
+        mime_parse_final_state(input).subtype
+            == ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int)),
+        mime_parse_final_state(input).parameters == Seq::<(Seq<char>, Seq<char>)>::empty(),
+        mime_parse_done_view(mime_parse_final_state(input)) == mime_parse_plain_view(input),
+{
+    hide(mime_parse_run);
+    hide(collect_code_points);
+    reveal(MimeParseAutomaton::State::next);
+    reveal(MimeParseAutomaton::State::next_by);
+    let slash = input.index_of('/');
+    collect_code_points_range(input, 0, slash, |c: char| c != '/');
+    collect_code_points_range(input, slash + 1, input.len() as int, |c: char| c != ';');
+    // assert(remove_http_whitespace(input) == input);
+    let initial = MimeParseAutomaton::take_step::initialize(input);
+    mime_parse_initialize_properties(input, initial);
+    let s = mime_parse_run_one_step(initial);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    mime_parse_run_one_step(s);
+}
+
+// Expose the existing last-plus theorem when a parsed subtype is projected.
+pub broadcast proof fn lemma_mime_parse_suffix_index(subtype: Seq<char>)
+    ensures
+        #![trigger mime_parse_subtype_and_suffix(subtype)]
+        match subtype.index_of_last('+') {
+            Some(index) => {
+                &&& 0 <= index < subtype.len()
+                &&& subtype[index] == '+'
+                &&& forall|j: int| index < j < subtype.len() ==> subtype[j] != '+'
+            },
+            None => !subtype.contains('+'),
+        },
+{
+    subtype.index_of_last_ensures('+');
+}
+
+// A client's expected normalized type supplies a separator position. Check the
+// input's separator, prefix contents, and token conditions, then apply the
+// general parser theorem without unfolding the runner at the call site.
+pub proof fn lemma_mime_parse_plain_type_hint(input: Seq<char>, type_hint: &str)
+    requires
+        0 < type_hint@.len() < input.len() - 1,
+        input[type_hint@.len() as int] == '/',
+        ascii_lowercase(input.subrange(0, type_hint@.len() as int)) =~= type_hint@,
+        forall|i: int| #![auto] 0 <= i < input.len() && i != type_hint@.len()
+            ==> is_http_token_code_point(input[i]),
+    ensures
+        mime_parse_plain_input(input),
+        input.index_of('/') == type_hint@.len(),
+        mime_parse_final_state(input).state == MimeParseState::Done,
+        mime_parse_final_state(input).type_ == type_hint@,
+        mime_parse_done_view(mime_parse_final_state(input)) == mime_parse_plain_view(input),
+{
+    lemma_mime_parse_plain(input);
+}
+
+// Use the supported sequence-index trigger. Separator/suffix hints introduce
+// the relevant indexes; this bridge does not invent an index witness. vstd
+// already enables the equivalent axiom, so the group below does not repeat it.
+pub broadcast proof fn lemma_mime_parse_strlit_index(s: &str, i: int)
+    ensures
+        strslice_get_char(s, i) == #[trigger] s@[i],
+{
+    vstd::string::axiom_str_literal_get_char(s, i);
+}
+
+// Relate normalized components to literal views by their length and contents.
+pub broadcast proof fn lemma_mime_parse_lowercase_str(input: Seq<char>, expected: &str)
+    requires
+        input.len() == expected@.len(),
+        forall|i: int| 0 <= i < input.len()
+            ==> ascii_lowercase(input)[i] == #[trigger] expected@[i],
+    ensures
+        #![trigger ascii_lowercase(input), expected@]
+        ascii_lowercase(input) == expected@,
+{
+}
+
+// Keep essence equality instantiation tied to a parsed plain-MIME view rather
+// than every MIME essence comparison in the classifier.
+pub broadcast proof fn lemma_mime_parse_plain_essence_str(input: Seq<char>, expected: &str)
+    requires
+        mime_parse_plain_input(input),
+        essence_str_view(&mime_parse_plain_view(input)).len() == expected@.len(),
+        forall|i: int| 0 <= i < expected@.len() ==>
+            essence_str_view(&mime_parse_plain_view(input))[i] == #[trigger] expected@[i],
+    ensures
+        #![trigger mime_parse_plain_view(input), expected@]
+        essence_str_view(&mime_parse_plain_view(input)) == expected@,
+{
+}
+
+// Normalization cannot introduce a suffix separator into a plus-free input.
+pub broadcast proof fn lemma_mime_parse_plain_no_plus(input: Seq<char>)
+    requires mime_parse_plain_input(input), !input.contains('+'),
+    ensures
+        #![trigger mime_parse_plain_view(input)]
+        mime_parse_plain_view(input).suffix == None,
+        mime_parse_plain_view(input).subtype
+            == ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int)),
+{
+    let slash = input.index_of('/');
+    let subtype = ascii_lowercase(input.subrange(slash + 1, input.len() as int));
+    subtype.index_of_last_ensures('+');
+}
+
+// A plus in the input's subtype remains at the corresponding position after
+// normalization. Supply that witness to the last-plus projection.
+pub proof fn lemma_mime_parse_plain_plus(input: Seq<char>, i: int)
+    requires
+        mime_parse_plain_input(input),
+        input.index_of('/') < i < input.len(),
+        input[i] == '+',
+    ensures
+        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))[
+            i - input.index_of('/') - 1
+        ] == '+',
+        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))
+            .contains('+'),
+        input.index_of('/') + 1 < i ==> mime_parse_plain_view(input).suffix.is_some(),
+{
+    let slash = input.index_of('/');
+    let subtype = ascii_lowercase(input.subrange(slash + 1, input.len() as int));
+    subtype.index_of_last_ensures('+');
+}
+
+// The expected base subtype supplies a candidate non-leading plus position.
+pub proof fn lemma_mime_parse_plain_suffix_hint(input: Seq<char>, subtype_hint: &str)
+    requires
+        mime_parse_plain_input(input),
+        subtype_hint@.len() > 0,
+        input.index_of('/') + 1 + subtype_hint@.len() < input.len(),
+        input[input.index_of('/') + 1 + subtype_hint@.len()] == '+',
+    ensures
+        mime_parse_plain_view(input).suffix.is_some(),
+        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))[
+            subtype_hint@.len() as int
+        ] == '+',
+{
+    lemma_mime_parse_plain_plus(input, input.index_of('/') + 1 + subtype_hint@.len());
+}
+
+pub broadcast group mime_parse_lemmas {
+    lemma_mime_parse_plain,
+    lemma_mime_parse_suffix_index,
+    lemma_mime_parse_lowercase_str,
+    lemma_mime_parse_plain_essence_str,
+    lemma_mime_parse_plain_no_plus,
 }
 
 // Collection advances the cursor without passing the end of input.

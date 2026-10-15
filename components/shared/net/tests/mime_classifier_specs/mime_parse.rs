@@ -45,6 +45,34 @@ test_verify_one_file! {
     } => Err(err) => assert_rust_error(err, "E0308")
 }
 
+// The supported sequence-index trigger proves character and membership facts
+// once an index term is present; it does not require a modified verifier.
+test_verify_one_file! {
+    #[test] sequence_index_trigger verus_code! {
+        use vstd::prelude::*;
+
+        broadcast proof fn sequence_index(s: &str, i: int)
+            ensures strslice_get_char(s, i) == #[trigger] s@[i],
+        {
+            vstd::string::axiom_str_literal_get_char(s, i);
+        }
+
+        proof fn known_index(s: &str, i: int)
+            requires 0 <= i < s@.len(), strslice_get_char(s, i) == '/',
+            ensures s@[i] == '/', s@.contains('/'),
+        {
+            broadcast use sequence_index;
+            assert(s@[i] == '/');
+        }
+
+        proof fn literal_with_witness() {
+            broadcast use sequence_index;
+            assert("image/x-icon"@[5] == '/');
+            assert("image/x-icon"@.contains('/'));
+        }
+    } => Ok(())
+}
+
 // Pure-model cases for suffix splitting, independent of the unfinished parser run.
 // Use character sequences directly, matching the helper's input type.
 // Cases checked against ordinary Rust mime 0.3.17 on 2026-10-12.
@@ -103,6 +131,135 @@ test_verify_one_file! {
             two_pluses.index_of_last_ensures('+');
             assert(mime_parse_subtype_and_suffix(two_pluses)
                 =~~= (seq!['+'], Some(seq![])));
+        }
+    } => Ok(())
+}
+
+// The icon matcher needs this literal to parse successfully with its canonical view.
+test_verify_one_file! {
+    #[test] parse_image_x_icon verus_code! {
+        use vstd::prelude::*;
+        use crate::mime_api::{image_x_icon_identity, lemma_mime_parse_plain_type_hint, view};
+        broadcast use crate::mime_api::mime_parse_lemmas;
+
+        fn test() {
+            proof { lemma_mime_parse_plain_type_hint("image/x-icon"@, "image"); }
+            let parsed = "image/x-icon".parse::<mime::Mime>().unwrap();
+            assert(ext_equal(view(&parsed).type_, "image"@));
+            assert(ext_equal(view(&parsed).subtype, "x-icon"@));
+            assert(view(&parsed) == image_x_icon_identity());
+        }
+    } => Ok(())
+}
+
+// A symbolic client uses only the syntax condition, with no bound on input length.
+test_verify_one_file! {
+    #[test] parse_plain_broadcast_symbolic verus_code! {
+        use vstd::prelude::*;
+        use crate::mime_api::{mime_parse_plain_input, mime_parse_plain_view, view};
+        broadcast use crate::mime_api::mime_parse_lemmas;
+
+        fn test(input: &str) -> (parsed: mime::Mime)
+            requires mime_parse_plain_input(input@),
+            ensures view(&parsed) == mime_parse_plain_view(input@),
+        {
+            input.parse::<mime::Mime>().unwrap()
+        }
+    } => Ok(())
+}
+
+// Stock servo-stable uses reusable syntax/suffix witnesses, not per-literal lemmas.
+test_verify_one_file! {
+    #[test] parse_plain_broadcast_literals verus_code! {
+        use vstd::prelude::*;
+        use crate::mime_api::{
+            application_vnd_ms_fontobject_identity, essence_str_view, image_x_icon_identity,
+            lemma_mime_parse_plain_suffix_hint, lemma_mime_parse_plain_type_hint, view,
+        };
+        broadcast use crate::mime_api::mime_parse_lemmas;
+
+        fn long_subtype() {
+            proof { lemma_mime_parse_plain_type_hint("application/vnd.ms-fontobject"@, "application"); }
+            let parsed = "application/vnd.ms-fontobject".parse::<mime::Mime>().unwrap();
+            assert(view(&parsed) == application_vnd_ms_fontobject_identity());
+        }
+
+        fn uppercase() {
+            proof { lemma_mime_parse_plain_type_hint("IMAGE/X-ICON"@, "image"); }
+            let parsed = "IMAGE/X-ICON".parse::<mime::Mime>().unwrap();
+            assert(ext_equal(view(&parsed).type_, "image"@));
+            assert(ext_equal(view(&parsed).subtype, "x-icon"@));
+            assert(view(&parsed) == image_x_icon_identity());
+        }
+
+        fn suffix() {
+            proof {
+                lemma_mime_parse_plain_type_hint("IMAGE/SVG+XML"@, "image");
+                lemma_mime_parse_plain_suffix_hint("IMAGE/SVG+XML"@, "svg");
+            }
+            let parsed = "IMAGE/SVG+XML".parse::<mime::Mime>().unwrap();
+            let type_ = parsed.type_().as_str();
+            let subtype = parsed.subtype().as_str();
+            let suffix = parsed.suffix().unwrap().as_str();
+            assert(ext_equal(type_@, "image"@));
+            assert(ext_equal(subtype@, "svg"@));
+            assert(ext_equal(suffix@, "xml"@));
+            assert(view(&parsed).params == Seq::empty());
+        }
+
+        fn last_plus() {
+            proof {
+                lemma_mime_parse_plain_type_hint("application/a+b+json"@, "application");
+                lemma_mime_parse_plain_suffix_hint("application/a+b+json"@, "a+b");
+            }
+            let parsed = "application/a+b+json".parse::<mime::Mime>().unwrap();
+            let subtype = parsed.subtype().as_str();
+            let suffix = parsed.suffix().unwrap().as_str();
+            assert(ext_equal(subtype@, "a+b"@));
+            assert(ext_equal(suffix@, "json"@));
+        }
+
+        fn text_track_essence() {
+            proof { lemma_mime_parse_plain_type_hint("text/vtt"@, "text"); }
+            let parsed = "text/vtt".parse::<mime::Mime>().unwrap();
+            assert(ext_equal(essence_str_view(&view(&parsed)), "text/vtt"@));
+        }
+
+        fn cache_manifest_essence() {
+            proof { lemma_mime_parse_plain_type_hint("text/cache-manifest"@, "text"); }
+            let parsed = "text/cache-manifest".parse::<mime::Mime>().unwrap();
+            assert(ext_equal(essence_str_view(&view(&parsed)), "text/cache-manifest"@));
+        }
+    } => Ok(())
+}
+
+// Outside this predicate, parsing may still succeed; the plain-input theorem
+// makes no claim about parameters, surrounding whitespace, or malformed inputs.
+test_verify_one_file! {
+    #[test] parse_plain_broadcast_domain verus_code! {
+        use vstd::prelude::*;
+        use crate::mime_api::{lemma_mime_parse_plain_type_hint, mime_parse_plain_input};
+        broadcast use crate::mime_api::mime_parse_lemmas;
+
+        proof fn test() {
+            lemma_mime_parse_plain_type_hint("image/x-icon"@, "image");
+            lemma_mime_parse_plain_type_hint("IMAGE/SVG+XML"@, "image");
+            lemma_mime_parse_plain_type_hint("*/*"@, "*");
+            assert(mime_parse_plain_input("image/x-icon"@));
+            assert(mime_parse_plain_input("IMAGE/SVG+XML"@));
+            assert(mime_parse_plain_input("*/*"@));
+            assert(!mime_parse_plain_input(""@));
+            assert(!mime_parse_plain_input("text"@));
+            assert(!mime_parse_plain_input("/plain"@));
+            assert(!mime_parse_plain_input("text/"@));
+            assert("text//plain"@[4] == '/' && "text//plain"@[5] == '/');
+            assert(!mime_parse_plain_input("text//plain"@));
+            assert("text/plain; charset=utf-8"@[10] == ';');
+            assert(!mime_parse_plain_input("text/plain; charset=utf-8"@));
+            assert(" text/plain"@[0] == ' ');
+            assert(!mime_parse_plain_input(" text/plain"@));
+            assert("text/pläin"@[7] == 'ä');
+            assert(!mime_parse_plain_input("text/pläin"@));
         }
     } => Ok(())
 }

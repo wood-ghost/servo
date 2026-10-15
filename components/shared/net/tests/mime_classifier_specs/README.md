@@ -144,6 +144,139 @@ Rust 1.95.0 Cargo driver:
 - Independent ordinary-Rust execution against `mime 0.3.17`: **9 reference inputs
   passed**, comprising the seven mismatch inputs and the two SVG inputs.
 
+### Current workflow: unmodified servo-stable, 2026-10-14
+
+Active proof work is on Servo's `mime_classifier` branch and uses the original
+Verus `servo-stable` revision `3a347310d098e784cdfbea97294315b079bb409e`.
+The rebuilt release reports **`0.2026.09.24.3a34731`**, without `.dirty`.
+Verus's tracked source is unchanged. Its release rebuild verified **2059 vstd
+obligations, 0 errors**.
+
+The previous experiment is preserved on the local branch
+`checkpoint/mime-trigger-experiment-2026-10-14` in both repositories:
+
+- Servo checkpoint: `47c227850ab` (including the existing lockfile adjustment and
+  `test.log` deletion).
+- Verus checkpoint: `a6e2e70c0` (the compiler trigger patch and its tests).
+
+The active Servo implementation uses the supported sequence-index trigger form:
+
+```rust
+strslice_get_char(s, i) == #[trigger] s@[i]
+```
+
+A controlled check on the original verifier accepted and proved this lemma.
+Its known-index client and explicit-index literal control also verified.
+The raw-character-only and literal membership clients without an index witness
+remained unproved (**3 verified, 2 errors** in that diagnostic). This records an
+instantiation limitation of those clients, not a rejection of the trigger form.
+
+For literal parse sites, `lemma_mime_parse_plain_type_hint` proves the separator,
+HTTP-token conditions, and normalized type prefix before applying the general
+parser theorem. The prefix length supplies an index witness for the existing
+string/sequence axioms. Suffix clients use the analogous suffix-position helper.
+These are reusable proofs, not assumptions or MIME-specific success axioms.
+The original executable `.parse()` expressions and automaton transitions remain
+intact; proof blocks supply the witnesses. The main result theorem still broadcasts
+for symbolic inputs satisfying `mime_parse_plain_input`.
+
+`mime_parse_final_state` is opaque to clients. Its initialization proof reveals
+the definition and relates it to the DSL-based runner, so callers can use proved
+contracts without automatically expanding the recursive parser. Witness helpers
+are called explicitly rather than broadcast over every string in a query.
+
+Checked with the unmodified verifier:
+
+- The package command below: **207 verified, 0 errors**, with lifetime and
+  trait-conflict checking disabled. `focus` compiles dependencies without checking
+  their proofs.
+- `sequence_index_trigger`, `parse_image_x_icon`, and `parse_plain_broadcast*`:
+  **5 passed, 0 failed**. The snippet verifier keeps lifetime and trait-conflict
+  checking enabled. No existing fidelity regression was ignored or had its
+  Rust-expected result weakened.
+- Rust formatting checks and `git diff --check` passed for the changed files.
+
+```bash
+cargo +1.98.1 verus focus --locked --offline -p servo-net-traits -- \
+  --no-lifetime --no-trait-conflicts --expand-errors --multiple-errors 20
+
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+cargo +1.95.0 test --locked --offline -p servo-net-traits --test mime_parse \
+  --message-format=short -- sequence_index_trigger parse_image_x_icon \
+  parse_plain_broadcast --test-threads=2
+```
+
+The success theorem covers parameter-free MIME syntax; the trusted external
+parsing contract and documented model/library differences are still explicit
+boundaries. The full MIME regression suite is not claimed to pass.
+
+### Archived trigger-patch experiment: 2026-10-14
+
+The following results describe the saved checkpoint, not the active verifier
+requirement. The current workflow above does not use this compiler patch.
+
+`lemma_mime_parse_plain` now proves successful model execution for arbitrary-length
+`type/subtype` inputs with nonempty HTTP-token components and exactly one slash.
+Its view includes ASCII normalization, last-non-leading-plus suffix splitting,
+and empty parameters. The collector proof is inductive; no literal-dependent
+unfolding bound is used. The generic theorem supersedes the icon-specific lemma.
+
+The `mime_parse_lemmas` broadcast group connects the parsing contract's
+`mime_parse_final_state(input)` term to this theorem. Proved bridges expose
+literal-character witnesses and establish component, suffix, and essence facts.
+Character witnesses are triggered only for parsing syntax/view queries. The
+classifier enables string-literal revelation at its parsing functions and the
+byte-matcher constructor impl, avoiding unnecessary expansion in comparison-only
+predicates. Its executable parsing expressions and state-machine transitions are
+unchanged. `is_javascript` needed its existing local resource limit increased
+from 20 to 30 for the package-level checking context.
+
+This uses Servo base `296200a05cb` plus the local proof changes and the local
+Verus `servo-stable` base `3a347310d098` plus a trigger patch. The rebuilt release
+reports `0.2026.09.24.3a34731.dirty`, with Rust 1.98.1. The Verus patch permits
+`StrGetChar` at a manual trigger's root and classifies its operands as native,
+matching their SMT representation. It adds no axioms. Before that patch, the new
+direct-trigger regressions stopped at trigger validation and the nested-trigger
+client failed its membership proof.
+
+Checked with the patched release:
+
+- Verus `triggers` suite: **41 passed**; `auto_reveal` suite: **28 passed**.
+  These include four new trigger regressions; the negative control still rejects
+  wrong-character and out-of-bounds membership claims.
+- Release `vstd` rebuild: **2059 verified, 0 errors**.
+- Servo package command below: **205 verified, 0 errors**. This checks all
+  verification-enabled code selected by `focus -p servo-net-traits`, with **both
+  lifetime and trait-conflict checking disabled** and dependency proofs skipped.
+- `parse_image_x_icon` and `parse_plain_broadcast*`: **4 passed, 0 failed**,
+  with lifetime and trait-conflict checking enabled in the snippet verifier.
+  Coverage includes an arbitrary-input client under the syntax predicate, long
+  and uppercase literals, structured suffixes, essence contents, and the
+  predicate's boundaries. Sequence-content assertions use `ext_equal` where
+  extensional reasoning is needed; this is logically equivalent to spec equality.
+- Independent ordinary-Rust execution of mime 0.3.17 checked components, suffix,
+  empty parameters, and essence for eight inputs: `image/x-icon`,
+  `application/vnd.ms-fontobject`, `IMAGE/X-ICON`, `IMAGE/SVG+XML`,
+  `application/a+b+json`, `*/*`, `text/vtt`, and `text/cache-manifest`.
+
+```bash
+cargo +1.98.1 verus focus --locked --offline -p servo-net-traits -- \
+  --no-lifetime --no-trait-conflicts --expand-errors --multiple-errors 20
+
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+cargo +1.95.0 test --locked --offline -p servo-net-traits --test mime_parse \
+  --message-format=short -- parse_image_x_icon parse_plain_broadcast --test-threads=2
+```
+
+The syntax predicate is a sufficient condition for this theorem, not an external
+parser precondition or a complete MIME grammar. Parameterized inputs and surrounding
+whitespace are outside its scope, and rejection of the predicate does not imply a
+parse error. The trusted external parsing contract and the documented Rust/model
+fidelity gaps remain. These focused results do not make the entire MIME regression
+suite green or verify the external Rust parser implementation.
+
 ### Library constants
 
 `mime_constants.rs` covers every public constant in the pinned crate: 38 `Name`
