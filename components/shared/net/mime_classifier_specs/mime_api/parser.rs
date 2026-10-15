@@ -1,18 +1,20 @@
 //! MIME parser model and specifications.
 //!
-//! The FromStr/str::parse declarations below are trusted external contracts.
+//! The external FromStr/str::parse contracts are declared in `mime.rs`.
 //! The automata and their proofs supply models; their general correspondence
 //! with the external parser remains an explicit TODO.
 //! Parent-parser execution follows the state-machine transitions, with a proved
 //! terminating run and completed-trace witness.
 
-use ::mime::{self, Mime};
-use core::str::FromStr;
 use verus_state_machines_macros::{case_on_next, state_machine};
 use vstd::prelude::*;
 
-// use super::constants::*; // Used by the commented-out literal-specific contract.
-use super::mime::{MimeView, essence_str_view, view};
+use super::mime::{MimeView, essence_str_view};
+use super::utils::{
+    ascii_lowercase, collect_code_points, is_http_quoted_string_token_code_point,
+    is_http_token_code_point, is_http_whitespace, is_rust_quoted_value_char,
+    remove_http_whitespace, remove_trailing_http_whitespace,
+};
 
 pub use legacy::{
     collect_a_sequence_of_code_points,
@@ -100,231 +102,6 @@ pub open spec fn mime_parse_plain_view(input: Seq<char>) -> MimeView
     MimeView { type_, subtype, suffix, params: Seq::empty() }
 }
 
-#[verifier::external_trait_specification]
-#[verifier::external_trait_extension(FromStrSpec via FromStrSpecImpl)]
-pub trait ExFromStr: Sized {
-    type ExternalTraitSpecificationFor: FromStr;
-    type Err;
-
-    spec fn from_str_requires(i: Seq<char>) -> bool;
-    spec fn from_str_ensures(i: Seq<char>, r: Result<Self, Self::Err>) -> bool;
-
-    fn from_str(s: &str) -> (r: Result<Self, Self::Err>)
-        requires
-            Self::from_str_requires(s@),
-        ensures
-            Self::from_str_ensures(s@, r)
-    ;
-}
-
-#[verifier::external_type_specification]
-#[verifier::external_body]
-pub struct ExFromStrError(mime::FromStrError);
-
-impl FromStrSpecImpl for Mime {
-    open spec fn from_str_requires(input: Seq<char>) -> bool {
-        mime_parse_requires(input)
-    }
-
-    open spec fn from_str_ensures(
-        input: Seq<char>,
-        result: Result<Mime, <Mime as FromStr>::Err>,
-    ) -> bool {
-        // Successful parsing does not imply essence == input: case and parameters can differ.
-        // The external call is related to the parser's terminal outcome. Error
-        // payloads remain abstract, and a nonterminal state is not a parse failure.
-        let final_state = mime_parse_final_state(input);
-        match (final_state.state, result) {
-            (MimeParseState::Done, Ok(mt)) => view(&mt) == mime_parse_done_view(final_state),
-            (MimeParseState::Failure, Err(_)) => true,
-            _ => false,
-        }
-
-        /* Previous literal-specific guarantees, retained as a reference only.
-        // hardcode
-        // &&& result is Ok
-        &&& (input == "image/x-icon"@) ==> result is Ok
-        &&& (input == "image/webp"@) ==> result is Ok
-        &&& (input == "video/webm"@) ==> result is Ok
-        &&& (input == "audio/basic"@) ==> result is Ok
-        &&& (input == "audio/aiff"@) ==> result is Ok
-        &&& (input == "audio/mpeg"@) ==> result is Ok
-        &&& (input == "application/ogg"@) ==> result is Ok
-        &&& (input == "audio/midi"@) ==> result is Ok
-        &&& (input == "video/avi"@) ==> result is Ok
-        &&& (input == "audio/wave"@) ==> result is Ok
-
-        &&& (input == "application/postscript"@) ==> result is Ok
-        &&& (input == "application/x-gzip"@) ==> result is Ok
-        &&& (input == "application/zip"@) ==> result is Ok
-        &&& (input == "application/x-rar-compressed"@) ==> result is Ok
-        &&& (input == "application/font-woff"@) ==> result is Ok
-        &&& (input == "application/font-sfnt"@) ==> result is Ok
-        &&& (input == "application/vnd.ms-fontobject"@) ==> result is Ok
-        &&& (input == "video/mp4"@) ==> result is Ok
-        &&& (input == "text/vtt"@) ==> result is Ok
-        &&& (input == "text/cache-manifest"@) ==> result is Ok
-
-        &&& (input == "application/ecmascript"@) ==> result is Ok
-        &&& (input == "application/javascript"@) ==> result is Ok
-        &&& (input == "application/x-ecmascript"@) ==> result is Ok
-        &&& (input == "application/x-javascript"@) ==> result is Ok
-        &&& (input == "text/ecmascript"@) ==> result is Ok
-        &&& (input == "text/javascript"@) ==> result is Ok
-        &&& (input == "text/javascript1.0"@) ==> result is Ok
-        &&& (input == "text/javascript1.1"@) ==> result is Ok
-        &&& (input == "text/javascript1.2"@) ==> result is Ok
-        &&& (input == "text/javascript1.3"@) ==> result is Ok
-        &&& (input == "text/javascript1.4"@) ==> result is Ok
-        &&& (input == "text/javascript1.5"@) ==> result is Ok
-        &&& (input == "text/jscript"@) ==> result is Ok
-        &&& (input == "text/livescript"@) ==> result is Ok
-        &&& (input == "text/x-ecmascript"@) ==> result is Ok
-        &&& (input == "text/x-javascript"@) ==> result is Ok
-
-        &&& (input == "image/x-icon"@) ==> view(&result->Ok_0) == image_x_icon_identity()
-        &&& (input == "image/webp"@) ==> view(&result->Ok_0) == image_webp_identity()
-        &&& (input == "video/webm"@) ==> view(&result->Ok_0) == video_webm_identity()
-        &&& (input == "audio/basic"@) ==> view(&result->Ok_0) == audio_basic_identity()
-        &&& (input == "audio/aiff"@) ==> view(&result->Ok_0) == audio_aiff_identity()
-        &&& (input == "audio/mpeg"@) ==> view(&result->Ok_0) == audio_mpeg_identity()
-        &&& (input == "application/ogg"@) ==> view(&result->Ok_0) == application_ogg_identity()
-        &&& (input == "audio/midi"@) ==> view(&result->Ok_0) == audio_midi_identity()
-        &&& (input == "video/avi"@) ==> view(&result->Ok_0) == video_avi_identity()
-        &&& (input == "audio/wave"@) ==> view(&result->Ok_0) == audio_wave_identity()
-
-        &&& (input == "application/postscript"@) ==> view(&result->Ok_0) == application_postscript_identity()
-        &&& (input == "application/x-gzip"@) ==> view(&result->Ok_0) == application_x_gzip_identity()
-        &&& (input == "application/zip"@) ==> view(&result->Ok_0) == application_zip_identity()
-        &&& (input == "application/x-rar-compressed"@) ==> view(&result->Ok_0) == application_x_rar_compressed_identity()
-        &&& (input == "application/font-woff"@) ==> view(&result->Ok_0) == application_font_woff_identity()
-        &&& (input == "application/font-sfnt"@) ==> view(&result->Ok_0) == application_font_sfnt_identity()
-        &&& (input == "application/vnd.ms-fontobject"@) ==> view(&result->Ok_0) == application_vnd_ms_fontobject_identity()
-        &&& (input == "video/mp4"@) ==> view(&result->Ok_0) == video_mp4_identity()
-        &&& (input == "text/vtt"@) ==> view(&result->Ok_0) == text_vtt_identity()
-        &&& (input == "text/cache-manifest"@) ==> view(&result->Ok_0) == text_cache_manifest_identity()
-
-        &&& (input == "application/ecmascript"@) ==> view(&result->Ok_0) == application_ecmascript_identity()
-        &&& (input == "application/javascript"@) ==> view(&result->Ok_0) == application_javascript_identity()
-        &&& (input == "application/x-ecmascript"@) ==> view(&result->Ok_0) == application_x_ecmascript_identity()
-        &&& (input == "application/x-javascript"@) ==> view(&result->Ok_0) == application_x_javascript_identity()
-        &&& (input == "text/ecmascript"@) ==> view(&result->Ok_0) == text_ecmascript_identity()
-        &&& (input == "text/javascript"@) ==> view(&result->Ok_0) == text_javascript_identity()
-        &&& (input == "text/javascript1.0"@) ==> view(&result->Ok_0) == text_javascript1_0_identity()
-        &&& (input == "text/javascript1.1"@) ==> view(&result->Ok_0) == text_javascript1_1_identity()
-        &&& (input == "text/javascript1.2"@) ==> view(&result->Ok_0) == text_javascript1_2_identity()
-        &&& (input == "text/javascript1.3"@) ==> view(&result->Ok_0) == text_javascript1_3_identity()
-        &&& (input == "text/javascript1.4"@) ==> view(&result->Ok_0) == text_javascript1_4_identity()
-        &&& (input == "text/javascript1.5"@) ==> view(&result->Ok_0) == text_javascript1_5_identity()
-        &&& (input == "text/jscript"@) ==> view(&result->Ok_0) == text_jscript_identity()
-        &&& (input == "text/livescript"@) ==> view(&result->Ok_0) == text_livescript_identity()
-        &&& (input == "text/x-ecmascript"@) ==> view(&result->Ok_0) == text_x_ecmascript_identity()
-        &&& (input == "text/x-javascript"@) ==> view(&result->Ok_0) == text_x_javascript_identity()
-        */
-    }
-}
-
-// --------------------
-// str::parse for Mime
-// --------------------
-pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
-    result: Result<F, <F as FromStr>::Err>
-)
-    requires
-        call_requires(<F as FromStr>::from_str, (s,)),
-    ensures
-        call_ensures( <F as FromStr>::from_str, (s,), result),
-;
-
-// https://fetch.spec.whatwg.org/#http-whitespace
-pub open spec fn is_http_whitespace(c: char) -> bool {
-    c == '\u{0009}'    // TAB
-    || c == '\u{000A}' // LF
-    || c == '\u{000D}' // CR
-    || c == '\u{0020}' // SPACE
-}
-
-// https://mimesniff.spec.whatwg.org/#http-token-code-point
-pub open spec fn is_http_token_code_point(c: char) -> bool {
-    ('\u{0030}' <= c && c <= '\u{0039}') // 0-9
-    || ('\u{0041}' <= c && c <= '\u{005A}') // A-Z
-    || ('\u{0061}' <= c && c <= '\u{007A}') // a-z
-    || c == '\u{0021}' // !
-    || c == '\u{0023}' // #
-    || c == '\u{0024}' // $
-    || c == '\u{0025}' // %
-    || c == '\u{0026}' // &
-    || c == '\u{0027}' // '
-    || c == '\u{002A}' // *
-    || c == '\u{002B}' // +
-    || c == '\u{002D}' // -
-    || c == '\u{002E}' // .
-    || c == '\u{005E}' // ^
-    || c == '\u{005F}' // _
-    || c == '\u{0060}' // `
-    || c == '\u{007C}' // |
-    || c == '\u{007E}' // ~
-}
-
-// https://mimesniff.spec.whatwg.org/#http-quoted-string-token-code-point
-pub open spec fn is_http_quoted_string_token_code_point(c: char) -> bool {
-    c == '\u{0009}' // TAB
-    || ('\u{0020}' <= c && c <= '\u{007E}')
-    || ('\u{0080}' <= c && c <= '\u{00FF}')
-}
-
-pub open spec fn remove_leading_http_whitespace(input: Seq<char>) -> Seq<char>
-    decreases input.len(),
-{
-    if input.len() == 0 {
-        input
-    } else if is_http_whitespace(input[0]) {
-        remove_leading_http_whitespace(input.subrange(1, input.len() as int))
-    } else {
-        input
-    }
-}
-
-pub open spec fn remove_trailing_http_whitespace(input: Seq<char>) -> Seq<char>
-    decreases input.len(),
-{
-    if input.len() == 0 {
-        input
-    } else if is_http_whitespace(input[input.len() - 1]) {
-        remove_trailing_http_whitespace(input.subrange(0, input.len() - 1))
-    } else {
-        input
-    }
-}
-
-// Remove leading and trailing HTTP whitespace, preserving interior characters.
-pub open spec fn remove_http_whitespace(input: Seq<char>) -> Seq<char> {
-    remove_trailing_http_whitespace(remove_leading_http_whitespace(input))
-}
-
-// https://infra.spec.whatwg.org/#collect-a-sequence-of-code-points
-pub open spec fn collect_code_points(
-    input: Seq<char>,
-    position: int,
-    condition: spec_fn(char) -> bool,
-) -> (Seq<char>, int)
-    decreases input.len() - position,
-{
-    if position < 0 || position >= input.len() {
-        // 1. Let result be the empty string. 
-        (Seq::empty(), position)
-    // 2. While position doesn’t point past the end of input and the code point at position within input meets the condition condition: 
-    } else if condition(input[position]) {
-        // 2.2 Advance position by 1. 
-        let (result, new_position) = collect_code_points(input, position + 1, condition);
-        // 2.1 Append that code point to the end of result. 
-        (seq![input[position]] + result, new_position)
-    } else {
-        // 1. Let result be the empty string. 
-        (Seq::empty(), position)
-    }
-}
-
 // Historical compatibility-only model notes; these are no longer input restrictions.
 // Common quoted-value domain for the simplified scan. Rust mime 0.3.17 rejects TAB
 // and mishandles empty quoted values; backslashes have different escaping semantics.
@@ -338,13 +115,6 @@ pub open spec fn collect_code_points(
 pub ghost enum QuotedStringError {
     MissingQuote,
     InvalidToken,
-}
-
-// mime 0.3.17 checks each quoted byte with `c > 31 && c != 127`.
-// For a Rust string, every UTF-8 byte of a non-ASCII scalar satisfies that rule.
-// Thus only ASCII controls and DEL are invalid in this character-indexed model.
-pub open spec fn is_rust_quoted_value_char(c: char) -> bool {
-    c >= '\u{0020}' && c != '\u{007F}'
 }
 
 // https://fetch.spec.whatwg.org/#collect-an-http-quoted-string
@@ -953,17 +723,6 @@ pub proof fn http_quoted_string_done_is_terminal(
     }
 }
 
-
-// https://infra.spec.whatwg.org/#ascii-lowercase
-pub open spec fn ascii_lowercase(input: Seq<char>) -> Seq<char> {
-    input.map(|i: int, c: char|
-        if '\u{0041}' <= c && c <= '\u{005A}' {
-            ((c as u32 + 0x20) as u32) as char
-        } else {
-            c
-        }
-    )
-}
 
 pub ghost enum MimeParseState {
     Init,
