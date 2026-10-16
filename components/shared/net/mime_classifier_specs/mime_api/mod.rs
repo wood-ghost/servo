@@ -2,8 +2,8 @@
 //!
 //! Sub-modules:
 //! - [`constants`] — named model values and trusted bindings for library constants
-//! - [`lemmas`] — proved MIME API support lemmas and broadcast groups
-//! - `mime` — the `MimeView` abstraction and external API contracts, including parsing
+//! - [`http_quoted_string`] — quoted-string collector, automaton, and trace proofs
+//! - `mime` — the `MimeView` abstraction, API contracts (including parsing), and essence proofs
 //! - `name` — the `Name` abstraction, contracts, and equality axioms
 //! - [`parser`] — parsing requirements, parser models, and state-machine proofs
 //! - [`utils`] — character predicates, whitespace handling, and sequence utilities
@@ -14,7 +14,7 @@
 //! separate specification obligations; organization does not discharge them.
 
 pub mod constants;
-pub mod lemmas;
+pub mod http_quoted_string;
 mod mime;
 mod name;
 pub mod parser;
@@ -23,7 +23,7 @@ pub mod utils;
 // Preserve the umbrella API used as SpecMime and by existing glob imports.
 // Keep the implementation module `mime` private so it cannot shadow ::mime.
 pub use self::constants::*;
-pub use self::lemmas::*;
+pub use self::http_quoted_string::*;
 pub use self::mime::*;
 pub use self::name::*;
 pub use self::parser::*;
