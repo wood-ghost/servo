@@ -190,9 +190,14 @@ impl Verifier {
             directory.path(),
             "version",
         ));
-        let toolchain = version["verus"]["toolchain"]
+        let reported_toolchain = version["verus"]["toolchain"]
             .as_str()
             .expect("Verus must report its Rust toolchain");
+        // Newer Verus versions annotate an environment override in this field.
+        // rustup needs only the toolchain name, including when Cargo set the override.
+        let toolchain = reported_toolchain
+            .strip_suffix(" (overridden by environment variable RUSTUP_TOOLCHAIN)")
+            .unwrap_or(reported_toolchain);
         eprintln!("MIME specification verifier: {executable:?}\n{version}");
 
         let net = Path::new(env!("CARGO_MANIFEST_DIR"));

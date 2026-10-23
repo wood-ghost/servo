@@ -1054,32 +1054,13 @@ pub broadcast proof fn lemma_mime_parse_suffix_index(subtype: Seq<char>)
     subtype.index_of_last_ensures('+');
 }
 
-// A client's expected normalized type supplies a separator position. Check the
-// input's separator, prefix contents, and token conditions, then apply the
-// general parser theorem without unfolding the runner at the call site.
-pub proof fn lemma_mime_parse_plain_type_hint(input: Seq<char>, type_hint: &str)
-    requires
-        0 < type_hint@.len() < input.len() - 1,
-        input[type_hint@.len() as int] == '/',
-        ascii_lowercase(input.subrange(0, type_hint@.len() as int)) =~= type_hint@,
-        forall|i: int| #![auto] 0 <= i < input.len() && i != type_hint@.len()
-            ==> is_http_token_code_point(input[i]),
-    ensures
-        mime_parse_plain_input(input),
-        input.index_of('/') == type_hint@.len(),
-        mime_parse_final_state(input).state == MimeParseState::Done,
-        mime_parse_final_state(input).type_ == type_hint@,
-        mime_parse_done_view(mime_parse_final_state(input)) == mime_parse_plain_view(input),
-{
-    lemma_mime_parse_plain(input);
-}
-
-// Use the supported sequence-index trigger. Separator/suffix hints introduce
-// the relevant indexes; this bridge does not invent an index witness. vstd
-// already enables the equivalent axiom, so the group below does not repeat it.
+// Reveal sequence-index witnesses from literal character facts. PR #3196 allows
+// StrGetChar triggers; scope the bridge to parsing syntax/view queries.
 pub broadcast proof fn lemma_mime_parse_strlit_index(s: &str, i: int)
     ensures
-        strslice_get_char(s, i) == #[trigger] s@[i],
+        #![trigger mime_parse_plain_input(s@), strslice_get_char(s, i)]
+        #![trigger mime_parse_plain_view(s@), strslice_get_char(s, i)]
+        strslice_get_char(s, i) == s@[i],
 {
     vstd::string::axiom_str_literal_get_char(s, i);
 }
@@ -1125,47 +1106,36 @@ pub broadcast proof fn lemma_mime_parse_plain_no_plus(input: Seq<char>)
 }
 
 // A plus in the input's subtype remains at the corresponding position after
-// normalization. Supply that witness to the last-plus projection.
-pub proof fn lemma_mime_parse_plain_plus(input: Seq<char>, i: int)
+// normalization. Trigger on the literal character so clients need no position hint.
+pub broadcast proof fn lemma_mime_parse_plain_plus(s: &str, i: int)
     requires
-        mime_parse_plain_input(input),
-        input.index_of('/') < i < input.len(),
-        input[i] == '+',
+        mime_parse_plain_input(s@),
+        s@.index_of('/') < i < s@.len(),
+        strslice_get_char(s, i) == '+',
     ensures
-        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))[
-            i - input.index_of('/') - 1
+        #![trigger mime_parse_plain_view(s@), strslice_get_char(s, i)]
+        ascii_lowercase(s@.subrange(s@.index_of('/') + 1, s@.len() as int))[
+            i - s@.index_of('/') - 1
         ] == '+',
-        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))
+        ascii_lowercase(s@.subrange(s@.index_of('/') + 1, s@.len() as int))
             .contains('+'),
-        input.index_of('/') + 1 < i ==> mime_parse_plain_view(input).suffix.is_some(),
+        s@.index_of('/') + 1 < i ==> mime_parse_plain_view(s@).suffix.is_some(),
 {
+    vstd::string::axiom_str_literal_get_char(s, i);
+    let input = s@;
     let slash = input.index_of('/');
     let subtype = ascii_lowercase(input.subrange(slash + 1, input.len() as int));
     subtype.index_of_last_ensures('+');
 }
 
-// The expected base subtype supplies a candidate non-leading plus position.
-pub proof fn lemma_mime_parse_plain_suffix_hint(input: Seq<char>, subtype_hint: &str)
-    requires
-        mime_parse_plain_input(input),
-        subtype_hint@.len() > 0,
-        input.index_of('/') + 1 + subtype_hint@.len() < input.len(),
-        input[input.index_of('/') + 1 + subtype_hint@.len()] == '+',
-    ensures
-        mime_parse_plain_view(input).suffix.is_some(),
-        ascii_lowercase(input.subrange(input.index_of('/') + 1, input.len() as int))[
-            subtype_hint@.len() as int
-        ] == '+',
-{
-    lemma_mime_parse_plain_plus(input, input.index_of('/') + 1 + subtype_hint@.len());
-}
-
 pub broadcast group mime_parse_lemmas {
     lemma_mime_parse_plain,
     lemma_mime_parse_suffix_index,
+    lemma_mime_parse_strlit_index,
     lemma_mime_parse_lowercase_str,
     lemma_mime_parse_plain_essence_str,
     lemma_mime_parse_plain_no_plus,
+    lemma_mime_parse_plain_plus,
 }
 
 // Collection advances the cursor without passing the end of input.

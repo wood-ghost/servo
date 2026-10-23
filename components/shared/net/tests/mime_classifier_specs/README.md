@@ -144,9 +144,60 @@ Rust 1.95.0 Cargo driver:
 - Independent ordinary-Rust execution against `mime 0.3.17`: **9 reference inputs
   passed**, comprising the seven mismatch inputs and the two SVG inputs.
 
-### Current workflow: unmodified servo-stable, 2026-10-14
+### Current workflow: upstream trigger support, 2026-10-23
 
-Active proof work is on Servo's `mime_classifier` branch and uses the original
+[Verus PR #3196](https://github.com/verus-lang/verus/pull/3196) merged into
+`main` on 2026-10-16 at `c0e3553145e4bd2e4bc026464c74fb48202c5f07`. It permits
+`StrGetChar` as an explicit trigger root and uses native operands for matching.
+The local `servo-stable` revision `67f7055fea00583c250c62c4a7d4668a7fe55cce`
+includes this merge; its release reports `0.2026.10.23.67f7055` and uses Rust
+1.99.1. No uncommitted Verus changes are needed for this workflow.
+
+The active bridge now triggers on `strslice_get_char(s, i)`, together with a
+plain-MIME syntax or view query. The plus-position theorem also broadcasts from
+literal-character facts. This replaces the explicit type-prefix and suffix-position
+helpers and their call-site proof blocks. `mime_parse_final_state` remains opaque;
+the general parsing theorem supplies its result. The executable parsing calls,
+state-machine behavior, and trusted external contracts are unchanged.
+
+The four local Verus packages in the lockfile were aligned with this checkout.
+The older, separately pinned state-machine macro used by Servo is retained.
+The test runner strips the new `RUSTUP_TOOLCHAIN` override annotation from Verus's
+JSON toolchain field before passing the toolchain name to `rustup`.
+
+Checked on Servo base `f76a3c9ad9c` plus this change:
+
+- Parser module: **41 verified, 0 errors**.
+- Icon and cursor constructors without type hints: **2 verified, 0 errors**.
+- Package check: **202 verified, 0 errors**, using the command below. Lifetime
+  and trait-conflict checking are disabled; dependency proofs are skipped by
+  `focus`. No resource limits were changed. Before removing the hints, the same
+  new-toolchain package check reached 203 verified and one `classify` resource-limit
+  failure.
+- `sequence_index_trigger`, `raw_character_trigger`, `parse_image_x_icon`, and
+  `parse_plain_broadcast*`: **6 passed, 0 failed**, with lifetime and trait-conflict
+  checking enabled in the snippet verifier. Literal clients and syntax-domain
+  checks supply no explicit separator/suffix index witnesses. The sequence-index
+  control retains its known-index assertions to check the older trigger form.
+
+```bash
+cargo +1.99.1 verus focus --locked --offline -p servo-net-traits -- \
+  --no-lifetime --no-trait-conflicts --expand-errors --multiple-errors 20
+
+VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
+TMPDIR=/tmp/opencode \
+cargo +1.99.1 test --locked --offline -p servo-net-traits --test mime_parse \
+  --message-format=short -- sequence_index_trigger raw_character_trigger \
+  parse_image_x_icon parse_plain_broadcast --test-threads=2
+```
+
+The theorem's parameter-free input domain and the existing model/library fidelity
+gaps remain as described below. These selected results do not establish general
+correspondence with Rust's parser or a passing full MIME regression suite.
+
+### Historical workflow: unmodified servo-stable, 2026-10-14
+
+At this checkpoint, proof work on Servo's `mime_classifier` branch used the original
 Verus `servo-stable` revision `3a347310d098e784cdfbea97294315b079bb409e`.
 The rebuilt release reports **`0.2026.09.24.3a34731`**, without `.dirty`.
 Verus's tracked source is unchanged. Its release rebuild verified **2059 vstd
@@ -159,7 +210,7 @@ The previous experiment is preserved on the local branch
   `test.log` deletion).
 - Verus checkpoint: `a6e2e70c0` (the compiler trigger patch and its tests).
 
-The active Servo implementation uses the supported sequence-index trigger form:
+The Servo implementation at that checkpoint used the sequence-index trigger form:
 
 ```rust
 strslice_get_char(s, i) == #[trigger] s@[i]
@@ -214,7 +265,7 @@ boundaries. The full MIME regression suite is not claimed to pass.
 ### Archived trigger-patch experiment: 2026-10-14
 
 The following results describe the saved checkpoint, not the active verifier
-requirement. The current workflow above does not use this compiler patch.
+requirement. Trigger support is now upstream, as recorded in the current workflow.
 
 `lemma_mime_parse_plain` now proves successful model execution for arbitrary-length
 `type/subtype` inputs with nonempty HTTP-token components and exactly one slash.
@@ -315,30 +366,32 @@ toolchain-dependent `DefaultHasher` numeric digests.
 
 ## Running
 
-From the Servo root:
+From the Servo root, use the current verifier's Rust toolchain (1.99.1 for the
+build recorded above). Cargo passes its toolchain selection through
+`RUSTUP_TOOLCHAIN`, which the verifier also honors:
 
 ```bash
 # The full suite currently fails on the unfinished MIME specifications.
-cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse \
+cargo +1.99.1 test --locked -p servo-net-traits --test mime_parse \
   -- --test-threads=2
 
 # Run the additional API cases.
-cargo +1.95.0 test --locked -p servo-net-traits --test mime_api \
+cargo +1.99.1 test --locked -p servo-net-traits --test mime_api \
   -- --test-threads=2
 
 # Check every library constant.
-cargo +1.95.0 test --locked -p servo-net-traits --test mime_constants \
+cargo +1.99.1 test --locked -p servo-net-traits --test mime_constants \
   -- --test-threads=2
 
 # Run both targets even if one still has failing contracts.
-cargo +1.95.0 test --locked -p servo-net-traits \
+cargo +1.99.1 test --locked -p servo-net-traits \
   --test mime_parse --test mime_api --no-fail-fast -- --test-threads=2
 
 # Check the verifier runner independently of the unfinished contracts.
-cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse harness_
+cargo +1.99.1 test --locked -p servo-net-traits --test mime_parse harness_
 
 # Inspect one parsing contract test.
-cargo +1.95.0 test --locked -p servo-net-traits --test mime_parse \
+cargo +1.99.1 test --locked -p servo-net-traits --test mime_parse \
   parse_plain_mime -- --exact --nocapture
 ```
 
@@ -347,7 +400,7 @@ or select it explicitly for a command:
 
 ```bash
 VERUS_PATH=/home/yizhiy/Desktop/verus/source/target-verus/release/verus \
-  cargo +1.95.0 test --locked -p servo-net-traits --test mime_api \
+  cargo +1.99.1 test --locked -p servo-net-traits --test mime_api \
   constant_components -- --test-threads=2
 ```
 

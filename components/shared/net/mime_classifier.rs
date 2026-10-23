@@ -405,9 +405,6 @@ impl MimeClassifier {
                 //
                 // This section was *not* finalized in the specs at the time
                 // of this implementation.
-                proof {
-                    SpecMime::lemma_mime_parse_plain_type_hint("text/vtt"@, "text");
-                }
                 "text/vtt".parse().unwrap()
             },
             LoadContext::CacheManifest => {
@@ -415,9 +412,6 @@ impl MimeClassifier {
                 //
                 // This section was *not* finalized in the specs at the time
                 // of this implementation.
-                proof {
-                    SpecMime::lemma_mime_parse_plain_type_hint("text/cache-manifest"@, "text");
-                }
                 "text/cache-manifest".parse().unwrap()
             },
         }
@@ -1056,9 +1050,6 @@ impl MIMEChecker for Mp4Matcher {
     #[verifier::auto_reveal_strlit]
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         if self.matches(data) {
-            proof {
-                SpecMime::lemma_mime_parse_plain_type_hint("video/mp4"@, "video");
-            }
             Some("video/mp4".parse().unwrap())
         } else {
             None
@@ -1374,9 +1365,6 @@ impl ByteMatcher {
             Spec::is_image_x_icon(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("image/x-icon"@, "image");
-        }
         ByteMatcher {
             pattern: b"\x00\x00\x01\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1390,9 +1378,6 @@ impl ByteMatcher {
             Spec::is_image_x_icon_cursor(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("image/x-icon"@, "image");
-        }
         ByteMatcher {
             pattern: b"\x00\x00\x02\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1445,9 +1430,6 @@ impl ByteMatcher {
             Spec::is_image_webp(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("image/webp"@, "image");
-        }
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WEBPVP",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1488,9 +1470,6 @@ impl ByteMatcher {
             Spec::is_video_webm(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("video/webm"@, "video");
-        }
         ByteMatcher {
             pattern: b"\x1A\x45\xDF\xA3",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1504,9 +1483,6 @@ impl ByteMatcher {
             Spec::is_audio_basic(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("audio/basic"@, "audio");
-        }
         ByteMatcher {
             pattern: b".snd",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1520,9 +1496,6 @@ impl ByteMatcher {
             Spec::is_audio_aiff(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("audio/aiff"@, "audio");
-        }
         ByteMatcher {
             pattern: b"FORM\x00\x00\x00\x00AIFF",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1536,9 +1509,6 @@ impl ByteMatcher {
             Spec::is_audio_mpeg(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("audio/mpeg"@, "audio");
-        }
         ByteMatcher {
             pattern: b"ID3",
             mask: b"\xFF\xFF\xFF",
@@ -1552,9 +1522,6 @@ impl ByteMatcher {
             Spec::is_application_ogg(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/ogg"@, "application");
-        }
         ByteMatcher {
             pattern: b"OggS\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF",
@@ -1569,9 +1536,6 @@ impl ByteMatcher {
             Spec::is_audio_midi(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("audio/midi"@, "audio");
-        }
         ByteMatcher {
             pattern: b"MThd\x00\x00\x00\x06",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -1585,9 +1549,6 @@ impl ByteMatcher {
             Spec::is_video_avi(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("video/avi"@, "video");
-        }
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00AVI ",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1601,9 +1562,6 @@ impl ByteMatcher {
             Spec::is_audio_wave(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("audio/wave"@, "audio");
-        }
         ByteMatcher {
             pattern: b"RIFF\x00\x00\x00\x00WAVE",
             mask: b"\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF",
@@ -1917,9 +1875,6 @@ impl ByteMatcher {
             Spec::is_application_vnd_ms_font_object(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/vnd.ms-fontobject"@, "application");
-        }
         ByteMatcher {
             pattern: b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
                        \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -1937,9 +1892,6 @@ impl ByteMatcher {
             Spec::is_true_type(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/font-sfnt"@, "application");
-        }
         ByteMatcher {
             pattern: b"\x00\x01\x00\x00",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1953,9 +1905,6 @@ impl ByteMatcher {
             Spec::is_open_type(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/font-sfnt"@, "application");
-        }
         ByteMatcher {
             pattern: b"OTTO",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1969,9 +1918,6 @@ impl ByteMatcher {
             Spec::is_true_type_collection(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/font-sfnt"@, "application");
-        }
         ByteMatcher {
             pattern: b"ttcf",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -1985,9 +1931,6 @@ impl ByteMatcher {
             Spec::is_application_font_woff(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/font-woff"@, "application");
-        }
         ByteMatcher {
             pattern: b"wOFF",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -2001,9 +1944,6 @@ impl ByteMatcher {
             Spec::is_application_x_gzip(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/x-gzip"@, "application");
-        }
         ByteMatcher {
             pattern: b"\x1F\x8B\x08",
             mask: b"\xFF\xFF\xFF",
@@ -2017,9 +1957,6 @@ impl ByteMatcher {
             Spec::is_application_zip(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/zip"@, "application");
-        }
         ByteMatcher {
             pattern: b"PK\x03\x04",
             mask: b"\xFF\xFF\xFF\xFF",
@@ -2033,9 +1970,6 @@ impl ByteMatcher {
             Spec::is_application_x_rar_compressed(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/x-rar-compressed"@, "application");
-        }
         ByteMatcher {
             pattern: b"Rar \x1A\x07\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
@@ -2049,9 +1983,6 @@ impl ByteMatcher {
             Spec::is_application_postscript(&r),
             r.validate_spec(),
     {
-        proof {
-            SpecMime::lemma_mime_parse_plain_type_hint("application/postscript"@, "application");
-        }
         ByteMatcher {
             pattern: b"%!PS-Adobe-",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
