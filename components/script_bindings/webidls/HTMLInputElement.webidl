@@ -14,8 +14,6 @@ interface HTMLInputElement : HTMLElement {
            attribute DOMString alt;
   // [CEReactions]
   //         attribute DOMString autocomplete;
-  // [CEReactions]
-  //         attribute boolean autofocus;
   [CEReactions]
            attribute boolean defaultChecked;
            attribute boolean checked;
@@ -36,9 +34,9 @@ interface HTMLInputElement : HTMLElement {
            attribute boolean formNoValidate;
   [CEReactions]
            attribute DOMString formTarget;
-  // [CEReactions]
-  //          attribute unsigned long height;
-           attribute boolean indeterminate;
+  [CEReactions]
+           attribute unsigned long height;
+  attribute boolean indeterminate;
   // [CEReactions]
   //          attribute DOMString inputMode;
   readonly attribute HTMLDataListElement? list;
@@ -78,8 +76,8 @@ interface HTMLInputElement : HTMLElement {
            attribute object? valueAsDate;
   [SetterThrows]
            attribute unrestricted double valueAsNumber;
-  // [CEReactions]
-  //          attribute unsigned long width;
+  [CEReactions]
+           attribute unsigned long width;
 
   [Throws] undefined stepUp(optional long n = 1);
   [Throws] undefined stepDown(optional long n = 1);
@@ -118,5 +116,7 @@ interface HTMLInputElement : HTMLElement {
 // https://html.spec.whatwg.org/multipage/#HTMLInputElement-partial
 partial interface HTMLInputElement {
   //         attribute DOMString align;
-  attribute DOMString useMap;
+  [CEReactions] attribute DOMString useMap;
+  [CEReactions] attribute unsigned long hspace;
+  [CEReactions] attribute unsigned long vspace;
 };

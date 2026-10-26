@@ -4,10 +4,12 @@
 
 #![deny(unsafe_code)]
 
+use std::collections::hash_map::Entry;
 use std::fmt::{self, Debug, Display};
 use std::sync::{LazyLock, OnceLock};
 use std::thread::{self, JoinHandle};
 
+use bytes::Bytes;
 use content_security_policy::{self as csp};
 use cookie::Cookie;
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -15,17 +17,19 @@ use headers::{ContentType, HeaderMapExt, ReferrerPolicy as ReferrerPolicyHeader}
 use http::{HeaderMap, HeaderValue, StatusCode, header};
 use hyper_serde::Serde;
 use hyper_util::client::legacy::Error as HyperError;
-use ipc_channel::ipc::{self, IpcSender};
 use malloc_size_of::malloc_size_of_is_0;
 use malloc_size_of_derive::MallocSizeOf;
 use mime::Mime;
 use parking_lot::RwLock;
+use profile_traits::generic_callback::GenericCallback as ProfileGenericCallback;
 use profile_traits::mem::ReportsChan;
 use rand::{Rng, rng};
 use request::RequestId;
 use rustc_hash::FxHashMap;
+use rustls::{CipherSuite, NamedGroup, ProtocolVersion};
 use rustls_pki_types::CertificateDer;
 use serde::{Deserialize, Serialize};
+use serde_with::{FromInto, serde_as};
 use servo_base::generic_channel::{
     self, CallbackSetter, GenericCallback, GenericOneshotSender, GenericSend, GenericSender,
     SendResult,
@@ -47,6 +51,7 @@ use crate::request::{Request, RequestBuilder};
 use crate::response::{Response, ResponseInit};
 
 pub mod blob_url_store;
+pub mod fetch;
 pub mod filemanager_thread;
 pub mod http_status;
 pub mod image_cache;
@@ -68,11 +73,6 @@ pub use resource_fetch_timing::{
 /// <https://fetch.spec.whatwg.org/#document-accept-header-value>
 pub const DOCUMENT_ACCEPT_HEADER_VALUE: HeaderValue =
     HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-
-/// An implementation of the [Fetch specification](https://fetch.spec.whatwg.org/)
-pub mod fetch {
-    pub mod headers;
-}
 
 verus! {
 /// A loading context, for context-specific sniffing, as defined in
@@ -121,9 +121,9 @@ impl CustomResponse {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub struct CustomResponseMediator {
-    pub response_chan: IpcSender<Option<CustomResponse>>,
+    pub response_chan: GenericCallback<Option<CustomResponse>>,
     pub load_url: ServoUrl,
 }
 
@@ -157,12 +157,16 @@ impl ReferrerPolicy {
     pub fn from_with_legacy(value: &str) -> Self {
         // Step 5. If value is one of the values given in the first column of the following table,
         // then set value to the value given in the second column:
-        match value.to_ascii_lowercase().as_str() {
-            "never" => ReferrerPolicy::NoReferrer,
-            "default" => ReferrerPolicy::StrictOriginWhenCrossOrigin,
-            "always" => ReferrerPolicy::UnsafeUrl,
-            "origin-when-crossorigin" => ReferrerPolicy::OriginWhenCrossOrigin,
-            _ => ReferrerPolicy::from(value),
+        if value.eq_ignore_ascii_case("never") {
+            ReferrerPolicy::NoReferrer
+        } else if value.eq_ignore_ascii_case("default") {
+            ReferrerPolicy::StrictOriginWhenCrossOrigin
+        } else if value.eq_ignore_ascii_case("always") {
+            ReferrerPolicy::UnsafeUrl
+        } else if value.eq_ignore_ascii_case("origin-when-crossorigin") {
+            ReferrerPolicy::OriginWhenCrossOrigin
+        } else {
+            ReferrerPolicy::from(value)
         }
     }
 
@@ -181,16 +185,24 @@ impl ReferrerPolicy {
 impl From<&str> for ReferrerPolicy {
     /// <https://html.spec.whatwg.org/multipage/#referrer-policy-attribute>
     fn from(value: &str) -> Self {
-        match value.to_ascii_lowercase().as_str() {
-            "no-referrer" => ReferrerPolicy::NoReferrer,
-            "no-referrer-when-downgrade" => ReferrerPolicy::NoReferrerWhenDowngrade,
-            "origin" => ReferrerPolicy::Origin,
-            "same-origin" => ReferrerPolicy::SameOrigin,
-            "strict-origin" => ReferrerPolicy::StrictOrigin,
-            "strict-origin-when-cross-origin" => ReferrerPolicy::StrictOriginWhenCrossOrigin,
-            "origin-when-cross-origin" => ReferrerPolicy::OriginWhenCrossOrigin,
-            "unsafe-url" => ReferrerPolicy::UnsafeUrl,
-            _ => ReferrerPolicy::EmptyString,
+        if value.eq_ignore_ascii_case("no-referrer") {
+            ReferrerPolicy::NoReferrer
+        } else if value.eq_ignore_ascii_case("no-referrer-when-downgrade") {
+            ReferrerPolicy::NoReferrerWhenDowngrade
+        } else if value.eq_ignore_ascii_case("origin") {
+            ReferrerPolicy::Origin
+        } else if value.eq_ignore_ascii_case("same-origin") {
+            ReferrerPolicy::SameOrigin
+        } else if value.eq_ignore_ascii_case("strict-origin") {
+            ReferrerPolicy::StrictOrigin
+        } else if value.eq_ignore_ascii_case("strict-origin-when-cross-origin") {
+            ReferrerPolicy::StrictOriginWhenCrossOrigin
+        } else if value.eq_ignore_ascii_case("origin-when-cross-origin") {
+            ReferrerPolicy::OriginWhenCrossOrigin
+        } else if value.eq_ignore_ascii_case("unsafe-url") {
+            ReferrerPolicy::UnsafeUrl
+        } else {
+            ReferrerPolicy::EmptyString
         }
     }
 }
@@ -261,32 +273,10 @@ pub enum FetchResponseMsg {
     ProcessRequestBody(RequestId),
     // todo: send more info about the response (or perhaps the entire Response)
     ProcessResponse(RequestId, Result<FetchMetadata, NetworkError>),
-    ProcessResponseChunk(RequestId, DebugVec),
+    ProcessResponseChunk(RequestId, Bytes),
     ProcessResponseEOF(RequestId, Result<(), NetworkError>, ResourceFetchTiming),
     ProcessCspViolations(RequestId, Vec<csp::Violation>),
     ProcessContentLength(RequestId, usize),
-}
-
-#[derive(Deserialize, PartialEq, Serialize, MallocSizeOf)]
-pub struct DebugVec(pub Vec<u8>);
-
-impl From<Vec<u8>> for DebugVec {
-    fn from(v: Vec<u8>) -> Self {
-        Self(v)
-    }
-}
-
-impl std::ops::Deref for DebugVec {
-    type Target = Vec<u8>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Debug for DebugVec {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("[...; {}]", self.0.len()))
-    }
 }
 
 impl FetchResponseMsg {
@@ -314,7 +304,7 @@ pub trait FetchTaskTarget {
     fn process_response(&mut self, request: &Request, response: &Response);
 
     /// Fired when a chunk of response content is received
-    fn process_response_chunk(&mut self, request: &Request, chunk: Vec<u8>);
+    fn process_response_chunk(&mut self, request: &Request, chunk: bytes::Bytes);
 
     /// <https://fetch.spec.whatwg.org/#process-response-end-of-file>
     ///
@@ -333,6 +323,18 @@ pub enum FilteredMetadata {
     Cors(Metadata),
     Opaque,
     OpaqueRedirect(ServoUrl),
+}
+
+impl From<FetchMetadata> for Metadata {
+    fn from(value: FetchMetadata) -> Self {
+        match value {
+            FetchMetadata::Unfiltered(metadata) => metadata,
+            FetchMetadata::Filtered {
+                filtered: _,
+                unsafe_,
+            } => unsafe_,
+        }
+    }
 }
 
 // FIXME: https://github.com/servo/servo/issues/34591
@@ -379,11 +381,8 @@ impl FetchTaskTarget for GenericCallback<FetchResponseMsg> {
         ));
     }
 
-    fn process_response_chunk(&mut self, request: &Request, chunk: Vec<u8>) {
-        let _ = self.send(FetchResponseMsg::ProcessResponseChunk(
-            request.id,
-            chunk.into(),
-        ));
+    fn process_response_chunk(&mut self, request: &Request, chunk: bytes::Bytes) {
+        let _ = self.send(FetchResponseMsg::ProcessResponseChunk(request.id, chunk));
     }
 
     fn process_response_eof(&mut self, request: &Request, response: &Response) {
@@ -434,6 +433,66 @@ impl Display for TlsSecurityState {
     }
 }
 
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServoProtocolVersion(#[serde_as(as = "FromInto<u16>")] pub ProtocolVersion);
+
+impl malloc_size_of::MallocSizeOf for ServoProtocolVersion {
+    fn size_of(&self, _: &mut malloc_size_of::MallocSizeOfOps) -> usize {
+        0
+    }
+}
+
+impl std::fmt::Debug for ServoProtocolVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            ProtocolVersion::SSLv2 => write!(f, "SSL 2.0"),
+            ProtocolVersion::SSLv3 => write!(f, "SSL 3.0"),
+            ProtocolVersion::TLSv1_0 => write!(f, "TLS 1.0"),
+            ProtocolVersion::TLSv1_1 => write!(f, "TLS 1.1"),
+            ProtocolVersion::TLSv1_2 => write!(f, "TLS 1.2"),
+            ProtocolVersion::TLSv1_3 => write!(f, "TLS 1.3"),
+            ProtocolVersion::DTLSv1_0 => write!(f, "DTLS 1.0"),
+            ProtocolVersion::DTLSv1_2 => write!(f, "DTLS 1.2"),
+            ProtocolVersion::DTLSv1_3 => write!(f, "DTLS 1.3"),
+            ProtocolVersion::Unknown(value) => write!(f, "Unknown ({value})"),
+            _ => write!(f, "Not yet implemented"),
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServoCipherSuite(#[serde_as(as = "FromInto<u16>")] pub CipherSuite);
+
+impl malloc_size_of::MallocSizeOf for ServoCipherSuite {
+    fn size_of(&self, _: &mut malloc_size_of::MallocSizeOfOps) -> usize {
+        0
+    }
+}
+
+impl std::fmt::Debug for ServoCipherSuite {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServoNamedGroup(#[serde_as(as = "FromInto<u16>")] pub NamedGroup);
+
+impl malloc_size_of::MallocSizeOf for ServoNamedGroup {
+    fn size_of(&self, _: &mut malloc_size_of::MallocSizeOfOps) -> usize {
+        0
+    }
+}
+
+impl std::fmt::Debug for ServoNamedGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, MallocSizeOf, PartialEq, Serialize)]
 pub struct TlsSecurityInfo {
     // "insecure", "weak", "broken", "secure".
@@ -442,11 +501,11 @@ pub struct TlsSecurityInfo {
     // Reasons explaining why the negotiated parameters are considered weak.
     pub weakness_reasons: Vec<String>,
     // Negotiated TLS protocol version (e.g. "TLS 1.3").
-    pub protocol_version: Option<String>,
+    pub protocol_version: Option<ServoProtocolVersion>,
     // Negotiated cipher suite identifier.
-    pub cipher_suite: Option<String>,
+    pub cipher_suite: Option<ServoCipherSuite>,
     // Negotiated key exchange group.
-    pub kea_group_name: Option<String>,
+    pub kea_group_name: Option<ServoNamedGroup>,
     // Signature scheme used for certificate verification.
     pub signature_scheme_name: Option<String>,
     // Negotiated ALPN protocol (e.g. "h2" for HTTP/2, "http/1.1" for HTTP/1.1).
@@ -469,14 +528,14 @@ pub struct TlsSecurityInfo {
     pub used_private_dns: bool,
 }
 
-impl FetchTaskTarget for IpcSender<WebSocketNetworkEvent> {
+impl FetchTaskTarget for ProfileGenericCallback<WebSocketNetworkEvent> {
     fn process_request_body(&mut self, _: &Request) {}
     fn process_response(&mut self, _: &Request, response: &Response) {
         if response.is_network_error() {
             let _ = self.send(WebSocketNetworkEvent::Fail);
         }
     }
-    fn process_response_chunk(&mut self, _: &Request, _: Vec<u8>) {}
+    fn process_response_chunk(&mut self, _: &Request, _: bytes::Bytes) {}
     fn process_response_eof(&mut self, _: &Request, _: &Response) {}
     fn process_csp_violations(&mut self, _: &Request, violations: Vec<csp::Violation>) {
         let _ = self.send(WebSocketNetworkEvent::ReportCSPViolations(violations));
@@ -492,7 +551,7 @@ pub struct DiscardFetch;
 impl FetchTaskTarget for DiscardFetch {
     fn process_request_body(&mut self, _: &Request) {}
     fn process_response(&mut self, _: &Request, _: &Response) {}
-    fn process_response_chunk(&mut self, _: &Request, _: Vec<u8>) {}
+    fn process_response_chunk(&mut self, _: &Request, _: bytes::Bytes) {}
     fn process_response_eof(&mut self, _: &Request, _: &Response) {}
     fn process_csp_violations(&mut self, _: &Request, _: Vec<csp::Violation>) {}
     fn process_response_length_hint(&mut self, _: &Request, _: usize) {}
@@ -560,7 +619,7 @@ impl ResourceThreads {
     }
 
     pub fn clear_cookies(&self) {
-        let (sender, receiver) = ipc::channel().unwrap();
+        let (sender, receiver) = generic_channel::channel().unwrap();
         let _ = self
             .core_thread
             .send(CoreResourceMsg::DeleteCookies(None, Some(sender)));
@@ -699,7 +758,7 @@ pub enum WebSocketNetworkEvent {
 pub enum FetchChannels {
     ResponseMsg(GenericCallback<FetchResponseMsg>),
     WebSocket {
-        event_sender: IpcSender<WebSocketNetworkEvent>,
+        event_sender: ProfileGenericCallback<WebSocketNetworkEvent>,
         action_receiver: CallbackSetter<WebSocketDomAction>,
     },
     /// If the fetch is just being done to populate the cache,
@@ -762,7 +821,7 @@ pub enum CoreResourceMsg {
     DeleteCookiesForSites(Vec<String>, GenericSender<()>),
     /// This currently is used by unit tests and WebDriver only.
     /// When url is `None`, this clears cookies across all origins.
-    DeleteCookies(Option<ServoUrl>, Option<IpcSender<()>>),
+    DeleteCookies(Option<ServoUrl>, Option<GenericSender<()>>),
     /// Delete all session cookies (cookies without an expiry or max-age).
     DeleteSessionCookies(GenericSender<()>),
     DeleteCookie(ServoUrl, String),
@@ -785,7 +844,7 @@ pub enum CoreResourceMsg {
     /// Clear the network cache.
     ClearCache(Option<GenericSender<()>>),
     /// Send the service worker network mediator for an origin to CoreResourceThread
-    NetworkMediator(IpcSender<CustomResponseMediator>, ImmutableOrigin),
+    NetworkMediator(GenericSender<CustomResponseMediator>, ImmutableOrigin),
     /// Message forwarded to file manager's handler
     ToFileManager(FileManagerThreadMsg),
     TotalSizeOfInFlightKeepAliveRecords(PipelineId, GenericSender<u64>),
@@ -834,7 +893,11 @@ impl CacheEntryDescriptor {
 // FIXME: https://github.com/servo/servo/issues/34591
 #[expect(clippy::large_enum_variant)]
 enum ToFetchThreadMessage {
-    Cancel(Vec<RequestId>, CoreResourceThread),
+    Cancel {
+        request_ids: Vec<RequestId>,
+        forget: bool,
+        core_resource_thread: CoreResourceThread,
+    },
     StartFetch(
         /* request_builder */ RequestBuilder,
         /* response_init */ Option<ResponseInit>,
@@ -933,18 +996,31 @@ impl FetchThread {
                     let request_id = fetch_response_msg.request_id();
                     let fetch_finished =
                         matches!(fetch_response_msg, FetchResponseMsg::ProcessResponseEOF(..));
+                    let mut active_fetch = match self.active_fetches.entry(request_id) {
+                        Entry::Occupied(occupied_entry) => occupied_entry,
+                        Entry::Vacant(..) => {
+                            // The callback might no longer be in the map if it was cancelled and forgotten
+                            // (for instance, during a Document teardown).
+                            continue;
+                        },
+                    };
 
-                    self.active_fetches
-                        .get_mut(&request_id)
-                        .expect("Got fetch response for unknown fetch")(
-                        fetch_response_msg
-                    );
-
+                    active_fetch.get_mut()(fetch_response_msg);
                     if fetch_finished {
-                        self.active_fetches.remove(&request_id);
+                        let _ = active_fetch.remove();
                     }
                 },
-                Ok(ToFetchThreadMessage::Cancel(request_ids, core_resource_thread)) => {
+                Ok(ToFetchThreadMessage::Cancel {
+                    request_ids,
+                    forget,
+                    core_resource_thread,
+                }) => {
+                    if forget {
+                        for request_id in &request_ids {
+                            self.active_fetches.remove(request_id);
+                        }
+                    }
+
                     // Errors are ignored here, because Servo sends many cancellation requests when shutting down.
                     // At this point the networking task might be shut down completely, so just ignore errors
                     // during this time.
@@ -971,12 +1047,17 @@ impl FetchThread {
         );
     }
 
-    fn cancel_async_fetch(request_ids: Vec<RequestId>, core_resource_thread: &CoreResourceThread) {
+    fn cancel_async_fetch(
+        request_ids: Vec<RequestId>,
+        core_resource_thread: &CoreResourceThread,
+        forget: bool,
+    ) {
         if let Some(fetch_thread) = FETCH_THREAD.get() {
-            let _ = fetch_thread.sender.send(ToFetchThreadMessage::Cancel(
+            let _ = fetch_thread.sender.send(ToFetchThreadMessage::Cancel {
                 request_ids,
-                core_resource_thread.clone(),
-            ));
+                forget,
+                core_resource_thread: core_resource_thread.clone(),
+            });
         }
     }
 
@@ -1014,7 +1095,17 @@ pub fn fetch_async(
 /// Instruct the resource thread to cancel an existing request. Does nothing if the
 /// request has already completed or has not been fetched yet.
 pub fn cancel_async_fetch(request_ids: Vec<RequestId>, core_resource_thread: &CoreResourceThread) {
-    FetchThread::cancel_async_fetch(request_ids, core_resource_thread);
+    FetchThread::cancel_async_fetch(request_ids, core_resource_thread, false /* forget */);
+}
+
+/// Instruct the resource thread to cancel an existing request. Does nothing if the
+/// request has already completed or has not been fetched yet. This also "forgets"
+/// the request, which means that no further callbacks will be called when canceled.
+pub fn cancel_and_forget_async_fetch(
+    request_ids: Vec<RequestId>,
+    core_resource_thread: &CoreResourceThread,
+) {
+    FetchThread::cancel_async_fetch(request_ids, core_resource_thread, true /* forget */);
 }
 
 #[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
@@ -1034,14 +1125,12 @@ pub struct Metadata {
     /// Location URL from the response headers.
     pub location_url: Option<Result<ServoUrl, String>>,
 
-    #[ignore_malloc_size_of = "Defined in hyper"]
     /// MIME type / subtype.
     pub content_type: Option<Serde<ContentType>>,
 
     /// Character set.
     pub charset: Option<String>,
 
-    #[ignore_malloc_size_of = "Defined in hyper"]
     /// Headers
     pub headers: Option<Serde<HeaderMap>>,
 
@@ -1305,6 +1394,12 @@ pub fn trim_http_whitespace(mut slice: &[u8]) -> &[u8] {
     }
 
     slice
+}
+
+/// Returns true if a given string has a given suffix with case-insensitive match.
+pub fn ends_with_ignore_ascii_case(string: &str, suffix: &str) -> bool {
+    string.len() >= suffix.len() &&
+        string.as_bytes()[string.len() - suffix.len()..].eq_ignore_ascii_case(suffix.as_bytes())
 }
 
 /// Returns the cached current system locale, or en-US by default.

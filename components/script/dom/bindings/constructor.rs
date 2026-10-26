@@ -2,16 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+#![cfg_attr(crown, allow(crown::jscontext_first_arg))]
+
 use std::ptr;
 
 use html5ever::interface::QualName;
 use html5ever::{LocalName, local_name, ns};
+use js::conversions::ToJSValConvertible;
 use js::glue::{UnwrapObjectDynamic, UnwrapObjectStatic};
 use js::jsapi::{CallArgs, JSObject};
 use js::realm::AutoRealm;
 use js::rust::wrappers2::{JS_SetPrototype, JS_WrapObject};
 use js::rust::{HandleObject, MutableHandleObject, MutableHandleValue};
-use script_bindings::conversions::SafeToJSValConvertible;
 use script_bindings::interface::get_desired_proto;
 use script_bindings::reflector::DomObject;
 
@@ -149,10 +151,12 @@ fn html_constructor(
     rooted!(&in(cx) let mut prototype = ptr::null_mut::<JSObject>());
     get_desired_proto(cx, call_args, proto_id, creator, prototype.handle_mut())?;
 
-    let entry = definition.construction_stack.borrow().last().cloned();
-    let result = match entry {
+    let construction_stack_borrow = definition.construction_stack.borrow();
+    let result = match construction_stack_borrow.last().as_ref() {
         // Step 7. If definition's construction stack is empty:
         None => {
+            drop(construction_stack_borrow);
+
             // Step 7.1
             let name = QualName::new(None, ns!(html), definition.local_name.clone());
             // Any prototype used to create these elements will be overwritten before returning
@@ -173,14 +177,14 @@ fn html_constructor(
             // Step 7.2-7.5 are performed in the generated caller code.
 
             // Step 7.6 Set element's custom element state to "custom".
-            element.set_custom_element_state(CustomElementState::Custom);
+            element.set_custom_element_state(CustomElementState::Custom, cx.no_gc());
 
             // Step 7.7 Set element's custom element definition to definition.
-            element.set_custom_element_definition(definition);
+            element.set_custom_element_definition(definition, cx.no_gc());
 
             // Step 7.8 Set element's is value to isValue.
             if let Some(is_value) = is_value {
-                element.set_is(is_value);
+                element.set_is(is_value, cx.no_gc());
             }
 
             if !check_type(&element) {
@@ -195,21 +199,24 @@ fn html_constructor(
         Some(ConstructionStackEntry::Element(element)) => {
             // Step 11 is performed in the generated caller code.
 
-            // Step 12
+            // Step 13
+            if !check_type(element) {
+                throw_dom_exception(cx, global, Error::InvalidState(None));
+                return Err(());
+            }
+
+            let element = element.as_rooted();
+            drop(construction_stack_borrow);
+
+            // Step 15. Replace the last entry in definition's construction stack with an already
+            // constructed marker.
             {
                 let mut construction_stack =
                     definition.construction_stack.safe_borrow_mut(cx.no_gc());
                 construction_stack.pop();
                 construction_stack.push(ConstructionStackEntry::AlreadyConstructedMarker);
             }
-
-            // Step 13
-            if !check_type(&element) {
-                throw_dom_exception(cx, global, Error::InvalidState(None));
-                return Err(());
-            } else {
-                element
-            }
+            element
         },
         // Step 10
         Some(ConstructionStackEntry::AlreadyConstructedMarker) => {
@@ -231,7 +238,7 @@ fn html_constructor(
             return Err(());
         }
 
-        result.safe_to_jsval(cx, MutableHandleValue::from_raw(call_args.rval()));
+        result.to_jsval(cx, MutableHandleValue::from_raw(call_args.rval()));
     }
     Ok(())
 }

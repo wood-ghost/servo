@@ -5,7 +5,7 @@
 use dom_struct::dom_struct;
 use html5ever::LocalName;
 use js::context::{JSContext, NoGC};
-use script_bindings::reflector::{Reflector, reflect_dom_object_with_cx};
+use script_bindings::reflector::{Reflector, reflect_dom_object};
 
 use crate::dom::attr::Attr;
 use crate::dom::bindings::codegen::Bindings::ElementBinding::ElementMethods;
@@ -36,7 +36,7 @@ impl NamedNodeMap {
         window: &Window,
         elem: &Element,
     ) -> DomRoot<NamedNodeMap> {
-        reflect_dom_object_with_cx(Box::new(NamedNodeMap::new_inherited(elem)), window, cx)
+        reflect_dom_object(cx, Box::new(NamedNodeMap::new_inherited(elem)), window)
     }
 }
 
@@ -88,7 +88,9 @@ impl NamedNodeMapMethods<crate::DomTypeHolder> for NamedNodeMap {
         let name = self.owner.parsed_name(name);
         self.owner
             .remove_attribute_by_name(cx, &name)
-            .ok_or(Error::NotFound(None))
+            .ok_or(Error::NotFound(Some(
+                "No attribute with the given name".into(),
+            )))
     }
 
     /// <https://dom.spec.whatwg.org/#dom-namednodemap-removenameditemns>
@@ -101,7 +103,9 @@ impl NamedNodeMapMethods<crate::DomTypeHolder> for NamedNodeMap {
         let ns = namespace_from_domstring(namespace);
         self.owner
             .remove_attribute(cx, &ns, &LocalName::from(local_name))
-            .ok_or(Error::NotFound(None))
+            .ok_or(Error::NotFound(Some(
+                "No attribute with the given namespace and local name".into(),
+            )))
     }
 
     /// <https://dom.spec.whatwg.org/#dom-namednodemap-item>

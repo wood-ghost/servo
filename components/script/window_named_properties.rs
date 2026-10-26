@@ -3,10 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::ptr;
-use std::ptr::NonNull;
 use std::sync::LazyLock;
 
-use js::conversions::jsstr_to_string;
 use js::glue::{AppendToIdVector, CreateProxyHandler, ProxyTraps};
 use js::jsapi::{
     Handle, HandleId, HandleObject, JSCLASS_DELAY_METADATA_BUILDER, JSCLASS_IS_PROXY,
@@ -23,6 +21,7 @@ use js::rust::{
     MutableHandleObject as RustMutableHandleObject,
 };
 use script_bindings::proxyhandler::set_property_descriptor;
+use script_bindings::str::DOMString;
 
 use crate::dom::bindings::codegen::Bindings::WindowBinding::WindowMethods;
 use crate::dom::bindings::root::Root;
@@ -93,7 +92,7 @@ unsafe extern "C" fn get_own_property_descriptor(
             SymbolId(unsafe { GetWellKnownSymbol(&cx, SymbolCode::toStringTag) }).asBits_
         {
             rooted!(&in(cx) let mut rval = UndefinedValue());
-            "WindowProperties".safe_to_jsval(&mut cx, rval.handle_mut());
+            "WindowProperties".to_jsval(&mut cx, rval.handle_mut());
             set_property_descriptor(
                 unsafe { RustMutableHandle::from_raw(desc) },
                 rval.handle(),
@@ -119,12 +118,15 @@ unsafe extern "C" fn get_own_property_descriptor(
     }
 
     let s = if id.is_string() {
-        unsafe { jsstr_to_string(&cx, NonNull::new(id.to_string()).unwrap()) }
+        unsafe {
+            DOMString::from_raw_js_string(&cx, id.to_string())
+                .expect("Should always be able to convert because id is string")
+        }
     } else if id.is_int() {
         // If the property key is an integer index, convert it to a String too.
         // For indexed access on the window object, which may shadow this, see
         // the getOwnPropertyDescriptor trap in dom/windowproxy.rs.
-        id.to_int().to_string()
+        DOMString::from(id.to_int().to_string())
     } else if id.is_symbol() {
         // Symbol properties were already handled above.
         unreachable!()
@@ -137,9 +139,9 @@ unsafe extern "C" fn get_own_property_descriptor(
 
     let window = Root::downcast::<Window>(unsafe { GlobalScope::from_object(proxy.get()) })
         .expect("global is not a window");
-    if let Some(obj) = window.NamedGetter(&mut cx, s.into()) {
+    if let Some(obj) = window.NamedGetter(&mut cx, s) {
         rooted!(&in(cx) let mut rval = UndefinedValue());
-        obj.safe_to_jsval(&mut cx, rval.handle_mut());
+        obj.to_jsval(&mut cx, rval.handle_mut());
         set_property_descriptor(
             unsafe { RustMutableHandle::from_raw(desc) },
             rval.handle(),

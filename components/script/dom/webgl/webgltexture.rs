@@ -10,7 +10,7 @@ use std::cmp;
 use dom_struct::dom_struct;
 use js::context::JSContext;
 use script_bindings::cell::DomRefCell;
-use script_bindings::reflector::{DomObject as _, reflect_dom_object_with_cx};
+use script_bindings::reflector::{DomObject as _, reflect_dom_object};
 use script_bindings::weakref::WeakRef;
 use servo_canvas_traits::webgl::{
     TexDataType, TexFormat, TexParameter, TexParameterBool, TexParameterInt, WebGLCommand,
@@ -107,13 +107,13 @@ impl Drop for DroppableWebGLTexture {
     }
 }
 
-#[dom_struct(associated_memory)]
+#[dom_struct]
 pub(crate) struct WebGLTexture {
     webgl_object: WebGLObject,
     /// The target to which this texture was bound the first time
     target: Cell<Option<u32>>,
     /// Stores information about mipmap levels and cubemap faces.
-    #[ignore_malloc_size_of = "Arrays are cumbersome"]
+    #[ignore_malloc_size_of = "I do not know how"]
     image_info_array: DomRefCell<[Option<ImageInfo>; MAX_LEVEL_COUNT * MAX_FACE_COUNT]>,
     /// Face count can only be 1 or 6
     face_count: Cell<u8>,
@@ -175,7 +175,8 @@ impl WebGLTexture {
         context: &WebGLRenderingContext,
         id: WebGLTextureId,
     ) -> DomRoot<Self> {
-        reflect_dom_object_with_cx(
+        reflect_dom_object(
+            cx,
             Box::new(WebGLTexture::new_inherited(
                 context,
                 id,
@@ -183,7 +184,6 @@ impl WebGLTexture {
                 None,
             )),
             &*context.global(),
-            cx,
         )
     }
 
@@ -194,10 +194,10 @@ impl WebGLTexture {
         id: WebGLTextureId,
         session: &XRSession,
     ) -> DomRoot<Self> {
-        reflect_dom_object_with_cx(
+        reflect_dom_object(
+            cx,
             Box::new(WebGLTexture::new_inherited(context, id, Some(session))),
             &*context.global(),
-            cx,
         )
     }
 }

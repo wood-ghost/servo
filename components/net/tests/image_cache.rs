@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
+use malloc_size_of_derive::MallocSizeOf;
 use net::image_cache::ImageCacheFactoryImpl;
 use net_traits::image_cache::{
     FontResolver, ImageCache, ImageCacheFactory, ImageCacheResponseMessage, ImageCacheResult,
@@ -14,8 +15,8 @@ use net_traits::image_cache::{
 };
 use net_traits::request::RequestId;
 use net_traits::{
-    DebugVec, FetchMetadata, FetchResponseMsg, FilteredMetadata, Metadata, NetworkError,
-    ResourceFetchTiming, ResourceTimingType,
+    FetchMetadata, FetchResponseMsg, FilteredMetadata, Metadata, NetworkError, ResourceFetchTiming,
+    ResourceTimingType,
 };
 use paint_api::{CrossProcessPaintApi, PaintMessage};
 // For dummy Font Resolver
@@ -27,9 +28,20 @@ use webrender_api::ImageKey;
 
 use crate::mock_origin;
 
+#[derive(MallocSizeOf)]
 struct DummyFontResolver;
+
 impl FontResolver for DummyFontResolver {
     fn resolve(&self, _: &Font, _: &mut Arc<fontdb::Database>) -> Option<fontdb::ID> {
+        None
+    }
+
+    fn resolve_fallback(
+        &self,
+        _: char,
+        _: &[fontdb::ID],
+        _: &mut Arc<fontdb::Database>,
+    ) -> Option<fontdb::ID> {
         None
     }
 }
@@ -110,7 +122,7 @@ fn test_get_cached_image_status_before_request() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
 
     match result {
         ImageCacheResult::ReadyForRequest(id) => {
@@ -126,12 +138,12 @@ fn test_get_cached_image_status_no_response_data() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
 
     match result {
         ImageCacheResult::Pending(pending_id) => {
@@ -147,7 +159,7 @@ fn test_notify_pending_response_with_headers() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -157,7 +169,7 @@ fn test_notify_pending_response_with_headers() {
         FetchResponseMsg::ProcessResponse(create_request_id(), Ok(create_test_metadata(None))),
     );
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
 
     match result {
         ImageCacheResult::Pending(pending_id) => {
@@ -173,7 +185,7 @@ fn test_notify_pending_response_with_partial_chunk() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -186,10 +198,10 @@ fn test_notify_pending_response_with_partial_chunk() {
     let small_chunk = vec![0u8; 10];
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(small_chunk)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), small_chunk.into()),
     );
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
 
     match result {
         ImageCacheResult::Pending(pending_id) => {
@@ -205,7 +217,7 @@ fn test_notify_pending_response_with_metadata_chunk() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -219,10 +231,10 @@ fn test_notify_pending_response_with_metadata_chunk() {
     let metadata_chunk = jpeg_bytes[..200.min(jpeg_bytes.len())].to_vec();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(metadata_chunk)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), metadata_chunk.into()),
     );
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
 
     match result {
         ImageCacheResult::Available(ImageOrMetadataAvailable::MetadataAvailable(metadata, _)) => {
@@ -240,7 +252,7 @@ fn test_notify_pending_response_complete() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -253,7 +265,7 @@ fn test_notify_pending_response_complete() {
     let jpeg_bytes = jpeg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(jpeg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), jpeg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -264,7 +276,7 @@ fn test_notify_pending_response_complete() {
     loop {
         handle_pending_key_requests(&cache, &key_receiver);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         if matches!(
             result,
             ImageCacheResult::Available(ImageOrMetadataAvailable::ImageAvailable { .. })
@@ -284,7 +296,7 @@ fn test_notify_pending_response_network_error() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -303,7 +315,7 @@ fn test_notify_pending_response_network_error() {
         ),
     );
 
-    let result = cache.get_cached_image_status(url, origin, None);
+    let result = cache.get_cached_image_status(url, &origin, None);
     assert!(matches!(result, ImageCacheResult::FailedToLoadOrDecode));
 }
 
@@ -313,7 +325,7 @@ fn test_image_listener_on_complete_response() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -331,7 +343,7 @@ fn test_image_listener_on_complete_response() {
     let jpeg_bytes = jpeg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(jpeg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), jpeg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -357,7 +369,7 @@ fn test_image_listener_on_network_error() {
     let url = ServoUrl::parse("http://example.com/image.png").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -394,7 +406,7 @@ fn test_image_listener_on_metadata_available() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -413,7 +425,7 @@ fn test_image_listener_on_metadata_available() {
     let metadata_chunk = jpeg_bytes[..200.min(jpeg_bytes.len())].to_vec();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(metadata_chunk)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), metadata_chunk.into()),
     );
 
     match receiver.recv_timeout(std::time::Duration::from_millis(100)) {
@@ -442,7 +454,7 @@ fn test_multiple_listeners_same_image() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -464,7 +476,7 @@ fn test_multiple_listeners_same_image() {
     let jpeg_bytes = jpeg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(jpeg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), jpeg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -497,7 +509,7 @@ fn test_cached_image_reuse() {
     let url = ServoUrl::parse("http://example.com/test.jpeg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -510,7 +522,7 @@ fn test_cached_image_reuse() {
     let jpeg_bytes = jpeg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(jpeg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), jpeg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -521,7 +533,7 @@ fn test_cached_image_reuse() {
     loop {
         handle_pending_key_requests(&cache, &key_receiver);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         if matches!(result, ImageCacheResult::Available(_)) {
             break;
         }
@@ -534,7 +546,7 @@ fn test_svg_rasterization() {
     let url = ServoUrl::parse("http://example.com/image.svg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -550,7 +562,7 @@ fn test_svg_rasterization() {
     let svg_bytes = svg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(svg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), svg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -561,7 +573,7 @@ fn test_svg_rasterization() {
     let vec_img = loop {
         handle_pending_key_requests(&cache, &key_receiver);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         let ImageCacheResult::Available(ImageOrMetadataAvailable::ImageAvailable { image, .. }) =
             result
         else {
@@ -586,7 +598,7 @@ fn test_rasterization_listener() {
     let url = ServoUrl::parse("http://example.com/image.svg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -602,7 +614,7 @@ fn test_rasterization_listener() {
     let svg_bytes = svg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(svg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), svg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -613,7 +625,7 @@ fn test_rasterization_listener() {
     let vec_img = loop {
         handle_pending_key_requests(&cache, &key_receiver);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         let ImageCacheResult::Available(ImageOrMetadataAvailable::ImageAvailable { image, .. }) =
             result
         else {
@@ -656,7 +668,7 @@ fn test_svg_rasterization_do_not_double_rasterize() {
     let url = ServoUrl::parse("http://example.com/image.svg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -672,7 +684,7 @@ fn test_svg_rasterization_do_not_double_rasterize() {
     let svg_bytes = svg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(svg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), svg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -682,7 +694,7 @@ fn test_svg_rasterization_do_not_double_rasterize() {
 
     let vec_img = loop {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         let ImageCacheResult::Available(ImageOrMetadataAvailable::ImageAvailable { image, .. }) =
             result
         else {
@@ -716,7 +728,7 @@ fn test_svg_not_rasterize_zero_size() {
     let url = ServoUrl::parse("http://example.com/image.svg").unwrap();
     let origin = mock_origin();
 
-    let id = match cache.get_cached_image_status(url.clone(), origin.clone(), None) {
+    let id = match cache.get_cached_image_status(url.clone(), &origin, None) {
         ImageCacheResult::ReadyForRequest(id) => id,
         _ => panic!("Expected ReadyForRequest"),
     };
@@ -732,7 +744,7 @@ fn test_svg_not_rasterize_zero_size() {
     let svg_bytes = svg_image_bytes();
     cache.notify_pending_response(
         id,
-        FetchResponseMsg::ProcessResponseChunk(create_request_id(), DebugVec(svg_bytes)),
+        FetchResponseMsg::ProcessResponseChunk(create_request_id(), svg_bytes.into()),
     );
 
     cache.notify_pending_response(
@@ -743,7 +755,7 @@ fn test_svg_not_rasterize_zero_size() {
     let vec_img = loop {
         handle_pending_key_requests(&cache, &key_receiver);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let result = cache.get_cached_image_status(url.clone(), origin.clone(), None);
+        let result = cache.get_cached_image_status(url.clone(), &origin, None);
         let ImageCacheResult::Available(ImageOrMetadataAvailable::ImageAvailable { image, .. }) =
             result
         else {

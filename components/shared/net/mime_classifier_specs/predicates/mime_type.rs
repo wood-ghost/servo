@@ -169,7 +169,7 @@ pub open spec fn is_font(mt: &Mime) -> bool {
     ||| view(mt).type_ == font_name()
     ||| essence_str(mt) == "application/font-cff"@
     // https://github.com/servo/servo/issues/47903
-    ||| essence_str(mt) == "application/font-off"@ //TODO: new version is font-otf
+    ||| essence_str(mt) == "application/font-otf"@
     ||| essence_str(mt) == "application/font-sfnt"@
     ||| essence_str(mt) == "application/font-ttf"@
     ||| essence_str(mt) == "application/font-woff"@

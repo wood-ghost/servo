@@ -6,12 +6,14 @@ use std::cell::Cell;
 
 use dom_struct::dom_struct;
 use js::context::JSContext;
-use js::jsapi::{Heap, JSObject};
-use js::rust::{CustomAutoRooter, CustomAutoRooterGuard, HandleValue};
+use js::jsapi::JSObject;
+use js::rust::{CustomAutoRooterGuard, HandleValue};
 use script_bindings::cell::DomRefCell;
-use script_bindings::reflector::reflect_dom_object_with_cx;
+use script_bindings::reflector::reflect_dom_object;
 use servo_base::id::ServiceWorkerId;
-use servo_constellation_traits::{DOMMessage, ScriptToConstellationMessage};
+use servo_constellation_traits::{
+    DOMMessage, ScriptToConstellationMessage, ServiceWorkerState as ConstellationServiceWorkerState,
+};
 use servo_url::ServoUrl;
 
 use crate::dom::abstractworker::SimpleWorkerErrorHandler;
@@ -26,10 +28,9 @@ use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::USVString;
 use crate::dom::bindings::structuredclone;
-use crate::dom::bindings::trace::RootedTraceableBox;
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
-use crate::task::TaskOnce;
+use crate::tasks::task::TaskOnce;
 
 pub(crate) type TrustedServiceWorkerAddress = Trusted<ServiceWorker>;
 
@@ -66,14 +67,14 @@ impl ServiceWorker {
         scope_url: ServoUrl,
         worker_id: ServiceWorkerId,
     ) -> DomRoot<ServiceWorker> {
-        reflect_dom_object_with_cx(
+        reflect_dom_object(
+            cx,
             Box::new(ServiceWorker::new_inherited(
                 script_url.as_str(),
                 scope_url,
                 worker_id,
             )),
             global,
-            cx,
         )
     }
 
@@ -84,6 +85,29 @@ impl ServiceWorker {
 
     pub(crate) fn get_script_url(&self) -> ServoUrl {
         ServoUrl::parse(&self.script_url.borrow().clone()).unwrap()
+    }
+
+    pub(crate) fn set_state(&self, state: ConstellationServiceWorkerState) {
+        match state {
+            ConstellationServiceWorkerState::Parsed => {
+                debug_assert!(false, "An update is never for the parsed state.")
+            },
+            ConstellationServiceWorkerState::Installing => {
+                self.state.set(ServiceWorkerState::Installing);
+            },
+            ConstellationServiceWorkerState::Installed => {
+                self.state.set(ServiceWorkerState::Installed);
+            },
+            ConstellationServiceWorkerState::Activating => {
+                self.state.set(ServiceWorkerState::Activating);
+            },
+            ConstellationServiceWorkerState::Activated => {
+                self.state.set(ServiceWorkerState::Activated);
+            },
+            ConstellationServiceWorkerState::Redundant => {
+                self.state.set(ServiceWorkerState::Redundant);
+            },
+        }
     }
 
     /// <https://w3c.github.io/ServiceWorker/#service-worker-postmessage>
@@ -139,17 +163,14 @@ impl ServiceWorkerMethods<crate::DomTypeHolder> for ServiceWorker {
         &self,
         cx: &mut JSContext,
         message: HandleValue,
-        options: RootedTraceableBox<StructuredSerializeOptions>,
+        options: &StructuredSerializeOptions,
     ) -> ErrorResult {
-        let mut rooted = CustomAutoRooter::new(
+        auto_root!(&in(cx) let guard =
             options
                 .transfer
                 .iter()
-                .map(|js: &RootedTraceableBox<Heap<*mut JSObject>>| js.get())
-                .collect(),
-        );
-        #[expect(unsafe_code)]
-        let guard = unsafe { CustomAutoRooterGuard::new(cx.raw_cx(), &mut rooted) };
+                .map(|js| js.get())
+                .collect::<Vec<_>>());
         self.post_message_impl(cx, message, guard)
     }
 

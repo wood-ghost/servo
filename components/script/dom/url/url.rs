@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::default::Default;
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use dom_struct::dom_struct;
@@ -105,13 +106,13 @@ impl URL {
         // Step 6. If serialized is "null", set it to an implementation-defined value.
         // Step 7. Append serialized to result.
         // N.B. We leave it as "null" right now.
-        result.push_str(&origin.ascii_serialization());
+        result.push_str(origin.ascii_serialization().as_ref());
 
         // Step 8. Append U+0024 SOLIDUS (/) to result.
         result.push('/');
 
         // Step 9. Generate a UUID [RFC4122] as a string and append it to result.
-        result.push_str(&id.to_string());
+        write!(result, "{id}").unwrap();
 
         // Step 10. Return result.
         result
@@ -211,7 +212,7 @@ impl URLMethods<crate::DomTypeHolder> for URL {
 
         if let Ok(url) = ServoUrl::parse(&url.str()) &&
             url.fragment().is_none() &&
-            let Ok((id, _)) = parse_blob_url(&url)
+            let Ok(id) = parse_blob_url(&url)
         {
             let resource_threads = global.resource_threads();
             let (tx, rx) = generic_channel::channel(global.time_profiler_chan().clone()).unwrap();

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use cssparser::{Parser, ParserInput};
+use cssparser::Parser;
 use dom_struct::dom_struct;
 use script_bindings::cell::DomRefCell;
 use script_bindings::codegen::GenericBindings::AnimationEffectBinding::{
@@ -14,13 +14,14 @@ use script_bindings::error::{Error, Fallible};
 use script_bindings::num::Finite;
 use script_bindings::reflector::Reflector;
 use script_bindings::root::Dom;
+use script_bindings::str::DOMString;
 use style::parser::Parse;
 use style::stylesheets::CssRuleType;
 use style::values::generics::easing::TimingKeyword;
 use style::values::specified::TimingFunction;
 use style_traits::{ParsingMode, ToCss};
 
-use crate::css::parser_context_for_document;
+use crate::css::css::parser_context_for_document;
 use crate::dom::Window;
 use crate::dom::bindings::codegen::UnionTypes::UnrestrictedDoubleOrString;
 
@@ -116,17 +117,8 @@ impl AnimationEffect {
             ));
         }
 
-        // Step 3. If the duration member of input exists, and is less than zero or is the value NaN,
-        // throw a TypeError and abort this procedure.
-        //
-        // Note: "auto" values are treated as zero: https://drafts.csswg.org/web-animations-1/#dom-animationeffect-updatetiming
-        // > In this level of this specification, the string value auto is treated as the value zero
-        // > for the purpose of timing model calculations and for the result of the duration member returned
-        // > from getComputedTiming(). If the author specifies the auto value, user agents must, however,
-        // > return auto for the duration member returned from getTiming().
-        //
-        // Note: It is unspecified how non-"auto" strings should be treated. We choose to throw a TypeError.
-        //       See also https://github.com/w3c/csswg-drafts/issues/14206
+        // Step 3. If the duration member of input exists, and is less than zero, is the value NaN,
+        // or is a string other than the lowercase auto, throw a TypeError and abort this procedure.
         let Ok(duration) = input
             .duration
             .as_ref()
@@ -160,8 +152,7 @@ impl AnimationEffect {
             .as_ref()
             .map(|easing| {
                 let easing = easing.str();
-                let mut parser_input = ParserInput::new(&easing);
-                let mut parser = Parser::new(&mut parser_input);
+                let mut parser = Parser::new(&easing);
 
                 // None of these values should matter
                 let document = self.window.Document();
@@ -318,7 +309,9 @@ impl IterationDurationOrAuto {
 impl From<IterationDurationOrAuto> for UnrestrictedDoubleOrString {
     fn from(value: IterationDurationOrAuto) -> Self {
         match value {
-            IterationDurationOrAuto::Auto => UnrestrictedDoubleOrString::String("auto".into()),
+            IterationDurationOrAuto::Auto => {
+                UnrestrictedDoubleOrString::String(DOMString::from_static("auto"))
+            },
             IterationDurationOrAuto::Duration(double) => {
                 UnrestrictedDoubleOrString::UnrestrictedDouble(double)
             },

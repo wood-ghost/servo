@@ -8,9 +8,7 @@ use std::fmt;
 
 use embedder_traits::UntrustedNodeAddress;
 use js::context::JSContext;
-use js::conversions::FromJSValConvertible;
-use js::rust::HandleValue;
-use script_bindings::cell::DomRefCell;
+use layout_api::HitTestFlags;
 use script_bindings::codegen::GenericBindings::DocumentBinding::DocumentMethods;
 use script_bindings::codegen::GenericBindings::ShadowRootBinding::ShadowRootMethods;
 use script_bindings::codegen::GenericBindings::WindowBinding::WindowMethods;
@@ -23,10 +21,10 @@ use style::stylesheets::scope_rule::ImplicitScopeRoot;
 use style::stylesheets::{Stylesheet, StylesheetContents};
 use webrender_api::units::LayoutPoint;
 
+use crate::css::stylesheet_set::StylesheetSetRef;
 use crate::dom::Document;
 use crate::dom::bindings::codegen::Bindings::NodeBinding::GetRootNodeOptions;
 use crate::dom::bindings::codegen::Bindings::NodeBinding::Node_Binding::NodeMethods;
-use crate::dom::bindings::conversions::ConversionResult;
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::num::Finite;
 use crate::dom::bindings::root::{Dom, DomRoot, MutNullableDom};
@@ -36,7 +34,6 @@ use crate::dom::element::Element;
 use crate::dom::node::{self, Node};
 use crate::dom::types::{CSSStyleSheet, EventTarget, ShadowRoot};
 use crate::dom::window::Window;
-use crate::stylesheet_set::StylesheetSetRef;
 
 /// Stylesheet could be constructed by a CSSOM object CSSStylesheet or parsed
 /// from HTML element such as `<style>` or `<link>`.
@@ -188,10 +185,11 @@ impl DocumentOrShadowRoot {
             return None;
         }
 
-        let results = self
+        let flags = HitTestFlags::empty();
+        let result = self
             .window
-            .elements_from_point_query(LayoutPoint::new(x, y));
-        let Some(result) = results.first() else {
+            .elements_from_point_query(flags, LayoutPoint::new(x, y));
+        let Some(result) = result.items.first() else {
             return document_element;
         };
 
@@ -231,11 +229,13 @@ impl DocumentOrShadowRoot {
         // box, that would be a target for hit testing at coordinates x,y even if nothing
         // would be overlapping it, when applying the transforms that apply to the
         // descendants of the viewport, append the associated element to sequence.
-        let nodes = self
+        let flags = HitTestFlags::empty();
+        let result = self
             .window
-            .elements_from_point_query(LayoutPoint::new(x, y));
+            .elements_from_point_query(flags, LayoutPoint::new(x, y));
 
-        let mut elements: Vec<_> = nodes
+        let mut elements: Vec<_> = result
+            .items
             .iter()
             .flat_map(|result| {
                 // SAFETY: This is safe because `Self::query_elements_from_point` has ensured that
@@ -352,27 +352,21 @@ impl DocumentOrShadowRoot {
 
         match insertion_point {
             Some(ip) => {
-                stylesheets.insert_stylesheet_before(None, sheet, ip, &guard);
+                stylesheets.insert_stylesheet_before(sheet, ip, &guard);
             },
             None => {
-                stylesheets.append_stylesheet(None, sheet, &guard);
+                stylesheets.append_stylesheet(sheet, &guard);
             },
         }
     }
 
-    /// Inner part of adopted stylesheet. We are setting it by, assuming it is a FrozenArray
-    /// instead of an ObservableArray. Thus, it would have a completely different workflow
-    /// compared to the spec. The workflow here is actually following Gecko's implementation
-    /// of AdoptedStylesheet before the implementation of ObservableArray.
-    ///
-    /// The main purpose from this function is to set the `&mut adopted_stylesheet` to match
-    /// `incoming_stylesheet` and update the corresponding Styleset in a Document or a ShadowRoot.
-    /// In case of duplicates, the setter will respect the last duplicates.
-    ///
     /// <https://drafts.csswg.org/cssom/#dom-documentorshadowroot-adoptedstylesheets>
-    // TODO: Handle duplicated adoptedstylesheet correctly, Stylo is preventing duplicates inside a
-    //       Stylesheet Set. But this is not ideal. https://bugzilla.mozilla.org/show_bug.cgi?id=1978755
-    fn set_adopted_stylesheet(
+    ///
+    /// To replace the DOM-side adopted stylesheet list:
+    /// 1. Validate each incoming stylesheet against the owner document.
+    /// 2. Remove the old effective constructed stylesheets from the style set.
+    /// 3. Rebuild the effective constructed stylesheet order from `incoming_stylesheets`.
+    fn set_adopted_stylesheets(
         adopted_stylesheets: &mut Vec<Dom<CSSStyleSheet>>,
         incoming_stylesheets: &[Dom<CSSStyleSheet>],
         owner: &StyleSheetListOwner,
@@ -386,11 +380,14 @@ impl DocumentOrShadowRoot {
             StyleSheetListOwner::ShadowRoot(root) => root.owner_doc(),
         };
 
-        for sheet in incoming_stylesheets.iter() {
+        for sheet in incoming_stylesheets {
             // > If value’s constructed flag is not set, or its constructor document is not equal
             // > to this DocumentOrShadowRoot’s node document, throw a "NotAllowedError" DOMException.
             if !sheet.constructor_document_matches(owner_doc) {
-                return Err(Error::NotAllowed(None));
+                return Err(Error::NotAllowed(Some(
+                    "Stylesheet is not constructed or its constructor document does not match"
+                        .into(),
+                )));
             }
         }
 
@@ -399,8 +396,6 @@ impl DocumentOrShadowRoot {
 
         // Remove the old stylesheets from the StyleSet. This workflow is limited by utilities
         // Stylo StyleSet given to us.
-        // TODO(stevennovaryo): we could optimize this by maintaining the longest common prefix
-        //                      but we should consider the implementation of ObservableArray as well.
         for sheet_to_remove in adopted_stylesheets.iter() {
             // Check for duplicates, only proceed with the removal if the stylesheet is not removed yet.
             if stylesheet_remove_set.insert(sheet_to_remove) {
@@ -417,7 +412,7 @@ impl DocumentOrShadowRoot {
 
         // Readd all stylesheet to the StyleSet. This workflow is limited by the utilities
         // Stylo StyleSet given to us.
-        for sheet in incoming_stylesheets.iter() {
+        for sheet in incoming_stylesheets {
             // Check for duplicates.
             if !stylesheet_add_set.insert(sheet) {
                 // The idea is that this case is rare, so we pay the price of removing the
@@ -435,30 +430,29 @@ impl DocumentOrShadowRoot {
         }
 
         *adopted_stylesheets = incoming_stylesheets.to_vec();
-
         Ok(())
     }
 
-    /// Set adoptedStylesheet given a js value by converting and passing the converted
-    /// values to the inner [DocumentOrShadowRoot::set_adopted_stylesheet].
-    pub(crate) fn set_adopted_stylesheet_from_jsval(
-        cx: &mut JSContext,
-        adopted_stylesheets: &DomRefCell<Vec<Dom<CSSStyleSheet>>>,
-        incoming_value: HandleValue,
+    /// <https://drafts.csswg.org/cssom/#dom-documentorshadowroot-adoptedstylesheets>
+    pub(crate) fn on_set_adopted_stylesheets(
+        adopted_stylesheets: &mut Vec<Dom<CSSStyleSheet>>,
+        value: &CSSStyleSheet,
+        index: u32,
         owner: &StyleSheetListOwner,
     ) -> ErrorResult {
-        let maybe_stylesheets =
-            Vec::<DomRoot<CSSStyleSheet>>::safe_from_jsval(cx, incoming_value, ())
-                .map_err(|_| Error::JSFailed)?;
+        rooted_vec!(let mut incoming_stylesheets <- adopted_stylesheets.iter().cloned());
+        incoming_stylesheets.insert(index as usize, Dom::from_ref(value));
+        Self::set_adopted_stylesheets(adopted_stylesheets, &incoming_stylesheets, owner)
+    }
 
-        match maybe_stylesheets {
-            ConversionResult::Success(stylesheets) => {
-                rooted_vec!(let stylesheets <- stylesheets.iter().map(|s| s.as_traced()));
-
-                let mut sheets = adopted_stylesheets.safe_borrow_mut(cx);
-                DocumentOrShadowRoot::set_adopted_stylesheet(sheets.as_mut(), &stylesheets, owner)
-            },
-            ConversionResult::Failure(msg) => Err(Error::Type(msg.into_owned())),
-        }
+    /// <https://drafts.csswg.org/cssom/#dom-documentorshadowroot-adoptedstylesheets>
+    pub(crate) fn on_delete_adopted_stylesheets(
+        adopted_stylesheets: &mut Vec<Dom<CSSStyleSheet>>,
+        index: u32,
+        owner: &StyleSheetListOwner,
+    ) -> ErrorResult {
+        rooted_vec!(let mut incoming_stylesheets <- adopted_stylesheets.iter().cloned());
+        incoming_stylesheets.remove(index as usize);
+        Self::set_adopted_stylesheets(adopted_stylesheets, &incoming_stylesheets, owner)
     }
 }

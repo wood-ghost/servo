@@ -381,8 +381,7 @@ pub(crate) open spec fn is_application_zip(bm: &ByteMatcher) -> bool {
 }
 // | 52 61 72 21 1A 07 00  | FF FF FF FF FF FF FF  | None                  | application/x-rar-compressed  |
 pub(crate) open spec fn is_application_x_rar_compressed(bm: &ByteMatcher) -> bool {
-    &&& bm.pattern@ == b"\x52\x61\x72\x20\x1A\x07\x00"@ //TODO: Wrong
-    // &&& bm.pattern@ == b"\x52\x61\x72\x21\x1A\x07\x00"@
+    &&& bm.pattern@ == b"\x52\x61\x72\x21\x1A\x07\x00"@
     &&& bm.mask@ == b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF"@
     &&& bm.leading_ignore@ == &[]@
     &&& view(&bm.content_type) == application_x_rar_compressed_identity()

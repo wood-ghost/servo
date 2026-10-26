@@ -11,8 +11,8 @@ use embedder_traits::ViewportDetails;
 use euclid::{Point2D, Rect, SideOffsets2D, Size2D};
 use malloc_size_of_derive::MallocSizeOf;
 use paint_api::display_list::{
-    AxesScrollSensitivity, PaintDisplayListInfo, ReferenceFrameNodeInfo, ScrollableNodeInfo,
-    SpatialTreeNodeInfo, StickyNodeInfo,
+    AxesScrollSensitivity, PaintDisplayListInfo, ReferenceFrameNodeInfo, ScrollType,
+    ScrollableNodeInfo, SpatialTreeNodeInfo, StickyNodeInfo, TouchAction,
 };
 use servo_base::id::ScrollTreeNodeId;
 use servo_base::print_tree::PrintTree;
@@ -39,13 +39,16 @@ use wr::units::{LayoutPixel, LayoutSize};
 use super::ClipId;
 use super::clip::StackingContextTreeClipStore;
 use crate::display_list::conversions::ToWebRender;
-use crate::display_list::{BuilderForBoxFragment, offset_radii};
+use crate::display_list::{
+    BuilderForBoxFragment, ContainerTimingRootChain, ContainerTimingRoots, offset_radii,
+};
 use crate::fragment_tree::{
-    BoxFragment, BoxFragmentWithStyle, ContainingBlockCalculation, ContainingBlockManager,
+    BoxFragment, BoxFragmentWithStyle, ContainingBlockManager, CumulativeContentRectCalculation,
     Fragment, FragmentFlags, FragmentTree, PositioningFragment,
 };
 use crate::geom::{
-    AuOrAuto, LengthPercentageOrAuto, PhysicalPoint, PhysicalRect, PhysicalSides, PhysicalVec,
+    AuOrAuto, LengthPercentageOrAuto, PhysicalPoint, PhysicalRect, PhysicalSides, PhysicalSize,
+    PhysicalVec,
 };
 use crate::style_ext::{ComputedValuesExt, TransformExt};
 
@@ -72,6 +75,9 @@ pub(crate) struct ContainingBlock {
     /// accumulated offset from the origin of the parent reference frame of this
     /// containing block.
     accumulated_reference_frame_offset: PhysicalVec<Au>,
+
+    /// Whether current containing block established a scroll frame.
+    established_scroll_frame: bool,
 }
 
 impl ContainingBlock {
@@ -81,6 +87,7 @@ impl ContainingBlock {
         scroll_frame_size: Option<LayoutSize>,
         clip_id: ClipId,
         accumulated_reference_frame_offset: PhysicalVec<Au>,
+        established_scroll_frame: bool,
     ) -> Self {
         ContainingBlock {
             scroll_node_id,
@@ -88,6 +95,7 @@ impl ContainingBlock {
             clip_id,
             rect,
             accumulated_reference_frame_offset,
+            established_scroll_frame,
         }
     }
 
@@ -100,6 +108,78 @@ impl ContainingBlock {
 }
 
 pub(crate) type ContainingBlockInfo<'a> = ContainingBlockManager<'a, ContainingBlock>;
+
+/// Information that is passed down during stacking context tree construction
+/// that does not apply per-containing block, but per-box.
+#[derive(Clone, Default)]
+pub(crate) struct StackingContextParentInfo {
+    /// The inherited [`FragmentTextDecoration`]s passed down by the parent.
+    text_decorations: Rc<Vec<FragmentTextDecoration>>,
+    /// Whether or not the parent participates in a 3D rendering context. This is used
+    /// to determine if its children do as well.
+    participates_in_a_3d_rendering_context: bool,
+    /// The [`ContainerTimingRoots`] established by the parent box.
+    container_timing_roots: ContainerTimingRoots,
+}
+
+impl StackingContextParentInfo {
+    fn without_text_decorations(&self) -> Self {
+        Self {
+            text_decorations: Default::default(),
+            ..self.clone()
+        }
+    }
+
+    fn for_children(&self, fragment: &BoxFragmentWithStyle) -> Self {
+        let style = fragment.style();
+
+        // Text decorations are not propagated to atomic inline-level descendants.
+        // From https://drafts.csswg.org/css2/#lining-striking-props:
+        // > Note that text decorations are not propagated to floating and absolutely
+        // > positioned descendants, nor to the contents of atomic inline-level descendants
+        // > such as inline blocks and inline tables.
+        let inherited_text_decorations = if fragment.is_atomic_inline_level() ||
+            fragment
+                .base
+                .flags
+                .contains(FragmentFlags::IS_OUTSIDE_LIST_ITEM_MARKER)
+        {
+            Default::default()
+        } else {
+            self.text_decorations.clone()
+        };
+
+        let text_decorations = match style.get_text_decoration_line() {
+            &TextDecorationLine::NONE => inherited_text_decorations,
+            line => {
+                let mut new_vector = (*inherited_text_decorations).clone();
+                let color = style.get_color();
+                new_vector.push(FragmentTextDecoration {
+                    line: *line,
+                    color: style.get_text_decoration_color().resolve_to_absolute(color),
+                    style: style.slow_clone_text_decoration_style(),
+                    thickness: style.slow_clone_text_decoration_thickness(),
+                });
+                Rc::new(new_vector)
+            },
+        };
+
+        let participates_in_a_3d_rendering_context = if fragment.base.is_anonymous() {
+            self.participates_in_a_3d_rendering_context
+        } else {
+            style.establishes_or_extends_3d_rendering_context(fragment.base.flags)
+        };
+
+        Self {
+            text_decorations,
+            participates_in_a_3d_rendering_context,
+            container_timing_roots: ContainerTimingRootChain::for_contents_of(
+                &self.container_timing_roots,
+                &fragment.base,
+            ),
+        }
+    }
+}
 
 #[derive(MallocSizeOf)]
 pub(crate) struct StackingContextTree {
@@ -153,6 +233,7 @@ impl StackingContextTree {
             Some(viewport_size),
             ClipId::INVALID,
             PhysicalVec::zero(),
+            true,
         );
         let cb_for_fixed_descendants = ContainingBlock::new(
             fragment_tree.initial_containing_block,
@@ -160,6 +241,7 @@ impl StackingContextTree {
             None,
             ClipId::INVALID,
             PhysicalVec::zero(),
+            false,
         );
 
         // We need to specify all three containing blocks here, because absolute
@@ -182,17 +264,13 @@ impl StackingContextTree {
             clip_store: Default::default(),
         };
 
-        let text_decorations = Default::default();
         let mut root_stacking_context = StackingContext::root(root_scroll_node_id);
         if let Some(root_box_fragment) = fragment_tree.root_box_fragment() {
-            Fragment::Box(root_box_fragment).build_stacking_context_tree(
+            root_box_fragment.build_stacking_context_tree(
                 &mut stacking_context_tree,
                 &containing_block_info,
                 &mut root_stacking_context,
-                // The root element might be absolutely positioned and we still want
-                // to process it, if it is.
-                StackingContextBuildMode::IncludeHoisted,
-                &text_decorations,
+                &StackingContextParentInfo::default(),
             );
         }
 
@@ -236,6 +314,7 @@ impl StackingContextTree {
         content_rect: LayoutRect,
         clip_rect: LayoutRect,
         scroll_sensitivity: AxesScrollSensitivity,
+        touch_action: TouchAction,
     ) -> ScrollTreeNodeId {
         self.paint_info.scroll_tree.add_scroll_tree_node(
             Some(parent_scroll_node_id),
@@ -244,6 +323,7 @@ impl StackingContextTree {
                 content_rect,
                 clip_rect,
                 scroll_sensitivity,
+                touch_action,
                 offset: LayoutVector2D::zero(),
                 offset_changed: Cell::new(false),
             }),
@@ -300,7 +380,7 @@ impl StackingContextTree {
             .map(Au::from_f32_px);
         let fragment_origin = fragment
             .cumulative_content_box_rect(
-                ContainingBlockCalculation::AlreadyDoneWithStackingContextTree,
+                CumulativeContentRectCalculation::AlreadyDoneWithStackingContextTree,
             )
             .origin -
             reference_frame_origin.cast_unit();
@@ -375,9 +455,19 @@ pub struct StackingContext {
     #[conditional_malloc_size_of]
     pub(crate) text_decorations: Rc<Vec<FragmentTextDecoration>>,
 
+    /// The Container Timing roots that enclose this [`StackingContext`] in tree order,
+    /// not including its own root fragment. Stacking contexts are painted out of tree
+    /// order, so these are captured while building the stacking context tree.
+    #[ignore_malloc_size_of = "Small and shared with other stacking contexts"]
+    pub(crate) container_timing_roots: ContainerTimingRoots,
+
     /// If this [`StackingContext`] also created a WebRender reference frame, this field
     /// holds information about that reference frame.
     pub(crate) reference_frame_info: Option<StackingContextReferenceFrameInfo>,
+
+    /// Whether or not this [`StackingContext`] participates in a 3D rendering context.
+    /// See <https://www.w3.org/TR/css-transforms-2/#3d-rendering-contexts>
+    pub(crate) participates_in_a_3d_rendering_context: bool,
 }
 
 impl StackingContext {
@@ -391,7 +481,9 @@ impl StackingContext {
             clip_id: ClipId::INVALID,
             z_index: 0,
             text_decorations: Default::default(),
+            container_timing_roots: None,
             reference_frame_info: None,
+            participates_in_a_3d_rendering_context: false,
         }
     }
 
@@ -403,8 +495,8 @@ impl StackingContext {
         spatial_id: ScrollTreeNodeId,
         clip_id: ClipId,
         initializing_fragment: Arc<BoxFragment>,
-        text_decorations: Rc<Vec<FragmentTextDecoration>>,
         reference_frame_info: Option<StackingContextReferenceFrameInfo>,
+        parent_info: &StackingContextParentInfo,
     ) -> Self {
         let z_index = initializing_fragment
             .style()
@@ -417,8 +509,11 @@ impl StackingContext {
             scroll_tree_node_id: spatial_id,
             clip_id,
             z_index,
-            text_decorations,
+            text_decorations: parent_info.text_decorations.clone(),
+            container_timing_roots: parent_info.container_timing_roots.clone(),
             reference_frame_info,
+            participates_in_a_3d_rendering_context: parent_info
+                .participates_in_a_3d_rendering_context,
         }
     }
 
@@ -456,55 +551,38 @@ impl StackingContext {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) enum StackingContextBuildMode {
-    IncludeHoisted,
-    SkipHoisted,
-}
-
 impl Fragment {
     pub(crate) fn build_stacking_context_tree(
         &self,
         stacking_context_tree: &mut StackingContextTree,
         containing_block_info: &ContainingBlockInfo,
         stacking_context: &mut StackingContext,
-        mode: StackingContextBuildMode,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
+        parent_info: &StackingContextParentInfo,
     ) {
-        let containing_block = containing_block_info.get_containing_block_for_fragment(self);
-        let cumulative_containing_block = containing_block
-            .rect
-            .translate(containing_block.accumulated_reference_frame_offset);
-        self.set_containing_block(&cumulative_containing_block);
-
-        if self
-            .base()
-            .is_some_and(|base| base.flags.contains(FragmentFlags::IS_COLLAPSED))
-        {
-            return;
-        }
-
-        let fragment_clone = self.clone();
         match self {
             Fragment::Box(fragment) | Fragment::Float(fragment) => {
-                if mode == StackingContextBuildMode::SkipHoisted &&
-                    fragment.style().clone_position().is_absolutely_positioned()
+                // Absolutely positioned elements are processed when their originating
+                // `Fragment::AbsoluteOrFixedPositionedPlaceholder` placeholder is
+                // processed.
+                if fragment
+                    .style()
+                    .get_box()
+                    .position
+                    .is_absolutely_positioned()
                 {
                     return;
                 }
 
-                let text_decorations = match self {
-                    Fragment::Float(..) => &Default::default(),
-                    _ => text_decorations,
+                let parent_info = match self {
+                    Fragment::Float(..) => &parent_info.without_text_decorations(),
+                    _ => parent_info,
                 };
 
                 fragment.build_stacking_context_tree(
-                    fragment_clone,
                     stacking_context_tree,
-                    containing_block,
                     containing_block_info,
                     stacking_context,
-                    text_decorations,
+                    parent_info,
                 );
             },
             Fragment::LayoutRoot(..) => {
@@ -513,26 +591,24 @@ impl Fragment {
             },
             Fragment::AbsoluteOrFixedPositionedPlaceholder(fragment) => {
                 let shared_fragment = fragment.borrow();
-                let fragment_ref = match shared_fragment.fragment.as_ref() {
-                    Some(fragment_ref) => fragment_ref,
-                    None => unreachable!("Found hoisted box with missing fragment."),
+                let box_fragment = match shared_fragment.fragment.as_ref() {
+                    Some(Fragment::Box(box_fragment)) => box_fragment,
+                    _ => unreachable!("Found hoisted box with missing or non-BoxFragment."),
                 };
 
-                fragment_ref.build_stacking_context_tree(
+                box_fragment.build_stacking_context_tree(
                     stacking_context_tree,
                     containing_block_info,
                     stacking_context,
-                    StackingContextBuildMode::IncludeHoisted,
-                    &Default::default(),
+                    &parent_info.without_text_decorations(),
                 );
             },
             Fragment::Positioning(fragment) => {
                 fragment.build_stacking_context_tree(
                     stacking_context_tree,
-                    containing_block,
                     containing_block_info,
                     stacking_context,
-                    text_decorations,
+                    parent_info,
                 );
             },
             Fragment::Text(_) | Fragment::Image(_) | Fragment::IFrame(_) => {},
@@ -573,45 +649,50 @@ impl BoxFragment {
 
     fn build_stacking_context_tree(
         self: &Arc<Self>,
-        fragment: Fragment,
         stacking_context_tree: &mut StackingContextTree,
-        containing_block: &ContainingBlock,
         containing_block_info: &ContainingBlockInfo,
         parent_stacking_context: &mut StackingContext,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
+        parent_info: &StackingContextParentInfo,
     ) {
+        let containing_block = containing_block_info.containing_block_for_box(self);
+        let cumulative_containing_block = containing_block
+            .rect
+            .translate(containing_block.accumulated_reference_frame_offset);
+        self.set_cumulative_content_rect(&cumulative_containing_block);
+
+        if self.base.flags.contains(FragmentFlags::IS_COLLAPSED) {
+            return;
+        }
+
         self.clear_stacking_context_tree_traversal_data();
         self.build_stacking_context_tree_maybe_creating_reference_frame(
-            fragment,
             stacking_context_tree,
             containing_block,
             containing_block_info,
             parent_stacking_context,
-            text_decorations,
+            parent_info,
         );
     }
 
     fn build_stacking_context_tree_maybe_creating_reference_frame(
         self: &Arc<Self>,
-        fragment: Fragment,
         stacking_context_tree: &mut StackingContextTree,
         containing_block: &ContainingBlock,
         containing_block_info: &ContainingBlockInfo,
         parent_stacking_context: &mut StackingContext,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
+        parent_info: &StackingContextParentInfo,
     ) {
         let reference_frame_data =
             match self.reference_frame_data_if_necessary(&containing_block.rect) {
                 Some(reference_frame_data) => reference_frame_data,
                 None => {
                     return self.build_stacking_context_tree_maybe_creating_stacking_context(
-                        fragment,
                         stacking_context_tree,
                         containing_block,
                         containing_block_info,
                         parent_stacking_context,
-                        text_decorations,
                         None, /* reference_frame_info */
+                        parent_info,
                     );
                 },
             };
@@ -627,7 +708,7 @@ impl BoxFragment {
         let style = self.style();
         let frame_origin_for_query = self
             .cumulative_border_box_rect(
-                ContainingBlockCalculation::AlreadyDoneWithStackingContextTree,
+                CumulativeContentRectCalculation::AlreadyDoneWithStackingContextTree,
             )
             .origin
             .to_webrender();
@@ -657,6 +738,7 @@ impl BoxFragment {
             None,
             ClipId::INVALID,
             containing_block.accumulated_reference_frame_offset + reference_frame_offset,
+            false,
         );
         let new_containing_block_info =
             containing_block_info.new_for_non_absolute_descendants(&adjusted_containing_block);
@@ -667,26 +749,23 @@ impl BoxFragment {
         };
 
         self.build_stacking_context_tree_maybe_creating_stacking_context(
-            fragment,
             stacking_context_tree,
             &adjusted_containing_block,
             &new_containing_block_info,
             parent_stacking_context,
-            text_decorations,
             Some(reference_frame_info),
+            parent_info,
         );
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn build_stacking_context_tree_maybe_creating_stacking_context(
         self: &Arc<Self>,
-        fragment: Fragment,
         stacking_context_tree: &mut StackingContextTree,
         containing_block: &ContainingBlock,
         containing_block_info: &ContainingBlockInfo,
         parent_stacking_context: &mut StackingContext,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
         reference_frame_info: Option<StackingContextReferenceFrameInfo>,
+        parent_info: &StackingContextParentInfo,
     ) {
         let with_style = &self.with_style();
         let style = with_style.style();
@@ -696,7 +775,7 @@ impl BoxFragment {
                 containing_block,
                 containing_block_info,
                 parent_stacking_context,
-                text_decorations,
+                parent_info,
             );
             return;
         };
@@ -709,6 +788,7 @@ impl BoxFragment {
             containing_block.scroll_node_id,
             &containing_block.rect,
             &new_scroll_frame_size,
+            containing_block.established_scroll_frame,
         );
 
         let clip_id = with_style.build_clip_frame_if_necessary(
@@ -745,25 +825,22 @@ impl BoxFragment {
             containing_block
         };
 
-        let box_fragment = fragment
-            .retrieve_box_fragment()
-            .expect("Should never try to make stacking context for non-BoxFragment")
-            .clone();
+        let box_fragment = self.clone();
         let mut child_stacking_context = parent_stacking_context.create_descendant(
             stacking_context_type,
             containing_block.rect.origin,
             containing_block.scroll_node_id,
             containing_block.clip_id,
             box_fragment,
-            text_decorations.clone(),
             reference_frame_info,
+            parent_info,
         );
         with_style.build_stacking_context_tree_for_children(
             stacking_context_tree,
             containing_block,
             containing_block_info,
             &mut child_stacking_context,
-            text_decorations,
+            parent_info,
         );
 
         let mut stolen_children = vec![];
@@ -790,7 +867,7 @@ impl BoxFragmentWithStyle<'_> {
         containing_block: &ContainingBlock,
         containing_block_info: &ContainingBlockInfo,
         stacking_context: &mut StackingContext,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
+        parent_info: &StackingContextParentInfo,
     ) {
         let style = self.style();
         let establishes_containing_block_for_all_descendants =
@@ -806,6 +883,13 @@ impl BoxFragmentWithStyle<'_> {
         let mut new_scroll_frame_size = containing_block_info
             .for_non_absolute_descendants
             .scroll_frame_size;
+
+        let mut established_scroll_frame = containing_block.established_scroll_frame;
+        // We want to skip leaving scroll frame for anonymous fragments,
+        // because anonymous fragment belong to same node as its closest non-anonymous child.
+        if established_scroll_frame && !self.base.is_anonymous() {
+            established_scroll_frame = false;
+        }
         let mut new_clip_id = containing_block.clip_id;
         if let Some(overflow_frame_data) = self.build_overflow_frame_if_necessary(
             stacking_context_tree,
@@ -819,89 +903,43 @@ impl BoxFragmentWithStyle<'_> {
             if let Some(scroll_frame_data) = overflow_frame_data.scroll_frame_data {
                 new_scroll_node_id = scroll_frame_data.scroll_tree_node_id;
                 new_scroll_frame_size = Some(scroll_frame_data.scroll_frame_rect.size());
+                established_scroll_frame = true;
                 self.set_generated_scroll_tree_node_id(new_scroll_node_id);
             }
         }
 
-        let padding_rect = self
-            .padding_rect()
-            .translate(containing_block.rect.origin.to_vector());
         let content_rect = self
             .content_rect()
             .translate(containing_block.rect.origin.to_vector());
-
-        let for_absolute_descendants = ContainingBlock::new(
-            padding_rect,
-            new_scroll_node_id,
-            new_scroll_frame_size,
-            new_clip_id,
-            containing_block.accumulated_reference_frame_offset,
-        );
-        let for_non_absolute_descendants = ContainingBlock::new(
+        let containing_block_for_descendants = ContainingBlock::new(
             content_rect,
             new_scroll_node_id,
             new_scroll_frame_size,
             new_clip_id,
             containing_block.accumulated_reference_frame_offset,
+            established_scroll_frame,
         );
 
         // Create a new `ContainingBlockInfo` for descendants depending on
         // whether or not this fragment establishes a containing block for
         // absolute and fixed descendants.
         let new_containing_block_info = if establishes_containing_block_for_all_descendants {
-            containing_block_info.new_for_absolute_and_fixed_descendants(
-                &for_non_absolute_descendants,
-                &for_absolute_descendants,
-            )
+            containing_block_info
+                .new_for_absolute_and_fixed_descendants(&containing_block_for_descendants)
         } else if establishes_containing_block_for_absolute_descendants {
-            containing_block_info.new_for_absolute_descendants(
-                &for_non_absolute_descendants,
-                &for_absolute_descendants,
-            )
+            containing_block_info.new_for_absolute_descendants(&containing_block_for_descendants)
         } else {
-            containing_block_info.new_for_non_absolute_descendants(&for_non_absolute_descendants)
+            containing_block_info
+                .new_for_non_absolute_descendants(&containing_block_for_descendants)
         };
 
-        // Text decorations are not propagated to atomic inline-level descendants.
-        // From https://drafts.csswg.org/css2/#lining-striking-props:
-        // > Note that text decorations are not propagated to floating and absolutely
-        // > positioned descendants, nor to the contents of atomic inline-level descendants
-        // > such as inline blocks and inline tables.
-        let text_decorations = match self.is_atomic_inline_level() ||
-            self.base
-                .flags
-                .contains(FragmentFlags::IS_OUTSIDE_LIST_ITEM_MARKER)
-        {
-            true => &Default::default(),
-            false => text_decorations,
-        };
-
-        let new_text_decoration;
-        let text_decorations = match style.clone_text_decoration_line() {
-            TextDecorationLine::NONE => text_decorations,
-            line => {
-                let mut new_vector = (**text_decorations).clone();
-                let color = &style.get_inherited_text().color;
-                new_vector.push(FragmentTextDecoration {
-                    line,
-                    color: style
-                        .clone_text_decoration_color()
-                        .resolve_to_absolute(color),
-                    style: style.clone_text_decoration_style(),
-                    thickness: style.clone_text_decoration_thickness(),
-                });
-                new_text_decoration = Rc::new(new_vector);
-                &new_text_decoration
-            },
-        };
-
+        let parent_info_for_children = parent_info.for_children(self);
         for child in &self.children {
             child.build_stacking_context_tree(
                 stacking_context_tree,
                 &new_containing_block_info,
                 stacking_context,
-                StackingContextBuildMode::SkipHoisted,
-                text_decorations,
+                &parent_info_for_children,
             );
         }
     }
@@ -1029,9 +1067,28 @@ impl BoxFragmentWithStyle<'_> {
             stacking_context_tree.paint_info.pipeline_id,
         );
 
+        let mut x_sensitivity: ScrollType = overflow.x.into();
+        let mut y_sensitivity: ScrollType = overflow.y.into();
+        let touch_action = TouchAction::from(style.get_box().touch_action);
+        // `touch-action` only restricts direct touch manipulation; mouse wheel
+        // (`InputEvents`) and script-driven scrolling are unaffected, so we only
+        // strip `ScrollType::Touch` from the excluded axis.
+        match touch_action {
+            TouchAction::PanX => {
+                y_sensitivity.remove(ScrollType::Touch);
+            },
+            TouchAction::PanY => {
+                x_sensitivity.remove(ScrollType::Touch);
+            },
+            TouchAction::None => {
+                x_sensitivity.remove(ScrollType::Touch);
+                y_sensitivity.remove(ScrollType::Touch);
+            },
+            TouchAction::Auto => {},
+        }
         let sensitivity = AxesScrollSensitivity {
-            x: overflow.x.into(),
-            y: overflow.y.into(),
+            x: x_sensitivity,
+            y: y_sensitivity,
         };
 
         let scroll_tree_node_id = stacking_context_tree.define_scroll_frame(
@@ -1040,6 +1097,7 @@ impl BoxFragmentWithStyle<'_> {
             self.scrollable_overflow().to_webrender(),
             scroll_frame_rect,
             sensitivity,
+            touch_action,
         );
 
         Some(OverflowFrameData {
@@ -1059,6 +1117,7 @@ impl BoxFragment {
         parent_scroll_node_id: ScrollTreeNodeId,
         containing_block_rect: &PhysicalRect<Au>,
         scroll_frame_size: &Option<LayoutSize>,
+        established_scroll_frame: bool,
     ) -> Option<ScrollTreeNodeId> {
         let style = self.style();
         if style.get_box().position != ComputedPosition::Sticky {
@@ -1122,17 +1181,35 @@ impl BoxFragment {
         // The logic below is a simplified (but equivalent) version of the description above.
         let border_rect = self.border_rect();
         let computed_margin = style.physical_margin();
-
+        let parent_scroll_node = stacking_context_tree
+            .paint_info
+            .scroll_tree
+            .get_node(parent_scroll_node_id);
+        let sticky_offset_boundary = match parent_scroll_node.info {
+            SpatialTreeNodeInfo::Scroll(ref scrollable_node_info) if established_scroll_frame => {
+                let content_rect = &scrollable_node_info.content_rect;
+                &PhysicalRect::new(
+                    PhysicalPoint::new(
+                        Au::from_f32_px(content_rect.min.x),
+                        Au::from_f32_px(content_rect.min.y),
+                    ),
+                    PhysicalSize::new(
+                        Au::from_f32_px(content_rect.max.x - content_rect.min.x),
+                        Au::from_f32_px(content_rect.max.y - content_rect.min.y),
+                    ),
+                )
+            },
+            _ => containing_block_rect,
+        };
         // Signed distance between each side of the border box to the corresponding side of the
         // containing block. Note that |border_rect| is already in the coordinate system of the
         // containing block.
         let distance_from_border_box_to_cb = PhysicalSides::new(
             border_rect.min_y(),
-            containing_block_rect.width() - border_rect.max_x(),
-            containing_block_rect.height() - border_rect.max_y(),
+            sticky_offset_boundary.width() - border_rect.max_x(),
+            sticky_offset_boundary.height() - border_rect.max_y(),
             border_rect.min_x(),
         );
-
         // Shrinks the signed distance by the margin, producing a limit on how much we can shift
         // the sticky positioned box without forcing the margin to move outside of the containing
         // block.
@@ -1252,20 +1329,20 @@ impl BoxFragment {
         let list = &style.get_box().transform;
         let length_rect = au_rect_to_length_rect(border_rect);
         // https://drafts.csswg.org/css-transforms-2/#individual-transforms
-        let rotate = match style.clone_rotate() {
-            GenericRotate::Rotate(angle) => (0., 0., 1., angle),
+        let rotate = match style.get_rotate() {
+            GenericRotate::Rotate(angle) => (0., 0., 1., *angle),
             GenericRotate::Rotate3D(x, y, z, angle) => {
                 // These are the raw, unormalized values from CSS, but euclid expects
                 // rotation input to be normalized, so we must do that first.
-                get_normalized_vector_and_angle(x, y, z, angle)
+                get_normalized_vector_and_angle(*x, *y, *z, *angle)
             },
             GenericRotate::None => (0., 0., 1., Angle::zero()),
         };
-        let scale = match style.clone_scale() {
-            GenericScale::Scale(sx, sy, sz) => (sx, sy, sz),
+        let scale = match style.get_scale() {
+            GenericScale::Scale(sx, sy, sz) => (*sx, *sy, *sz),
             GenericScale::None => (1., 1., 1.),
         };
-        let translation = match style.clone_translate() {
+        let translation = match style.get_translate() {
             GenericTranslate::Translate(x, y, z) => LayoutTransform::translation(
                 x.resolve(length_rect.size.width).px(),
                 y.resolve(length_rect.size.height).px(),
@@ -1361,11 +1438,16 @@ impl PositioningFragment {
     fn build_stacking_context_tree(
         &self,
         stacking_context_tree: &mut StackingContextTree,
-        containing_block: &ContainingBlock,
         containing_block_info: &ContainingBlockInfo,
         stacking_context: &mut StackingContext,
-        text_decorations: &Rc<Vec<FragmentTextDecoration>>,
+        parent_info: &StackingContextParentInfo,
     ) {
+        let containing_block = containing_block_info.for_non_absolute_descendants;
+        let cumulative_containing_block = containing_block
+            .rect
+            .translate(containing_block.accumulated_reference_frame_offset);
+        self.set_cumulative_content_rect(&cumulative_containing_block);
+
         let rect = self
             .base
             .rect()
@@ -1379,8 +1461,7 @@ impl PositioningFragment {
                 stacking_context_tree,
                 &new_containing_block_info,
                 stacking_context,
-                StackingContextBuildMode::SkipHoisted,
-                text_decorations,
+                parent_info,
             );
         }
     }

@@ -8,7 +8,8 @@ use dom_struct::dom_struct;
 use js::context::JSContext;
 use js::rust::HandleObject;
 use script_bindings::cell::DomRefCell;
-use script_bindings::reflector::{Reflector, reflect_dom_object_with_proto_and_cx};
+use script_bindings::domstring::TracedDOMString;
+use script_bindings::reflector::{Reflector, reflect_dom_object_with_proto};
 
 use crate::dom::bindings::codegen::Bindings::VTTRegionBinding::{ScrollSetting, VTTRegionMethods};
 use crate::dom::bindings::error::{Error, ErrorResult, Fallible};
@@ -20,7 +21,7 @@ use crate::dom::window::Window;
 #[dom_struct]
 pub(crate) struct VTTRegion {
     reflector_: Reflector,
-    id: DomRefCell<DOMString>,
+    id: DomRefCell<TracedDOMString>,
     width: Cell<f64>,
     lines: Cell<u32>,
     region_anchor_x: Cell<f64>,
@@ -34,7 +35,7 @@ impl VTTRegion {
     fn new_inherited() -> Self {
         VTTRegion {
             reflector_: Reflector::new(),
-            id: DomRefCell::new(DOMString::default()),
+            id: DomRefCell::new(DOMString::default().traced()),
             width: Cell::new(100_f64),
             lines: Cell::new(3),
             region_anchor_x: Cell::new(0_f64),
@@ -46,7 +47,7 @@ impl VTTRegion {
     }
 
     fn new(cx: &mut JSContext, window: &Window, proto: Option<HandleObject>) -> DomRoot<Self> {
-        reflect_dom_object_with_proto_and_cx(Box::new(Self::new_inherited()), window, proto, cx)
+        reflect_dom_object_with_proto(cx, Box::new(Self::new_inherited()), window, proto)
     }
 }
 
@@ -62,12 +63,12 @@ impl VTTRegionMethods<crate::DomTypeHolder> for VTTRegion {
 
     /// <https://w3c.github.io/webvtt/#dom-vttregion-id>
     fn Id(&self) -> DOMString {
-        self.id.borrow().clone()
+        self.id.borrow().clone().root()
     }
 
     /// <https://w3c.github.io/webvtt/#dom-vttregion-id>
     fn SetId(&self, value: DOMString) {
-        *self.id.borrow_mut() = value;
+        *self.id.borrow_mut() = value.traced();
     }
 
     /// <https://w3c.github.io/webvtt/#dom-vttregion-width>

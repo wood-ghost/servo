@@ -10,6 +10,7 @@ use js::context::JSContext;
 use js::rust::HandleObject;
 use keyboard_types::{Code, Key, Modifiers, NamedKey};
 use script_bindings::cell::DomRefCell;
+use script_bindings::domstring::TracedDOMString;
 use script_bindings::reflector::reflect_dom_object_with_proto;
 use style::Atom;
 
@@ -27,10 +28,10 @@ use crate::dom::window::Window;
 #[dom_struct]
 pub(crate) struct KeyboardEvent {
     uievent: UIEvent,
-    key: DomRefCell<DOMString>,
+    key: DomRefCell<TracedDOMString>,
     #[no_trace]
     typed_key: DomRefCell<Key>,
-    code: DomRefCell<DOMString>,
+    code: DomRefCell<TracedDOMString>,
     #[no_trace]
     original_code: DomRefCell<Option<Code>>,
     location: Cell<u32>,
@@ -77,6 +78,7 @@ impl KeyboardEvent {
         event_type: Atom,
         keyboard_event: &keyboard_types::KeyboardEvent,
     ) -> DomRoot<KeyboardEvent> {
+        let keycode = legacy_keycode_for_keyboard_event(keyboard_event);
         Self::new_with_proto(
             cx,
             window,
@@ -94,7 +96,7 @@ impl KeyboardEvent {
             keyboard_event.is_composing,
             keyboard_event.modifiers,
             0, /* char_code */
-            keyboard_event.key.legacy_keycode(),
+            keycode,
         )
     }
 
@@ -129,7 +131,7 @@ impl KeyboardEvent {
             repeat,
         );
         *event.typed_key.safe_borrow_mut(cx.no_gc()) = key;
-        *event.code.safe_borrow_mut(cx.no_gc()) = code;
+        *event.code.safe_borrow_mut(cx.no_gc()) = code.traced();
         *event.original_code.safe_borrow_mut(cx.no_gc()) = original_code;
         event.modifiers.set(modifiers);
         event.is_composing.set(is_composing);
@@ -145,10 +147,6 @@ impl KeyboardEvent {
 
     pub(crate) fn original_code(&self) -> Option<Code> {
         *self.original_code.borrow()
-    }
-
-    pub(crate) fn modifiers(&self) -> Modifiers {
-        self.modifiers.get()
     }
 
     /// <https://w3c.github.io/uievents/#widl-KeyboardEvent-initKeyboardEvent>
@@ -174,7 +172,7 @@ impl KeyboardEvent {
             view_arg,
             0,
         );
-        *self.key.borrow_mut() = key_arg;
+        *self.key.borrow_mut() = key_arg.traced();
         self.location.set(location_arg);
         self.repeat.set(repeat);
     }
@@ -213,7 +211,7 @@ impl KeyboardEventMethods<crate::DomTypeHolder> for KeyboardEvent {
             init.charCode,
             init.keyCode,
         );
-        *event.key.safe_borrow_mut(cx.no_gc()) = init.key.clone();
+        *event.key.safe_borrow_mut(cx.no_gc()) = init.key.clone().traced();
         Ok(event)
     }
 
@@ -243,12 +241,12 @@ impl KeyboardEventMethods<crate::DomTypeHolder> for KeyboardEvent {
 
     /// <https://w3c.github.io/uievents/#dom-keyboardevent-initkeyboardevent>
     fn Key(&self) -> DOMString {
-        self.key.borrow().clone()
+        self.key.borrow().clone().root()
     }
 
     /// <https://w3c.github.io/uievents/#dom-keyboardevent-code>
     fn Code(&self) -> DOMString {
-        self.code.borrow().clone()
+        self.code.borrow().clone().root()
     }
 
     /// <https://w3c.github.io/uievents/#dom-keyboardevent-location>
@@ -318,5 +316,43 @@ impl KeyboardEventMethods<crate::DomTypeHolder> for KeyboardEvent {
     /// <https://dom.spec.whatwg.org/#dom-event-istrusted>
     fn IsTrusted(&self) -> bool {
         self.uievent.IsTrusted()
+    }
+}
+
+fn legacy_keycode_for_keyboard_event(keyboard_event: &keyboard_types::KeyboardEvent) -> u32 {
+    match keyboard_event.code {
+        Code::Backquote => 192,
+        Code::MetaLeft | Code::MetaRight => 224,
+        Code::ContextMenu => 93,
+        Code::Insert => 45,
+        Code::NumLock => 144,
+        Code::PrintScreen => 4,
+        Code::ScrollLock => 145,
+        Code::Pause => 19,
+        Code::F1 => 112,
+        Code::F2 => 113,
+        Code::F3 => 114,
+        Code::F4 => 115,
+        Code::F5 => 116,
+        Code::F6 => 117,
+        Code::F7 => 118,
+        Code::F8 => 119,
+        Code::F9 => 120,
+        Code::F10 => 121,
+        Code::F11 => 122,
+        Code::F12 => 123,
+        Code::F13 => 124,
+        Code::F14 => 125,
+        Code::F15 => 126,
+        Code::F16 => 127,
+        Code::F17 => 128,
+        Code::F18 => 129,
+        Code::F19 => 130,
+        Code::F20 => 131,
+        Code::F21 => 132,
+        Code::F22 => 133,
+        Code::F23 => 134,
+        Code::F24 => 135,
+        _ => keyboard_event.key.legacy_keycode(),
     }
 }

@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use bytes::Bytes;
 use content_security_policy as csp;
 use headers::{ContentType, HeaderMap, HeaderMapExt};
 use js::context::JSContext;
@@ -9,13 +10,13 @@ use net_traits::request::{
     CredentialsMode, Destination, RequestBody, RequestId, create_request_body_with_content,
 };
 use net_traits::{FetchMetadata, NetworkError, ResourceFetchTiming};
+use script_bindings::str::DOMString;
 use servo_url::ServoUrl;
 use stylo_atoms::Atom;
 
 use crate::conversions::Convert;
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::refcounted::Trusted;
-use crate::dom::bindings::root::DomRoot;
 use crate::dom::csp::Violation;
 use crate::dom::csppolicyviolationreport::{
     CSPReportUriViolationReport, SecurityPolicyViolationReport,
@@ -26,9 +27,12 @@ use crate::dom::performance::performanceresourcetiming::InitiatorType;
 use crate::dom::reporting::reportingobserver::ReportingObserver;
 use crate::dom::securitypolicyviolationevent::SecurityPolicyViolationEvent;
 use crate::dom::types::GlobalScope;
-use crate::fetch::{RequestWithGlobalScope, create_a_potential_cors_request};
-use crate::network_listener::{FetchResponseListener, ResourceTimingListener, submit_timing};
-use crate::task::TaskOnce;
+use crate::fetch::fetch::{RequestWithGlobalScope, create_a_potential_cors_request_with_claim};
+use crate::fetch::network_listener::{
+    FetchResponseListener, ResourceTimingListener, submit_timing,
+};
+use crate::tasks::task::TaskOnce;
+use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 pub(crate) struct CSPViolationReportTask {
     global: Trusted<GlobalScope>,
@@ -106,9 +110,10 @@ impl CSPViolationReportTask {
                 "application/csp-report".parse::<mime::Mime>().unwrap(),
             ));
             let request_body = self.serialize_violation();
-            let request = create_a_potential_cors_request(
+            let url = ensure_blob_referenced_by_url_is_kept_alive(&global, endpoint.clone());
+            let request = create_a_potential_cors_request_with_claim(
                 None,
-                endpoint.clone(),
+                url,
                 Destination::Report,
                 None,
                 None,
@@ -122,10 +127,7 @@ impl CSPViolationReportTask {
             // Step 3.4.2.4. Fetch request. The result will be ignored.
             global.fetch(
                 request,
-                CSPReportUriFetchListener {
-                    endpoint,
-                    global: Trusted::new(&global),
-                },
+                CSPReportUriFetchListener { endpoint },
                 global.task_manager().networking_task_source().into(),
             );
         }
@@ -163,7 +165,7 @@ impl TaskOnce for CSPViolationReportTask {
             // Step 3.5.3. Generate and queue a report with the following arguments:
             ReportingObserver::generate_and_queue_a_report(
                 &self.global.root(),
-                "csp-violation".into(),
+                DOMString::from_static("csp-violation"),
                 Some(body),
                 report_to_directive.value.join(" ").into(),
             )
@@ -174,39 +176,46 @@ impl TaskOnce for CSPViolationReportTask {
 struct CSPReportUriFetchListener {
     /// Endpoint URL of this request.
     endpoint: ServoUrl,
-    /// The global object fetching the report uri violation
-    global: Trusted<GlobalScope>,
 }
 
 impl FetchResponseListener for CSPReportUriFetchListener {
-    fn process_request_body(&mut self, _: RequestId) {}
+    fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
 
     fn process_response(
         &mut self,
         _: &mut JSContext,
+        _: &GlobalScope,
         _: RequestId,
         fetch_metadata: Result<FetchMetadata, NetworkError>,
     ) {
         _ = fetch_metadata;
     }
 
-    fn process_response_chunk(&mut self, _: &mut JSContext, _: RequestId, chunk: Vec<u8>) {
+    fn process_response_chunk(
+        &mut self,
+        _: &mut JSContext,
+        _: &GlobalScope,
+        _: RequestId,
+        chunk: Bytes,
+    ) {
         _ = chunk;
     }
 
     fn process_response_eof(
         self,
         cx: &mut JSContext,
+        global: &GlobalScope,
         _: RequestId,
         response: Result<(), NetworkError>,
         timing: ResourceFetchTiming,
     ) {
-        submit_timing(cx, &self, &response, &timing)
+        submit_timing(cx, global, &self, &response, &timing)
     }
 
     fn process_csp_violations(
         &mut self,
         _cx: &mut JSContext,
+        _: &GlobalScope,
         _request_id: RequestId,
         _violations: Vec<Violation>,
     ) {
@@ -216,9 +225,5 @@ impl FetchResponseListener for CSPReportUriFetchListener {
 impl ResourceTimingListener for CSPReportUriFetchListener {
     fn resource_timing_information(&self) -> (InitiatorType, ServoUrl) {
         (InitiatorType::Other, self.endpoint.clone())
-    }
-
-    fn resource_timing_global(&self) -> DomRoot<GlobalScope> {
-        self.global.root()
     }
 }

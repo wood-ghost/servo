@@ -8,6 +8,7 @@ use std::convert::TryInto;
 use std::ops::Deref;
 use std::sync::LazyLock;
 
+use bytes::Bytes;
 use dom_struct::dom_struct;
 use embedder_traits::{EmbedderMsg, ProtocolHandlerUpdateRegistration, RegisterOrUnregister};
 use headers::HeaderMap;
@@ -23,19 +24,18 @@ use net_traits::{FetchMetadata, NetworkError, ResourceFetchTiming};
 use regex::Regex;
 #[cfg(feature = "gamepad")]
 use script_bindings::cell::DomRefCell;
-use script_bindings::reflector::{Reflector, reflect_dom_object_with_cx};
+use script_bindings::reflector::{Reflector, reflect_dom_object};
 use servo_base::generic_channel;
 use servo_config::pref;
 use servo_url::ServoUrl;
 
-use crate::body::Extractable;
+use crate::ScriptThread;
 use crate::dom::bindings::codegen::Bindings::NavigatorBinding::NavigatorMethods;
 #[cfg(feature = "gamepad")]
 use crate::dom::bindings::codegen::Bindings::PermissionStatusBinding::PermissionName;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::Window_Binding::WindowMethods;
 use crate::dom::bindings::codegen::Bindings::XMLHttpRequestBinding::BodyInit;
 use crate::dom::bindings::error::{Error, Fallible};
-use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::{DomRoot, MutNullableDom};
 use crate::dom::bindings::str::{DOMString, USVString};
@@ -66,8 +66,11 @@ use crate::dom::webgpu::gpu::GPU;
 use crate::dom::window::Window;
 #[cfg(feature = "webxr")]
 use crate::dom::xrsystem::XRSystem;
-use crate::fetch::RequestWithGlobalScope;
-use crate::network_listener::{FetchResponseListener, ResourceTimingListener, submit_timing};
+use crate::fetch::body::Extractable;
+use crate::fetch::fetch::RequestWithGlobalScope;
+use crate::fetch::network_listener::{
+    FetchResponseListener, ResourceTimingListener, submit_timing,
+};
 
 pub(crate) fn hardware_concurrency() -> u64 {
     static CPUS: LazyLock<u64> = LazyLock::new(|| num_cpus::get().try_into().unwrap_or(1));
@@ -123,6 +126,7 @@ pub(crate) struct Navigator {
     #[cfg(feature = "webxr")]
     xr: MutNullableDom<XRSystem>,
     mediadevices: MutNullableDom<MediaDevices>,
+    geolocation: MutNullableDom<Geolocation>,
     /// <https://www.w3.org/TR/gamepad/#dfn-gamepads>
     #[cfg(feature = "gamepad")]
     gamepads: DomRefCell<Vec<MutNullableDom<Gamepad>>>,
@@ -153,6 +157,7 @@ impl Navigator {
             #[cfg(feature = "webxr")]
             xr: Default::default(),
             mediadevices: Default::default(),
+            geolocation: Default::default(),
             #[cfg(feature = "gamepad")]
             gamepads: Default::default(),
             permissions: Default::default(),
@@ -170,12 +175,17 @@ impl Navigator {
     }
 
     pub(crate) fn new(cx: &mut JSContext, window: &Window) -> DomRoot<Navigator> {
-        reflect_dom_object_with_cx(Box::new(Navigator::new_inherited()), window, cx)
+        reflect_dom_object(cx, Box::new(Navigator::new_inherited()), window)
     }
 
     #[cfg(feature = "webxr")]
     pub(crate) fn xr(&self) -> Option<DomRoot<XRSystem>> {
         self.xr.get()
+    }
+
+    /// The `Geolocation` object, if `navigator.geolocation` was ever accessed.
+    pub(crate) fn maybe_geolocation(&self) -> Option<DomRoot<Geolocation>> {
+        self.geolocation.get()
     }
 
     #[cfg(feature = "gamepad")]
@@ -361,7 +371,8 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
 
     /// <https://www.w3.org/TR/geolocation/#navigator_interface>
     fn Geolocation(&self, cx: &mut js::context::JSContext) -> DomRoot<Geolocation> {
-        Geolocation::new(cx, &self.global())
+        self.geolocation
+            .or_init(|| Geolocation::new(cx, &self.global()))
     }
 
     /// <https://html.spec.whatwg.org/multipage/#navigatorlanguage>
@@ -369,14 +380,14 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
         navigatorinfo::Language()
     }
 
-    // https://html.spec.whatwg.org/multipage/#dom-navigator-languages
+    /// <https://html.spec.whatwg.org/multipage/#dom-navigator-languages>
     fn Languages(&self, cx: &mut js::context::JSContext, retval: MutableHandleValue) {
         to_frozen_array(cx, &[self.Language()], retval)
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-navigator-online>
     fn OnLine(&self) -> bool {
-        true
+        ScriptThread::online()
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-navigator-plugins>
@@ -533,7 +544,7 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
         let base = global.api_base_url();
         // Step 2. Set origin to this's relevant settings object's origin.
         //
-        // Handled in `crate::fetch::RequestWithGlobalScope::with_global_scope`
+        // Handled in `crate::fetch::fetch::RequestWithGlobalScope::with_global_scope`
 
         // Step 3. Set parsedUrl to the result of the URL parser steps with url and base.
         // If the algorithm returns an error, or if parsedUrl's scheme is not "http" or "https",
@@ -570,17 +581,18 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
                 cors_mode = RequestMode::CorsMode;
                 // If contentType value is a CORS-safelisted request-header value for the Content-Type header,
                 // set corsMode to "no-cors".
-                if is_cors_safelisted_request_content_type(content_type.as_bytes().deref()) {
+                if is_cors_safelisted_request_content_type(
+                    content_type.as_bytes(cx.no_gc()).deref(),
+                ) {
                     cors_mode = RequestMode::NoCors;
                 }
                 // Append a Content-Type header with value contentType to headerList.
                 //
                 // We cannot use typed header insertion with `mime::Mime` parsing here,
                 // since it lowercases `charset=UTF-8`: https://github.com/hyperium/mime/issues/116
-                headers.insert(
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_str(&content_type.str()).unwrap(),
-                );
+                if let Ok(content_type_header_value) = HeaderValue::from_str(&content_type.str()) {
+                    headers.insert(header::CONTENT_TYPE, content_type_header_value);
+                }
             }
             request_body = Some(extracted_body.into_net_request_body(cx).0);
         }
@@ -601,10 +613,7 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
         // Step 7.2. Fetch req.
         global.fetch(
             request,
-            BeaconFetchListener {
-                url,
-                global: Trusted::new(&global),
-            },
+            BeaconFetchListener { url },
             global.task_manager().networking_task_source().into(),
         );
         // Step 7. Set the return value to true, return the sendBeacon() call,
@@ -671,16 +680,15 @@ impl NavigatorMethods<crate::DomTypeHolder> for Navigator {
 struct BeaconFetchListener {
     /// URL of this request.
     url: ServoUrl,
-    /// The global object fetching the report uri violation
-    global: Trusted<GlobalScope>,
 }
 
 impl FetchResponseListener for BeaconFetchListener {
-    fn process_request_body(&mut self, _: RequestId) {}
+    fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
 
     fn process_response(
         &mut self,
         _: &mut js::context::JSContext,
+        _: &GlobalScope,
         _: RequestId,
         fetch_metadata: Result<FetchMetadata, NetworkError>,
     ) {
@@ -690,8 +698,9 @@ impl FetchResponseListener for BeaconFetchListener {
     fn process_response_chunk(
         &mut self,
         _: &mut js::context::JSContext,
+        _: &GlobalScope,
         _: RequestId,
-        chunk: Vec<u8>,
+        chunk: Bytes,
     ) {
         _ = chunk;
     }
@@ -699,20 +708,21 @@ impl FetchResponseListener for BeaconFetchListener {
     fn process_response_eof(
         self,
         cx: &mut js::context::JSContext,
+        global: &GlobalScope,
         _: RequestId,
         response: Result<(), NetworkError>,
         timing: ResourceFetchTiming,
     ) {
-        submit_timing(cx, &self, &response, &timing);
+        submit_timing(cx, global, &self, &response, &timing);
     }
 
     fn process_csp_violations(
         &mut self,
         cx: &mut js::context::JSContext,
+        global: &GlobalScope,
         _request_id: RequestId,
         violations: Vec<Violation>,
     ) {
-        let global = self.resource_timing_global();
         global.report_csp_violations(cx, violations, None, None);
     }
 }
@@ -720,9 +730,5 @@ impl FetchResponseListener for BeaconFetchListener {
 impl ResourceTimingListener for BeaconFetchListener {
     fn resource_timing_information(&self) -> (InitiatorType, ServoUrl) {
         (InitiatorType::Beacon, self.url.clone())
-    }
-
-    fn resource_timing_global(&self) -> DomRoot<GlobalScope> {
-        self.global.root()
     }
 }

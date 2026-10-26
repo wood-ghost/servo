@@ -5,12 +5,15 @@
 use std::cell::Cell;
 
 use dom_struct::dom_struct;
+use embedder_traits::MouseButton;
 use euclid::Point2D;
 use js::context::JSContext;
 use js::rust::HandleObject;
 use keyboard_types::Modifiers;
 use script_bindings::cell::DomRefCell;
+use script_bindings::domstring::TracedDOMString;
 use script_bindings::reflector::reflect_dom_object_with_proto;
+use script_traits::MouseButtons;
 use style::Atom;
 use style_traits::CSSPixel;
 
@@ -46,7 +49,7 @@ pub(crate) struct PointerEvent {
     twist: Cell<i32>,
     altitude_angle: Cell<f64>,
     azimuth_angle: Cell<f64>,
-    pointer_type: DomRefCell<DOMString>,
+    pointer_type: DomRefCell<TracedDOMString>,
     is_primary: Cell<bool>,
     coalesced_events: DomRefCell<Vec<Dom<PointerEvent>>>,
     predicted_events: DomRefCell<Vec<Dom<PointerEvent>>>,
@@ -66,7 +69,7 @@ impl PointerEvent {
             twist: Cell::new(0),
             altitude_angle: Cell::new(0.),
             azimuth_angle: Cell::new(0.),
-            pointer_type: DomRefCell::new(DOMString::new()),
+            pointer_type: DomRefCell::new(DOMString::new().traced()),
             is_primary: Cell::new(false),
             coalesced_events: DomRefCell::new(Vec::new()),
             predicted_events: DomRefCell::new(Vec::new()),
@@ -94,8 +97,8 @@ impl PointerEvent {
         client_point: Point2D<i32, CSSPixel>,
         page_point: Point2D<i32, CSSPixel>,
         modifiers: Modifiers,
-        button: i16,
-        buttons: u16,
+        button: MouseButton,
+        buttons: MouseButtons,
         related_target: Option<&EventTarget>,
         point_in_target: Option<Point2D<f32, CSSPixel>>,
         pointer_id: i32,
@@ -161,8 +164,8 @@ impl PointerEvent {
         client_point: Point2D<i32, CSSPixel>,
         page_point: Point2D<i32, CSSPixel>,
         modifiers: Modifiers,
-        button: i16,
-        buttons: u16,
+        button: MouseButton,
+        buttons: MouseButtons,
         related_target: Option<&EventTarget>,
         point_in_target: Option<Point2D<f32, CSSPixel>>,
         pointer_id: i32,
@@ -206,13 +209,13 @@ impl PointerEvent {
         ev.twist.set(twist);
         ev.altitude_angle.set(altitude_angle);
         ev.azimuth_angle.set(azimuth_angle);
-        *ev.pointer_type.borrow_mut() = pointer_type;
+        *ev.pointer_type.safe_borrow_mut(cx.no_gc()) = pointer_type.traced();
         ev.is_primary.set(is_primary);
-        *ev.coalesced_events.borrow_mut() = coalesced_events
+        *ev.coalesced_events.safe_borrow_mut(cx.no_gc()) = coalesced_events
             .into_iter()
             .map(|event| event.as_traced())
             .collect();
-        *ev.predicted_events.borrow_mut() = predicted_events
+        *ev.predicted_events.safe_borrow_mut(cx.no_gc()) = predicted_events
             .into_iter()
             .map(|event| event.as_traced())
             .collect();
@@ -249,8 +252,8 @@ impl PointerEventMethods<crate::DomTypeHolder> for PointerEvent {
             Point2D::new(init.parent.clientX, init.parent.clientY),
             page_point,
             init.parent.parent.modifiers(),
-            init.parent.button,
-            init.parent.buttons,
+            init.parent.button.into(),
+            MouseButtons::from_bits_retain(init.parent.buttons),
             init.parent.relatedTarget.as_deref(),
             None,
             init.pointerId,
@@ -322,7 +325,7 @@ impl PointerEventMethods<crate::DomTypeHolder> for PointerEvent {
 
     /// <https://w3c.github.io/pointerevents/#dom-pointerevent-pointertype>
     fn PointerType(&self) -> DOMString {
-        self.pointer_type.borrow().clone()
+        self.pointer_type.borrow().clone().root()
     }
 
     /// <https://w3c.github.io/pointerevents/#dom-pointerevent-isprimary>

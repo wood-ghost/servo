@@ -216,7 +216,8 @@ pub struct RequestClient {
     /// <https://html.spec.whatwg.org/multipage/#map-of-preloaded-resources>
     pub preloaded_resources: PreloadedResources,
     /// <https://html.spec.whatwg.org/multipage/#concept-settings-object-policy-container>
-    pub policy_container: PolicyContainer,
+    #[conditional_malloc_size_of]
+    pub policy_container: Arc<PolicyContainer>,
     /// <https://html.spec.whatwg.org/multipage/#concept-settings-object-origin>
     pub origin: Origin,
     /// <https://html.spec.whatwg.org/multipage/#nested-browsing-context>
@@ -268,10 +269,10 @@ pub enum CorsSettings {
 impl CorsSettings {
     /// <https://html.spec.whatwg.org/multipage/#cors-settings-attribute>
     pub fn from_enumerated_attribute(value: &str) -> CorsSettings {
-        match value.to_ascii_lowercase().as_str() {
-            "anonymous" => CorsSettings::Anonymous,
-            "use-credentials" => CorsSettings::UseCredentials,
-            _ => CorsSettings::Anonymous,
+        if value.eq_ignore_ascii_case("use-credentials") {
+            CorsSettings::UseCredentials
+        } else {
+            CorsSettings::Anonymous
         }
     }
 }
@@ -304,9 +305,10 @@ pub enum BodyChunkResponse {
     Error,
 }
 
-/// Messages used to implement <https://fetch.spec.whatwg.org/#concept-request-transmit-body>
-/// which are sent from net to script
-/// (with the exception of Done, which is sent from script to script).
+/// Messages used to implement [request body transmission] which are sent from
+/// net to script.
+///
+/// [request body transmission]: <https://fetch.spec.whatwg.org/#concept-request-transmit-body>
 #[derive(Debug, Deserialize, Serialize)]
 pub enum BodyChunkRequest {
     /// Connect a fetch in `net`, with a stream of bytes from `script`.
@@ -315,10 +317,6 @@ pub enum BodyChunkRequest {
     Extract(IpcReceiver<BodyChunkRequest>),
     /// Ask for another chunk.
     Chunk,
-    /// Signal the stream is done(sent from script to script).
-    Done,
-    /// Signal the stream has errored(sent from script to script).
-    Error,
 }
 
 /// A process local view into <https://fetch.spec.whatwg.org/#bodies>.
@@ -455,6 +453,12 @@ pub struct RequestBuilder {
 
     /// <https://fetch.spec.whatwg.org/#concept-request-body>
     pub body: Option<RequestBody>,
+    /// <https://fetch.spec.whatwg.org/#concept-request-reload-navigation-flag>
+    /// A request has an associated reload-navigation flag. Unless stated otherwise, it is unset.
+    pub reload_navigation: bool,
+    /// <https://fetch.spec.whatwg.org/#concept-request-history-navigation-flag>
+    /// A request has an associated history-navigation flag. Unless stated otherwise, it is unset.
+    pub history_navigation: bool,
 
     /// <https://fetch.spec.whatwg.org/#request-service-workers-mode>
     pub service_workers_mode: ServiceWorkersMode,
@@ -501,7 +505,7 @@ pub struct RequestBuilder {
     pub cryptographic_nonce_metadata: String,
 
     /// <https://fetch.spec.whatwg.org/#concept-request-url-list>
-    pub url_list: Vec<ServoUrl>,
+    pub url_list: Vec<UrlWithBlobClaim>,
 
     /// <https://fetch.spec.whatwg.org/#concept-request-parser-metadata>
     pub parser_metadata: ParserMetadata,
@@ -529,6 +533,8 @@ impl RequestBuilder {
             headers: HeaderMap::new(),
             unsafe_request: false,
             body: None,
+            reload_navigation: false,
+            history_navigation: false,
             service_workers_mode: ServiceWorkersMode::All,
             destination: Destination::None,
             synchronous: false,
@@ -546,8 +552,8 @@ impl RequestBuilder {
             pipeline_id: None,
             target_webview_id: webview_id,
             redirect_mode: RedirectMode::Follow,
-            integrity_metadata: "".to_owned(),
-            cryptographic_nonce_metadata: "".to_owned(),
+            integrity_metadata: String::new(),
+            cryptographic_nonce_metadata: String::new(),
             url_list: vec![],
             parser_metadata: ParserMetadata::Default,
             initiator: Initiator::None,
@@ -644,7 +650,7 @@ impl RequestBuilder {
     }
 
     /// <https://fetch.spec.whatwg.org/#concept-request-url-list>
-    pub fn url_list(mut self, url_list: Vec<ServoUrl>) -> RequestBuilder {
+    pub fn url_list(mut self, url_list: Vec<UrlWithBlobClaim>) -> RequestBuilder {
         self.url_list = url_list;
         self
     }
@@ -689,7 +695,7 @@ impl RequestBuilder {
     }
 
     /// <https://fetch.spec.whatwg.org/#concept-request-policy-container>
-    pub fn policy_container(mut self, policy_container: PolicyContainer) -> RequestBuilder {
+    pub fn policy_container(mut self, policy_container: Arc<PolicyContainer>) -> RequestBuilder {
         self.policy_container = RequestPolicyContainer::PolicyContainer(policy_container);
         self
     }
@@ -735,6 +741,8 @@ impl RequestBuilder {
         request.headers = self.headers;
         request.unsafe_request = self.unsafe_request;
         request.body = self.body;
+        request.reload_navigation = self.reload_navigation;
+        request.history_navigation = self.history_navigation;
         request.service_workers_mode = self.service_workers_mode;
         request.destination = self.destination;
         request.synchronous = self.synchronous;
@@ -746,11 +754,7 @@ impl RequestBuilder {
         request.cache_mode = self.cache_mode;
         request.referrer_policy = self.referrer_policy;
         request.redirect_mode = self.redirect_mode;
-        let mut url_list: Vec<_> = self
-            .url_list
-            .into_iter()
-            .map(UrlWithBlobClaim::from_url_without_having_claimed_blob)
-            .collect();
+        let mut url_list = self.url_list;
         if url_list.is_empty() {
             url_list.push(self.url);
         }
@@ -793,6 +797,12 @@ pub struct Request {
     pub unsafe_request: bool,
     /// <https://fetch.spec.whatwg.org/#concept-request-body>
     pub body: Option<RequestBody>,
+    /// <https://fetch.spec.whatwg.org/#concept-request-reload-navigation-flag>
+    /// A request has an associated reload-navigation flag. Unless stated otherwise, it is unset.
+    pub reload_navigation: bool,
+    /// <https://fetch.spec.whatwg.org/#concept-request-history-navigation-flag>
+    /// A request has an associated history-navigation flag. Unless stated otherwise, it is unset.
+    pub history_navigation: bool,
     /// <https://fetch.spec.whatwg.org/#concept-request-client>
     pub client: Option<RequestClient>,
     /// <https://fetch.spec.whatwg.org/#concept-request-window>
@@ -865,6 +875,8 @@ impl Request {
             headers: HeaderMap::new(),
             unsafe_request: false,
             body: None,
+            reload_navigation: false,
+            history_navigation: false,
             client: None,
             traversable_for_user_prompts: TraversableForUserPrompts::Client,
             keep_alive: false,
@@ -946,11 +958,15 @@ impl Request {
         matches!(
             self.destination,
             Destination::Audio |
+                Destination::AudioWorklet |
                 Destination::Font |
                 Destination::Image |
+                Destination::Json |
                 Destination::Manifest |
+                Destination::PaintWorklet |
                 Destination::Script |
                 Destination::Style |
+                Destination::Text |
                 Destination::Track |
                 Destination::Video |
                 Destination::Xslt |
@@ -1001,7 +1017,7 @@ impl Request {
             } else {
                 // Step 3.2. Otherwise, set request’s policy container to a new policy container.
                 self.policy_container =
-                    RequestPolicyContainer::PolicyContainer(PolicyContainer::default());
+                    RequestPolicyContainer::PolicyContainer(Arc::new(PolicyContainer::default()));
             }
         }
     }

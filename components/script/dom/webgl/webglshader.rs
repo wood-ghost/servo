@@ -12,24 +12,28 @@ use dom_struct::dom_struct;
 use js::context::JSContext;
 use mozangle::shaders::{BuiltInResources, CompileOptions, Output, ShaderValidator};
 use script_bindings::cell::DomRefCell;
+use script_bindings::domstring::TracedDOMString;
 use script_bindings::reflector::reflect_weak_referenceable_dom_object;
 use script_bindings::weakref::WeakRef;
 use servo_canvas_traits::webgl::{
     GLLimits, GlType, WebGLCommand, WebGLError, WebGLResult, WebGLSLVersion, WebGLShaderId,
     WebGLVersion, webgl_channel,
 };
+#[cfg(feature = "webgl")]
+use {
+    crate::dom::webgl::extensions::WebGLExtensions,
+    crate::dom::webgl::extensions::extfragdepth::EXTFragDepth,
+    crate::dom::webgl::extensions::extshadertexturelod::EXTShaderTextureLod,
+    crate::dom::webgl::extensions::oesstandardderivatives::OESStandardDerivatives,
+    crate::dom::webgl::webglobject::WebGLObject,
+    crate::dom::webgl::webglrenderingcontext::{Operation, WebGLRenderingContext},
+    crate::dom::webglrenderingcontext::capture_webgl_backtrace,
+};
 
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
-use crate::dom::webgl::extensions::WebGLExtensions;
-use crate::dom::webgl::extensions::extfragdepth::EXTFragDepth;
-use crate::dom::webgl::extensions::extshadertexturelod::EXTShaderTextureLod;
-use crate::dom::webgl::extensions::oesstandardderivatives::OESStandardDerivatives;
-use crate::dom::webgl::webglobject::WebGLObject;
-use crate::dom::webgl::webglrenderingcontext::{Operation, WebGLRenderingContext};
-use crate::dom::webglrenderingcontext::capture_webgl_backtrace;
 
 #[derive(Clone, Copy, Debug, JSTraceable, MallocSizeOf, PartialEq)]
 pub(crate) enum ShaderCompilationStatus {
@@ -70,12 +74,12 @@ impl Drop for DroppableWebGLShader {
     }
 }
 
-#[dom_struct(associated_memory)]
+#[dom_struct]
 pub(crate) struct WebGLShader {
     webgl_object: WebGLObject,
     gl_type: u32,
-    source: DomRefCell<DOMString>,
-    info_log: DomRefCell<DOMString>,
+    source: DomRefCell<TracedDOMString>,
+    info_log: DomRefCell<TracedDOMString>,
     attached_counter: Cell<u32>,
     compilation_status: Cell<ShaderCompilationStatus>,
     droppable: DroppableWebGLShader,
@@ -297,17 +301,17 @@ impl WebGLShader {
 
     /// glGetShaderInfoLog
     pub(crate) fn info_log(&self) -> DOMString {
-        self.info_log.borrow().clone()
+        self.info_log.borrow().clone().root()
     }
 
     /// Get the shader source
     pub(crate) fn source(&self) -> DOMString {
-        self.source.borrow().clone()
+        self.source.borrow().clone().root()
     }
 
     /// glShaderSource
     pub(crate) fn set_source(&self, source: DOMString) {
-        *self.source.borrow_mut() = source;
+        *self.source.borrow_mut() = source.traced();
     }
 
     pub(crate) fn successfully_compiled(&self) -> bool {

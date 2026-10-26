@@ -9,9 +9,11 @@ use app_units::Au;
 use malloc_size_of_derive::MallocSizeOf;
 use script::layout_dom::ServoLayoutNode;
 use servo_arc::Arc;
+use style::Atom;
 use style::context::SharedStyleContext;
 use style::properties::ComputedValues;
-use stylo_taffy::TaffyStyloStyle;
+pub(crate) use stylo_taffy::TaffyStyloStyle;
+use taffy::GridItemStyle;
 
 use crate::PropagatedBoxTreeData;
 use crate::cell::ArcRefCell;
@@ -20,7 +22,8 @@ use crate::context::LayoutContext;
 use crate::dom::{LayoutBox, WeakLayoutBox};
 use crate::dom_traversal::{NodeAndStyleInfo, NonReplacedContents};
 use crate::formatting_contexts::IndependentFormattingContext;
-use crate::fragment_tree::Fragment;
+use crate::fragment_tree::{BoxFragment, Fragment, FragmentFlags};
+use crate::geom::{PhysicalPoint, PhysicalRect, PhysicalSize};
 use crate::layout_box_base::LayoutBoxBase;
 use crate::positioned::{AbsolutelyPositionedBox, PositioningContext};
 
@@ -28,6 +31,7 @@ use crate::positioned::{AbsolutelyPositionedBox, PositioningContext};
 pub(crate) struct TaffyContainer {
     children: Vec<ArcRefCell<TaffyItemBox>>,
     style: Arc<ComputedValues>,
+    fragment_flags: FragmentFlags,
 }
 
 impl TaffyContainer {
@@ -36,6 +40,7 @@ impl TaffyContainer {
         info: &NodeAndStyleInfo,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
+        fragment_flags: FragmentFlags,
     ) -> Self {
         let mut builder = ModernContainerBuilder::new(context, info, propagated_data);
         contents.traverse(context, info, &mut builder);
@@ -72,6 +77,7 @@ impl TaffyContainer {
         Self {
             children,
             style: info.style.clone(),
+            fragment_flags,
         }
     }
 
@@ -83,6 +89,7 @@ impl TaffyContainer {
 #[derive(MallocSizeOf)]
 pub(crate) struct TaffyItemBox {
     pub(crate) taffy_layout: taffy::Layout,
+    pub(crate) taffy_baselines: taffy::Baselines,
     pub(crate) child_fragments: Vec<Fragment>,
     pub(crate) positioning_context: PositioningContext,
     pub(crate) style: Arc<ComputedValues>,
@@ -100,6 +107,7 @@ impl fmt::Debug for TaffyItemBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TaffyItemBox")
             .field("taffy_layout", &self.taffy_layout)
+            .field("taffy_baselines", &self.taffy_baselines)
             .field("child_fragments", &self.child_fragments.len())
             .field("style", &self.style)
             .field("taffy_level_box", &self.taffy_level_box)
@@ -118,6 +126,7 @@ impl TaffyItemBox {
 
         Self {
             taffy_layout: Default::default(),
+            taffy_baselines: taffy::Baselines::NONE,
             child_fragments: Vec::new(),
             positioning_context: PositioningContext::default(),
             style,
@@ -165,13 +174,6 @@ impl TaffyItemBox {
         }
     }
 
-    fn is_in_flow_replaced(&self) -> bool {
-        match &self.taffy_level_box {
-            TaffyItemBoxInner::InFlowBox(fc) => fc.is_replaced(),
-            TaffyItemBoxInner::OutOfFlowAbsolutelyPositionedBox(_) => false,
-        }
-    }
-
     pub(crate) fn attached_to_tree(&self, layout_box: WeakLayoutBox) {
         match &self.taffy_level_box {
             TaffyItemBoxInner::InFlowBox(formatting_context) => {
@@ -188,34 +190,66 @@ impl TaffyItemBox {
 /// Details from Taffy grid layout that will be stored
 #[derive(Clone, Debug, MallocSizeOf)]
 pub(crate) struct SpecificTaffyGridInfo {
-    pub rows: SpecificTaffyGridTrackInfo,
-    pub columns: SpecificTaffyGridTrackInfo,
+    pub info: taffy::DetailedGridInfo<Atom>,
 }
 
 impl SpecificTaffyGridInfo {
-    fn from_detailed_grid_layout(grid_info: taffy::DetailedGridInfo) -> Self {
-        Self {
-            rows: SpecificTaffyGridTrackInfo {
-                sizes: grid_info
-                    .rows
-                    .sizes
-                    .iter()
-                    .map(|size| Au::from_f32_px(*size))
-                    .collect(),
-            },
-            columns: SpecificTaffyGridTrackInfo {
-                sizes: grid_info
-                    .columns
-                    .sizes
-                    .iter()
-                    .map(|size| Au::from_f32_px(*size))
-                    .collect(),
-            },
-        }
+    fn from_detailed_grid_layout(grid_info: taffy::DetailedGridInfo<Atom>) -> Self {
+        Self { info: grid_info }
     }
-}
 
-#[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SpecificTaffyGridTrackInfo {
-    pub sizes: Box<[Au]>,
+    /// Resolve the grid area of an absolutely positioned grid item, returning a rectangle
+    /// relative to the grid container's content box.
+    pub(crate) fn resolve_grid_area(
+        &self,
+        containing_block_fragment: &BoxFragment,
+        item_style: &ComputedValues,
+    ) -> PhysicalRect<Au> {
+        // Fragment flags are not used when resolving the grid area, so empty flags are
+        // sufficient here.
+        let item_style = TaffyStyloStyle::new(item_style, FragmentFlags::empty());
+
+        // Convert direction to Taffy type
+        let direction = if containing_block_fragment.style().writing_mode.is_bidi_ltr() {
+            taffy::Direction::Ltr
+        } else {
+            taffy::Direction::Rtl
+        };
+
+        // Convert padding box to Taffy type
+        let containing_block_border = containing_block_fragment.border;
+        let border_left = containing_block_border.left.to_f32_px();
+        let border_top = containing_block_border.top.to_f32_px();
+
+        let containing_block_padding_rect = containing_block_fragment.padding_rect();
+        let padding_box = taffy::Rect {
+            left: border_left,
+            right: border_left + containing_block_padding_rect.width().to_f32_px(),
+            top: border_top,
+            bottom: border_top + containing_block_padding_rect.height().to_f32_px(),
+        };
+
+        // Call into Taffy to resolve grid area
+        let area = self.info.resolve_absolute_grid_area(
+            item_style.grid_row(),
+            item_style.grid_column(),
+            direction,
+            padding_box,
+        );
+
+        // Convert grid area into a PhysicalRect, and adjust it to be relative to the content box.
+        let containing_block_padding = containing_block_fragment.padding;
+        PhysicalRect::new(
+            PhysicalPoint::new(
+                Au::from_f32_px(area.left) -
+                    (containing_block_border.left + containing_block_padding.left),
+                Au::from_f32_px(area.top) -
+                    (containing_block_border.top + containing_block_padding.top),
+            ),
+            PhysicalSize::new(
+                Au::from_f32_px(area.right - area.left),
+                Au::from_f32_px(area.bottom - area.top),
+            ),
+        )
+    }
 }

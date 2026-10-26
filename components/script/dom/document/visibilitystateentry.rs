@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 use dom_struct::dom_struct;
 use js::context::JSContext;
-use script_bindings::reflector::reflect_dom_object_with_cx;
+use script_bindings::reflector::reflect_dom_object;
 use servo_base::cross_process_instant::CrossProcessInstant;
 use time::Duration;
 
@@ -30,12 +30,12 @@ impl VisibilityStateEntry {
         timestamp: CrossProcessInstant,
     ) -> VisibilityStateEntry {
         let name = match state {
-            DocumentVisibilityState::Visible => DOMString::from("visible"),
-            DocumentVisibilityState::Hidden => DOMString::from("hidden"),
+            DocumentVisibilityState::Visible => DOMString::from_static("visible"),
+            DocumentVisibilityState::Hidden => DOMString::from_static("hidden"),
         };
         VisibilityStateEntry {
             entry: PerformanceEntry::new_inherited(
-                name,
+                name.into(),
                 EntryType::VisibilityState,
                 Some(timestamp),
                 Duration::ZERO,
@@ -49,10 +49,10 @@ impl VisibilityStateEntry {
         state: DocumentVisibilityState,
         timestamp: CrossProcessInstant,
     ) -> DomRoot<VisibilityStateEntry> {
-        reflect_dom_object_with_cx(
+        reflect_dom_object(
+            cx,
             Box::new(VisibilityStateEntry::new_inherited(state, timestamp)),
             global,
-            cx,
         )
     }
 }
@@ -74,7 +74,7 @@ impl VisibilityStateEntryMethods<crate::DomTypeHolder> for VisibilityStateEntry 
     }
 
     /// <https://html.spec.whatwg.org/multipage/#visibilitystateentry-duration>
-    fn Duration(&self) -> u32 {
-        *self.entry.Duration().deref() as u32
+    fn Duration(&self, cx: &mut JSContext) -> u32 {
+        *self.entry.Duration(cx).deref() as u32
     }
 }

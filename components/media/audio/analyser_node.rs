@@ -9,8 +9,10 @@ use std::sync::{Arc, OnceLock};
 use malloc_size_of_derive::MallocSizeOf;
 use servo_base::generic_channel::GenericCallback;
 
+use crate::audio_node::{
+    AudioNodeEngine, AudioNodeType, BlockInfo, ChannelInfo, ChannelInterpretation,
+};
 use crate::block::{Block, Chunk, FRAMES_PER_BLOCK_USIZE};
-use crate::node::{AudioNodeEngine, AudioNodeType, BlockInfo, ChannelInfo, ChannelInterpretation};
 
 #[derive(AudioNodeCommon)]
 pub(crate) struct AnalyserNode {
@@ -63,7 +65,6 @@ pub struct AnalysisEngine {
     max_decibels: f64,
     /// This is a ring buffer containing the last MAX_FFT_SIZE
     /// sample-frames
-    #[ignore_malloc_size_of = "Do not know how"]
     data: Box<[f32; MAX_FFT_SIZE]>,
     /// The index of the current block
     current_block: usize,

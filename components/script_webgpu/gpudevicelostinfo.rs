@@ -11,44 +11,43 @@ use script_bindings::DomTypes;
 use script_bindings::codegen::GenericBindings::WebGPUBinding::{
     GPUDeviceLostInfoMethods, GPUDeviceLostInfoWrap, GPUDeviceLostReason,
 };
+use script_bindings::domstring::TracedDOMString;
 use script_bindings::reflector::{Reflector, reflect_dom_object_with_wrap};
 
 use crate::JSTraceable;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
+use crate::traits::Equivalence;
 
 #[dom_struct]
 pub struct GPUDeviceLostInfo<D: DomTypes> {
     reflector_: Reflector,
-    message: DOMString,
+    message: TracedDOMString,
     reason: GPUDeviceLostReason,
     #[no_trace = "PhantomData does not exist"]
     phantom: PhantomData<D>,
 }
 
-impl<D> GPUDeviceLostInfo<D>
-where
-    D: DomTypes<GPUDeviceLostInfo = GPUDeviceLostInfo<D>>,
-{
+impl<D: Equivalence> GPUDeviceLostInfo<D> {
     fn new_inherited(message: DOMString, reason: GPUDeviceLostReason) -> Self {
         Self {
             reflector_: Reflector::new(),
-            message,
+            message: message.traced(),
             reason,
             phantom: PhantomData,
         }
     }
 
-    pub fn new(
+    pub(crate) fn new(
         cx: &mut JSContext,
         global: &D::GlobalScope,
         message: DOMString,
         reason: GPUDeviceLostReason,
     ) -> DomRoot<Self> {
         reflect_dom_object_with_wrap::<D, _, _>(
+            cx,
             Box::new(GPUDeviceLostInfo::new_inherited(message, reason)),
             global,
-            cx,
             GPUDeviceLostInfoWrap::<D>,
         )
     }
@@ -57,7 +56,7 @@ where
 impl<D: DomTypes> GPUDeviceLostInfoMethods<D> for GPUDeviceLostInfo<D> {
     /// <https://gpuweb.github.io/gpuweb/#dom-gpudevicelostinfo-message>
     fn Message(&self) -> DOMString {
-        self.message.clone()
+        self.message.clone().root()
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpudevicelostinfo-reason>

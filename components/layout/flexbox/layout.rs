@@ -14,7 +14,7 @@ use rayon::iter::{
 };
 use style::Zero;
 use style::computed_values::position::T as Position;
-use style::logical_geometry::Direction;
+use style::logical_geometry::{LogicalAxis, WritingMode};
 use style::properties::ComputedValues;
 use style::properties::longhands::align_items::computed_value::T as AlignItems;
 use style::properties::longhands::box_sizing::computed_value::T as BoxSizing;
@@ -153,16 +153,20 @@ struct FlexLineItem<'a> {
 }
 
 impl FlexLineItem<'_> {
-    fn get_or_synthesize_baseline_with_cross_size(&self, cross_size: Au) -> Au {
+    fn get_or_synthesize_baseline_with_cross_size(
+        &self,
+        cross_size: Au,
+        flex_container_config: &FlexContainerConfig,
+    ) -> Au {
         self.layout_result
             .flex_alignment_baseline_relative_to_margin_box
             .unwrap_or_else(|| {
                 self.item
-                    .synthesized_baseline_relative_to_margin_box(cross_size)
+                    .synthesized_baseline_relative_to_margin_box(cross_size, flex_container_config)
             })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn collect_fragment(
         mut self,
         initial_flex_layout: &InitialFlexLineLayout,
@@ -288,7 +292,7 @@ impl FlexLineItem<'_> {
                 .layout_collected_children(flex_context.layout_context, &mut fragment);
         }
 
-        if style.clone_position() == Position::Relative {
+        if style.get_box().position == Position::Relative {
             fragment.base.translate_rect(
                 relative_adjustement(style, containing_block)
                     .to_physical_size(containing_block.style.writing_mode),
@@ -450,6 +454,7 @@ impl FlexContainer {
                         containing_block_for_children,
                         &LogicalVec2::zero(),
                         false, /* auto_block_size_stretches_to_containing_block */
+                        false, /* skippable_for_block_percentage_quirk */
                     );
                     sizes.max_assign(result.sizes);
                     depends_on_block_constraints |= result.depends_on_block_constraints;
@@ -532,8 +537,8 @@ impl FlexContainer {
         let chosen_max_flex_fraction = normalize_flex_fraction(chosen_max_flex_fraction);
 
         let main_gap = match self.config.flex_axis {
-            FlexAxis::Row => self.style.clone_column_gap(),
-            FlexAxis::Column => self.style.clone_row_gap(),
+            FlexAxis::Row => self.style.get_column_gap(),
+            FlexAxis::Column => self.style.get_row_gap(),
         };
         let main_gap = match main_gap {
             LengthPercentageOrNormal::LengthPercentage(length_percentage) => {
@@ -543,7 +548,7 @@ impl FlexContainer {
         };
         let extra_space_from_main_gap = main_gap * (item_infos.len() as i32 - 1);
         let mut container_max_content_size = extra_space_from_main_gap;
-        let mut container_min_content_size = if self.config.flex_wrap == FlexWrap::Nowrap {
+        let mut container_min_content_size = if self.config.flex_wrap == FlexWrap::NOWRAP {
             extra_space_from_main_gap
         } else {
             Au::zero()
@@ -581,7 +586,7 @@ impl FlexContainer {
             // > item’s flex base size if the item is not growable, floored by the item’s flex
             // > base size if the item is not shrinkable, and then further clamped by the item’s
             // > min and max main sizes.
-            if self.config.flex_wrap == FlexWrap::Nowrap {
+            if self.config.flex_wrap == FlexWrap::NOWRAP {
                 container_min_content_size += (*outer_flex_base_size +
                     Au::from_f32_px(
                         min_flex_factors.flex_grow_or_shrink_factor * chosen_min_flex_fraction,
@@ -673,13 +678,9 @@ impl FlexContainer {
                 }
             })
             .collect::<Vec<_>>();
-        let flex_item_boxes = flex_items.iter().map(|child| &**child);
-        let flex_items = flex_item_boxes
-            .map(|flex_item_box| FlexItem::new(&flex_context, flex_item_box))
-            .collect::<Vec<_>>();
 
-        let row_gap = self.style.clone_row_gap();
-        let column_gap = self.style.clone_column_gap();
+        let row_gap = self.style.get_row_gap();
+        let column_gap = self.style.get_column_gap();
         let (cross_gap, main_gap) = match flex_context.config.flex_axis {
             FlexAxis::Row => (row_gap, column_gap),
             FlexAxis::Column => (column_gap, row_gap),
@@ -712,7 +713,7 @@ impl FlexContainer {
         let initial_line_layouts = do_initial_flex_line_layout(
             &mut flex_context,
             container_main_size,
-            flex_items,
+            &flex_items,
             main_gap,
         );
 
@@ -1131,7 +1132,7 @@ fn item_with_auto_cross_size_stretches_to_line_size(
 fn do_initial_flex_line_layout<'items>(
     flex_context: &mut FlexContext,
     container_main_size: Au,
-    mut items: Vec<FlexItem<'items>>,
+    flex_item_boxes: &'items Vec<AtomicRef<'items, FlexItemBox>>,
     main_gap: Au,
 ) -> Vec<InitialFlexLineLayout<'items>> {
     let construct_line = |(items, outer_hypothetical_main_size)| {
@@ -1145,6 +1146,10 @@ fn do_initial_flex_line_layout<'items>(
     };
 
     if flex_context.config.container_is_single_line {
+        let items: Vec<_> = flex_item_boxes
+            .iter()
+            .map(|item_box| FlexItem::new(flex_context, item_box))
+            .collect();
         let outer_hypothetical_main_sizes_sum = items
             .iter()
             .map(|item| item.hypothetical_main_size + item.pbm_auto_is_zero.main)
@@ -1153,36 +1158,32 @@ fn do_initial_flex_line_layout<'items>(
     }
 
     let mut lines = Vec::new();
+    let mut line_items = Vec::new();
     let mut line_size_so_far = Au::zero();
-    let mut line_so_far_is_empty = true;
-    let mut index = 0;
 
-    while let Some(item) = items.get(index) {
+    for item_box in flex_item_boxes {
+        let item = FlexItem::new(flex_context, item_box);
         let item_size = item.hypothetical_main_size + item.pbm_auto_is_zero.main;
+
+        // Compute the size the line would be if we added this item.
         let mut line_size_would_be = line_size_so_far + item_size;
-        if !line_so_far_is_empty {
+        if !line_items.is_empty() {
             line_size_would_be += main_gap;
         }
+
         let item_fits = line_size_would_be <= container_main_size;
-        if item_fits || line_so_far_is_empty {
+        if item_fits || line_items.is_empty() {
+            line_items.push(item);
             line_size_so_far = line_size_would_be;
-            line_so_far_is_empty = false;
-            index += 1;
-            continue;
+        } else {
+            lines.push((std::mem::take(&mut line_items), line_size_so_far));
+            line_items.push(item);
+            line_size_so_far = item_size;
         }
-
-        // We found something that doesn’t fit. This line ends *before* this item.
-        let remaining = items.split_off(index);
-        lines.push((items, line_size_so_far));
-        items = remaining;
-
-        // The next line has this item.
-        line_size_so_far = item_size;
-        index = 1;
     }
 
     // We didn't reach the end of the last line, so add all remaining items there.
-    lines.push((items, line_size_so_far));
+    lines.push((line_items, line_size_so_far));
 
     let job_sizes = lines
         .iter()
@@ -1198,8 +1199,8 @@ fn do_initial_flex_line_layout<'items>(
 }
 
 /// The result of splitting the flex items into lines using their intrinsic sizes and doing an
-/// initial layout of each item. A final layout still needs to happen after this is produced to
-/// handle stretching.
+/// initial layout of each item. A final layout may still need to happen after this is produced
+/// to handle stretching.
 struct InitialFlexLineLayout<'a> {
     /// The items that are placed in this line.
     items: Vec<FlexLineItem<'a>>,
@@ -1227,6 +1228,22 @@ impl InitialFlexLineLayout<'_> {
         );
 
         // https://drafts.csswg.org/css-flexbox/#algo-cross-item
+        //
+        // When the cross size of the line is already known, the items whose used cross size
+        // doesn't depend on their layout are laid out with it directly, instead of being laid
+        // out once to find their hypothetical cross size and then again with their used size.
+        let line_cross_size_before_layout = Self::cross_size_before_layout(flex_context);
+        let layout_item = |(item, used_main_size): (FlexItem<'items>, Au)| {
+            let used_cross_size = line_cross_size_before_layout.and_then(|line_cross_size| {
+                item.used_cross_size_before_layout(flex_context, used_main_size, line_cross_size)
+            });
+            let layout_result = item.layout(used_main_size, flex_context, used_cross_size);
+            FlexLineItem {
+                item,
+                layout_result,
+                used_main_size,
+            }
+        };
         let items: Vec<_> = if flex_context
             .layout_context
             .should_parallelize_layout(items.iter().map(FlexItem::subtree_size))
@@ -1234,27 +1251,13 @@ impl InitialFlexLineLayout<'_> {
             items
                 .into_par_iter()
                 .zip(item_used_main_sizes.into_par_iter())
-                .map(|(item, used_main_size)| {
-                    let layout_result = item.layout(used_main_size, flex_context, None);
-                    FlexLineItem {
-                        item,
-                        layout_result,
-                        used_main_size,
-                    }
-                })
+                .map(layout_item)
                 .collect()
         } else {
             items
                 .into_iter()
                 .zip(item_used_main_sizes)
-                .map(|(item, used_main_size)| {
-                    let layout_result = item.layout(used_main_size, flex_context, None);
-                    FlexLineItem {
-                        item,
-                        layout_result,
-                        used_main_size,
-                    }
-                })
+                .map(layout_item)
                 .collect()
         };
 
@@ -1478,12 +1481,20 @@ impl InitialFlexLineLayout<'_> {
         }
     }
 
+    /// The cross size of the flex line, if it's known before laying out its items.
+    /// This is the case in single-line containers with a definite cross size.
+    /// <https://drafts.csswg.org/css-flexbox/#algo-cross-line>
+    fn cross_size_before_layout(flex_context: &FlexContext) -> Option<Au> {
+        flex_context
+            .container_inner_size_constraint
+            .cross
+            .to_definite()
+            .filter(|_| flex_context.config.container_is_single_line)
+    }
+
     /// <https://drafts.csswg.org/css-flexbox/#algo-cross-line>
     fn cross_size<'items>(items: &'items [FlexLineItem<'items>], flex_context: &FlexContext) -> Au {
-        if flex_context.config.container_is_single_line &&
-            let SizeConstraint::Definite(size) =
-                flex_context.container_inner_size_constraint.cross
-        {
+        if let Some(size) = Self::cross_size_before_layout(flex_context) {
             return size;
         }
 
@@ -1498,6 +1509,7 @@ impl InitialFlexLineLayout<'_> {
             ) {
                 let baseline = item.get_or_synthesize_baseline_with_cross_size(
                     item.layout_result.hypothetical_cross_size,
+                    &flex_context.config,
                 );
                 let hypothetical_margin_box_cross_size =
                     item.layout_result.hypothetical_cross_size + item.item.pbm_auto_is_zero.cross;
@@ -1559,29 +1571,19 @@ impl InitialFlexLineLayout<'_> {
         let mut item_margins = Vec::with_capacity(item_count);
         for item in self.items.iter_mut() {
             let cross_axis = match flex_context.config.flex_axis {
-                FlexAxis::Row => Direction::Block,
-                FlexAxis::Column => Direction::Inline,
+                FlexAxis::Row => LogicalAxis::Block,
+                FlexAxis::Column => LogicalAxis::Inline,
             };
             let layout = &mut item.layout_result;
             let get_content_size = || match cross_axis {
-                Direction::Block => layout.content_block_size.into(),
-                Direction::Inline => item
+                LogicalAxis::Block => layout.content_block_size.into(),
+                LogicalAxis::Inline => item
                     .item
                     .inline_content_sizes(flex_context, item.used_main_size),
             };
-            let used_cross_size = item.item.content_cross_sizes.resolve(
-                cross_axis,
-                item.item.automatic_cross_size,
-                Au::zero,
-                Some(Au::zero().max(final_line_cross_size - item.item.pbm_auto_is_zero.cross)),
-                get_content_size,
-                // Tables have a special sizing in the block axis in that handles collapsed rows,
-                // but it would prevent stretching. So we only recognize tables in the inline axis.
-                // The interaction of collapsed table tracks and the flexbox algorithms is unclear,
-                // see https://github.com/w3c/csswg-drafts/issues/11408.
-                item.item.box_.independent_formatting_context.is_table() &&
-                    cross_axis == Direction::Inline,
-            );
+            let used_cross_size =
+                item.item
+                    .used_cross_size(cross_axis, final_line_cross_size, get_content_size);
             item_used_cross_sizes.push(used_cross_size);
 
             // “If the flex item has `align-self: stretch`, redo layout for its contents,
@@ -1591,7 +1593,7 @@ impl InitialFlexLineLayout<'_> {
             // we do that when the cross size is `stretch`. We also need to do it if the
             // inline size changes, which may happen with a `fit-content` cross size.
             let needs_new_layout = match cross_axis {
-                Direction::Block => {
+                LogicalAxis::Block => {
                     (match item.item.content_cross_sizes.preferred {
                         Size::Initial => item.item.automatic_cross_size == Size::Stretch,
                         Size::Stretch => true,
@@ -1600,7 +1602,7 @@ impl InitialFlexLineLayout<'_> {
                         layout.containing_block_size.block &&
                         layout.depends_on_block_constraints
                 },
-                Direction::Inline => used_cross_size != layout.containing_block_size.inline,
+                LogicalAxis::Inline => used_cross_size != layout.containing_block_size.inline,
             };
             if needs_new_layout {
                 #[cfg(feature = "tracing")]
@@ -1617,7 +1619,8 @@ impl InitialFlexLineLayout<'_> {
                         .layout(item.used_main_size, flex_context, Some(used_cross_size));
             }
 
-            let baseline = item.get_or_synthesize_baseline_with_cross_size(used_cross_size);
+            let baseline = item
+                .get_or_synthesize_baseline_with_cross_size(used_cross_size, &flex_context.config);
             if matches!(
                 item.item.align_self.0.value(),
                 AlignFlags::BASELINE | AlignFlags::LAST_BASELINE
@@ -1645,7 +1648,32 @@ impl InitialFlexLineLayout<'_> {
             let justify_content_style = flex_context.config.justify_content.primary();
 
             // Inital values from the style system
-            let mut resolved_justify_content = justify_content_style.value();
+            let inline_axis_is_main_axis = flex_context.config.flex_axis == FlexAxis::Row;
+            let line_left_is_inline_start =
+                flex_context.config.writing_mode.line_left_is_inline_start();
+            let mut resolved_justify_content = match justify_content_style.value() {
+                // On the inline axis `left`/`right` are line-left/line-right.
+                // https://drafts.csswg.org/css-align/#valdef-justify-content-left
+                AlignFlags::LEFT if inline_axis_is_main_axis => {
+                    if line_left_is_inline_start {
+                        AlignFlags::FLEX_START
+                    } else {
+                        AlignFlags::FLEX_END
+                    }
+                },
+                // https://drafts.csswg.org/css-align/#valdef-justify-content-right
+                AlignFlags::RIGHT if inline_axis_is_main_axis => {
+                    if line_left_is_inline_start {
+                        AlignFlags::FLEX_END
+                    } else {
+                        AlignFlags::FLEX_START
+                    }
+                },
+                // On the block axis these keywords are not parallel with the
+                // left-right axis, so they behave as `start`.
+                AlignFlags::LEFT | AlignFlags::RIGHT => AlignFlags::FLEX_START,
+                justify_content => justify_content,
+            };
             let mut is_safe = justify_content_style.flags() == AlignFlags::SAFE;
 
             // Fallback occurs in two cases:
@@ -1760,7 +1788,7 @@ impl FlexItem<'_> {
             box_address = self.box_ as *const _ as usize,
         )
     )]
-    #[allow(clippy::too_many_arguments)]
+
     fn layout(
         &self,
         used_main_size: Au,
@@ -1798,7 +1826,7 @@ impl FlexItem<'_> {
                         );
                     if let Some(block_content_size) = tentative_block_content_size {
                         SizeConstraint::Definite(self.content_cross_sizes.resolve(
-                            Direction::Block,
+                            LogicalAxis::Block,
                             Size::FitContent,
                             Au::zero,
                             block_stretch_size,
@@ -1820,7 +1848,7 @@ impl FlexItem<'_> {
                 let stretch_size =
                     Au::zero().max(containing_block.size.inline - self.pbm_auto_is_zero.cross);
                 self.content_cross_sizes.resolve(
-                    Direction::Inline,
+                    LogicalAxis::Inline,
                     Size::FitContent,
                     Au::zero,
                     Some(stretch_size),
@@ -1846,7 +1874,7 @@ impl FlexItem<'_> {
             {
                 SizeConstraint::Definite(used_main_size)
             } else {
-                SizeConstraint::default()
+                SizeConstraint::MinMax(self.content_min_main_size, self.content_max_main_size)
             };
             (cross_size, main_size)
         };
@@ -1872,7 +1900,7 @@ impl FlexItem<'_> {
                 .map(|size| Au::zero().max(size - self.pbm_auto_is_zero.cross));
             LazySize::new(
                 &self.content_cross_sizes,
-                Direction::Block,
+                LogicalAxis::Block,
                 Size::FitContent,
                 Au::zero,
                 stretch_size,
@@ -1952,16 +1980,77 @@ impl FlexItem<'_> {
         }
     }
 
-    fn synthesized_baseline_relative_to_margin_box(&self, content_size: Au) -> Au {
-        // If the item does not have a baseline in the necessary axis,
-        // then one is synthesized from the flex item’s border box.
+    /// Returns the distance from the baseline relative to the cross-start edge of the margin box
+    /// along the cross axis.
+    fn synthesized_baseline_relative_to_margin_box(
+        &self,
+        content_size: Au,
+        config: &FlexContainerConfig,
+    ) -> Au {
+        let own_writing_mode = self.box_.style().writing_mode;
         // https://drafts.csswg.org/css-flexbox/#valdef-align-items-baseline
-        content_size +
-            self.margin.cross_start.auto_is(Au::zero) +
-            self.padding.cross_start +
-            self.border.cross_start +
-            self.border.cross_end +
-            self.padding.cross_end
+        // > If the item does not have a baseline in the necessary axis,
+        // > then one is synthesized from the flex item’s border box.
+        // Note: This is the case when this function is called.
+
+        // https://drafts.csswg.org/css-align-3/#synthesize-baseline
+        // > To synthesize baselines from a rectangle (or two parallel lines),
+        // > synthesize the alphabetic baseline from the line-under.
+        let distance_from_cross_start_to_line_under = |writing_mode: WritingMode| -> Au {
+            // The different positions for line-under depending on the writing mode are defined
+            // in https://drafts.csswg.org/css-writing-modes-4/#logical-to-physical.
+            // FIXME: This needs to handle "writing-mode: sideways-lr" once that is
+            // enabled in stylo.
+            let line_under_edge_is_on_same_side_as_cross_start = (writing_mode.is_horizontal() &&
+                config.flex_wrap_is_reversed) ||
+                (writing_mode.is_vertical_lr() != config.flex_wrap_is_reversed);
+            if line_under_edge_is_on_same_side_as_cross_start {
+                // line-under edge is the bottom border edge and cross axis goes bottom->top
+                // OR
+                // line-under edge is the left border edge and cross axis goes left->right
+                // OR
+                // line-under edge is the right border edge and cross axis goes right->left
+                self.margin.cross_start.auto_is(Au::zero)
+            } else {
+                // line-under edge is the bottom border edge and cross axis goes top->bottom
+                // OR
+                // line-under edge is the right border edge and cross axis goes left->right
+                // OR
+                // line-under edge is the left border edge and cross axis goes right->left
+                content_size +
+                    self.margin.cross_start.auto_is(Au::zero) +
+                    self.padding.cross_sum() +
+                    self.border.cross_sum()
+            }
+        };
+
+        // > In general, the writing mode of the box, shape, or other object being aligned is used
+        // > to determine the line-under and line-over edges for synthesis.
+        // > However, when that writing mode’s block flow direction is parallel to the axis of the
+        // > alignment context, an axis-compatible writing mode must be assumed:
+        // > * If the box establishing the alignment context has a block flow direction that is orthogonal
+        // >   to the axis of the alignment context, use its writing mode.
+        // > * Otherwise:
+        // >   * If the box’s own writing mode is vertical, assume horizontal-tb.
+        // >   * If the box’s own writing mode is horizontal, assume vertical-lr if direction is ltr
+        // >     and vertical-rl if direction is rtl.
+        let block_flow_direction_is_orthogonal_to_main_axis = |writing_mode: WritingMode| {
+            writing_mode.is_vertical() != (config.flex_axis == FlexAxis::Row)
+        };
+        if block_flow_direction_is_orthogonal_to_main_axis(own_writing_mode) {
+            distance_from_cross_start_to_line_under(own_writing_mode)
+        } else if block_flow_direction_is_orthogonal_to_main_axis(config.writing_mode) {
+            distance_from_cross_start_to_line_under(config.writing_mode)
+        } else if own_writing_mode.is_vertical() {
+            distance_from_cross_start_to_line_under(WritingMode::WRITING_MODE_HORIZONTAL_TB)
+        } else {
+            let used_writing_mode = match own_writing_mode.is_bidi_ltr() {
+                true => WritingMode::WRITING_MODE_VERTICAL_LR,
+                false => WritingMode::WRITING_MODE_VERTICAL_RL,
+            };
+
+            distance_from_cross_start_to_line_under(used_writing_mode)
+        }
     }
 
     fn subtree_size(&self) -> usize {
@@ -2024,8 +2113,9 @@ impl FlexItem<'_> {
             //  the cross-start and cross-end directions are swapped.”
             let flex_wrap = flex_context.containing_block.style.get_position().flex_wrap;
             let flex_wrap_reverse = match flex_wrap {
-                FlexWrap::Nowrap | FlexWrap::Wrap => false,
-                FlexWrap::WrapReverse => true,
+                FlexWrap::NOWRAP | FlexWrap::WRAP => false,
+                FlexWrap::WRAP_REVERSE => true,
+                _ => unreachable!("FlexWrap::BALANCE should be disabled"),
             };
             // “if the block-start or inline-start margin (whichever is in the cross axis) is auto,
             //  set it to zero. Set the opposite margin so that the outer cross size of the item
@@ -2096,6 +2186,58 @@ impl FlexItem<'_> {
             self.preferred_aspect_ratio,
         )
     }
+
+    /// The used cross size of this item in a flex line with the given cross size.
+    /// <https://drafts.csswg.org/css-flexbox/#algo-stretch>
+    fn used_cross_size(
+        &self,
+        cross_axis: LogicalAxis,
+        line_cross_size: Au,
+        get_content_size: impl FnOnce() -> ContentSizes,
+    ) -> Au {
+        self.content_cross_sizes.resolve(
+            cross_axis,
+            self.automatic_cross_size,
+            Au::zero,
+            Some(Au::zero().max(line_cross_size - self.pbm_auto_is_zero.cross)),
+            get_content_size,
+            // Tables have a special sizing in the block axis in that handles collapsed rows,
+            // but it would prevent stretching. So we only recognize tables in the inline axis.
+            // The interaction of collapsed table tracks and the flexbox algorithms is unclear,
+            // see https://github.com/w3c/csswg-drafts/issues/11408.
+            self.box_.independent_formatting_context.is_table() &&
+                cross_axis == LogicalAxis::Inline,
+        )
+    }
+
+    /// The used cross size of this item in a flex line with the given cross size, if it can
+    /// be determined without laying out the item.
+    fn used_cross_size_before_layout(
+        &self,
+        flex_context: &FlexContext,
+        used_main_size: Au,
+        line_cross_size: Au,
+    ) -> Option<Au> {
+        match flex_context.config.flex_axis {
+            FlexAxis::Column => Some(self.used_cross_size(
+                LogicalAxis::Inline,
+                line_cross_size,
+                || self.inline_content_sizes(flex_context, used_main_size),
+            )),
+            // The content size in the block axis is only known after laying out the item.
+            // This is the same resolution as after the layout, so unlike an extrinsic
+            // resolution, it's exact when intrinsic minimum or maximum sizes are involved.
+            FlexAxis::Row => {
+                let mut needs_content_size = false;
+                let used_cross_size =
+                    self.used_cross_size(LogicalAxis::Block, line_cross_size, || {
+                        needs_content_size = true;
+                        ContentSizes::default()
+                    });
+                (!needs_content_size).then_some(used_cross_size)
+            },
+        }
+    }
 }
 
 impl FlexItemBox {
@@ -2115,9 +2257,9 @@ impl FlexItemBox {
             flex_axis,
         );
         let main_axis = if cross_axis_is_item_block_axis {
-            Direction::Inline
+            LogicalAxis::Inline
         } else {
-            Direction::Block
+            LogicalAxis::Block
         };
         let align_self = AlignItems(config.resolve_align_self_for_child(style));
 
@@ -2398,6 +2540,7 @@ impl FlexItemBox {
                         containing_block,
                         &auto_minimum,
                         automatic_cross_size_for_intrinsic_sizing == Size::Stretch,
+                        false, /* skippable_for_block_percentage_quirk */
                     );
                 (sizes, depends_on_block_constraints)
             },
@@ -2525,7 +2668,7 @@ impl FlexItemBox {
             // > Indicates an automatic size based on the flex item’s content.
             FlexBasis::Content => Size::Initial,
 
-            FlexBasis::Size(size) => match Size::<LengthPercentage>::from(size.clone()) {
+            FlexBasis::Size(size) => match Size::<LengthPercentage>::from(size) {
                 // https://drafts.csswg.org/css-flexbox-1/#valdef-flex-basis-auto
                 // > When specified on a flex item, the `auto` keyword retrieves
                 // > the value of the main size property as the used `flex-basis`.
@@ -2556,7 +2699,6 @@ impl FlexItemBox {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[servo_tracing::instrument(name = "FlexContainer::layout_for_block_content_size", skip_all)]
     fn layout_for_block_content_size(
         &self,
@@ -2569,7 +2711,6 @@ impl FlexItemBox {
     ) -> Au {
         let content_block_size = || {
             let mut positioning_context = PositioningContext::default();
-            let style = self.independent_formatting_context.style();
 
             // We are computing the intrinsic block size, so the tentative block size that we use
             // as an input to the intrinsic inline sizes needs to ignore the values of the sizing
@@ -2589,7 +2730,7 @@ impl FlexItemBox {
                     )
                 };
                 content_box_sizes.inline.resolve(
-                    Direction::Inline,
+                    LogicalAxis::Inline,
                     automatic_inline_size,
                     Au::zero,
                     Some(stretch_size),
@@ -2597,23 +2738,16 @@ impl FlexItemBox {
                     false,
                 )
             };
-            let item_as_containing_block = ContainingBlock {
-                size: ContainingBlockSize {
-                    inline: inline_size,
-                    block: tentative_block_size,
-                },
-                style,
-            };
+
             self.independent_formatting_context
-                .layout(
+                .content_block_size_under_default_constraint(
                     flex_context.layout_context,
                     &mut positioning_context,
-                    &item_as_containing_block,
+                    inline_size,
                     flex_context.containing_block,
                     preferred_aspect_ratio,
                     &LazySize::intrinsic(),
                 )
-                .content_block_size
         };
         match intrinsic_sizing_mode {
             IntrinsicSizingMode::Contribution => {
@@ -2624,7 +2758,7 @@ impl FlexItemBox {
                     .to_definite()
                     .map(|block_size| block_size - pbm_auto_is_zero.main);
                 let inner_block_size = content_box_sizes.block.resolve(
-                    Direction::Block,
+                    LogicalAxis::Block,
                     Size::FitContent,
                     Au::zero,
                     stretch_size,

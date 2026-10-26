@@ -4,10 +4,11 @@
 
 use dom_struct::dom_struct;
 use js::context::JSContext;
+use js::conversions::ToJSValConvertible;
 use js::jsapi::{Heap, JSObject, Value};
 use js::rust::MutableHandleObject;
-use script_bindings::conversions::SafeToJSValConvertible;
-use script_bindings::reflector::{DomObject, reflect_dom_object_with_cx};
+use script_bindings::domstring::TracedDOMString;
+use script_bindings::reflector::{DomObject, reflect_dom_object};
 use script_bindings::str::DOMString;
 
 use crate::dom::bindings::codegen::Bindings::DebuggerAddDebuggeeEventBinding::DebuggerAddDebuggeeEventMethods;
@@ -23,7 +24,7 @@ pub(crate) struct DebuggerAddDebuggeeEvent {
     #[ignore_malloc_size_of = "Measured by the JS engine"]
     global: Heap<*mut JSObject>,
     pipeline_id: Dom<PipelineId>,
-    worker_id: Option<DOMString>,
+    worker_id: Option<TracedDOMString>,
 }
 
 impl DebuggerAddDebuggeeEvent {
@@ -38,17 +39,15 @@ impl DebuggerAddDebuggeeEvent {
             event: Event::new_inherited(),
             global: Heap::default(),
             pipeline_id: Dom::from_ref(pipeline_id),
-            worker_id,
+            worker_id: worker_id.map(|domstring| domstring.traced()),
         });
-        let result = reflect_dom_object_with_cx(result, debugger_global, cx);
+        let result = reflect_dom_object(cx, result, debugger_global);
         result.event.init_event("addDebuggee".into(), false, false);
 
         // Convert the debuggee global’s reflector to a Value, wrapping it from its originating realm (debuggee realm)
         // into the active realm (debugger realm) so that it can be passed across compartments.
         rooted!(&in(cx) let mut wrapped_global: Value);
-        global
-            .reflector()
-            .safe_to_jsval(cx, wrapped_global.handle_mut());
+        global.reflector().to_jsval(cx, wrapped_global.handle_mut());
         result.global.set(wrapped_global.to_object());
 
         result
@@ -68,7 +67,7 @@ impl DebuggerAddDebuggeeEventMethods<crate::DomTypeHolder> for DebuggerAddDebugg
     }
 
     fn GetWorkerId(&self) -> Option<DOMString> {
-        self.worker_id.clone()
+        self.worker_id.clone().map(|domstring| domstring.root())
     }
 
     fn IsTrusted(&self) -> bool {

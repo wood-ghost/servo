@@ -144,6 +144,35 @@ Rust 1.95.0 Cargo driver:
 - Independent ordinary-Rust execution against `mime 0.3.17`: **9 reference inputs
   passed**, comprising the seven mismatch inputs and the two SVG inputs.
 
+### Upstream integration baseline, 2026-10-26
+
+Merged official Servo `bb25871aba7785abfa98c06b57a5f57bc6b30964` into the
+verification branch based on `c0ed300a195bd47bb3b654d5ba3bcabdd8e74fc1`.
+The executable classifier adopts upstream's deferred cloning, `font-otf`, and
+`Rar!` signature; the corresponding font and RAR specifications are updated.
+The original closure parameter patterns are retained with contracts.
+
+This merge baseline retains the pre-existing checked-range MP4 implementation
+(`data.get(16..box_size)`), rather than upstream's direct slice. It introduces
+no MP4 input restriction. Restoring that body with an explicit requirement is
+separate follow-up work. Existing visibility and verification-only trait
+adaptations remain, as do the trusted MIME contracts and conformance premises.
+
+With Verus `67f7055fea00583c250c62c4a7d4668a7fe55cce`, the checks below passed:
+
+```bash
+cargo +1.97.1 test --locked -p servo-net-traits --test mime_classifier --message-format=short -- --quiet
+cargo +1.99.1 verus focus --locked -p servo-net-traits -- \
+  --no-lifetime --no-trait-conflicts --expand-errors --multiple-errors 20
+```
+
+Results: **74 native MIME tests passed**, and **202 verified, 0 errors** for
+verification-enabled package code. Both lifetime and trait-conflict checking
+are disabled in the latter command, and dependency proofs are skipped. The
+existing function-local resource limits include 20 for `MimeClassifier::classify`
+and 30 for JavaScript detection and grouped classification. The full MIME API
+regression suite and a whole-browser build are outside these checks.
+
 ### Current workflow: upstream trigger support, 2026-10-23
 
 [Verus PR #3196](https://github.com/verus-lang/verus/pull/3196) merged into

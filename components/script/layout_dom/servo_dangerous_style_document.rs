@@ -4,6 +4,7 @@
 
 #![deny(missing_docs)]
 
+use encoding_rs::Encoding;
 use layout_api::DangerousStyleElement;
 use selectors::matching::QuirksMode;
 use style::dom::{TDocument, TNode};
@@ -15,8 +16,8 @@ use style::values::AtomIdent;
 
 use crate::dom::bindings::root::LayoutDom;
 use crate::dom::document::Document;
+use crate::event_loop::script_thread::SharedRwLocks;
 use crate::layout_dom::{ServoDangerousStyleElement, ServoDangerousStyleNode, ServoLayoutElement};
-use crate::script_thread::SharedRwLocks;
 
 /// A wrapper around documents that ensures layout can only ever access safe properties.
 ///
@@ -87,6 +88,11 @@ impl<'dom> ServoDangerousStyleDocument<'dom> {
     /// Get the shared style lock for author stylesheets for this [`ServoDangerousStyleDocument`].
     pub fn shared_style_locks(&self) -> &SharedRwLocks {
         self.document.shared_style_locks()
+    }
+
+    /// The encoding that was used to decode the document.
+    pub fn encoding(&self) -> &'static Encoding {
+        self.document.encoding_for_layout()
     }
 
     /// Flush the the stylesheets of all descendant shadow roots.

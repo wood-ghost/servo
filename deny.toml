@@ -11,6 +11,11 @@ feature-depth = 1
 # More documentation for the advisories section can be found here:
 # https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
 [advisories]
+# Our `mach` integration currently errors on warnings. We should add support
+# for warnings without failing tidy to mach and then change this to `warn`.
+# We don't want to deny yanked crates, since it creates incentives to update
+# quickly, which could be abused by supply-chain attacks that yank old versions.
+yanked = "allow"
 ignore = [
     # The crate `paste` is no longer maintained.
     "RUSTSEC-2024-0436",
@@ -35,9 +40,15 @@ ignore = [
     # This is a dependency of `usvg`, `rustybuzz`, `fontdb`.
     # We will need to wait for upstream actions.
     "RUSTSEC-2026-0192",
-    # `rustybuzz` is unmaintained. Switch to harfrust.
-    # However, this is a dependecy of `resvg`, there's nothing we can do.
-    "RUSTSEC-2026-0206",
+    # The crate `zvariant` is unmaintained. Wait for `atspi-common` to start
+    # using `zbus`.
+    "RUSTSEC-2026-0370",
+    # The crate `zbus_names` is unmaintained. Wait for `atspi-common` to start
+    # using `zbus`.
+    "RUSTSEC-2026-0371",
+    # The crate `zvariant_derive` is unmaintained. Wait for `atspi-common` to start
+    # using `zbus`.
+    "RUSTSEC-2026-0372",
 ]
 
 # This section is considered when running `cargo deny check licenses`
@@ -93,6 +104,7 @@ deny = [
 
 # List of crates to skip for the duplicate check:
 skip = [
+    "base64",
     "bitflags",
     "cookie",
     "redox_syscall",
@@ -100,28 +112,14 @@ skip = [
     # New versions of these dependencies is pulled in by GStreamer / GLib.
     "itertools",
 
-    # Duplicated by btleplug
-    "jni",
+    # Duplicated by ndk and ndk-sys that are still on 0.3.1
     "jni-sys",
 
     # Duplicated by egui
     "foldhash",
-    "windows-collections",
-    "windows-future",
-    "windows-numerics",
-    "windows-strings",
-    "windows-threading",
-
-    # Duplicated by egui-file-dialog
-    "windows",
-    "windows-link",
-    "windows-result",
 
     # Duplicated by winit.
     "windows-sys",
-
-    # wgpu has the latest and greatest.
-    "windows-core",
 
     # Duplicated by gilrs.
     "core-foundation",
@@ -133,9 +131,6 @@ skip = [
     "thiserror",
     "thiserror-impl",
 
-    # duplicated by webdriver
-    "http",
-
     # duplicated by winit
     "block2",
     "objc2-app-kit",
@@ -145,7 +140,6 @@ skip = [
     # duplicated by tungstenite
     "getrandom",
     "rand",
-    "rand_chacha",
     "rand_core",
     "sha1",
 
@@ -200,23 +194,27 @@ skip = [
     "digest",
     "block-buffer",
 
-    # Duplicated by ml-kem. This should be gone in next version (>0.3.2)
-    # of ml-kem.
-    "sha3",
-
     # Duplicated by bindgen
     "shlex",
 
-    # Duplicated by vello (disabled by default) which uses old wgpu.
-    "bit-set",
-    "naga",
-    "wgpu-core",
-    "wgpu-core-deps-apple",
-    "wgpu-core-deps-emscripten",
-    "wgpu-core-deps-windows-linux-android",
-    "wgpu-hal",
-    "wgpu-naga-bridge",
-    "wgpu-types",
+    # duplicated by mozjs which brings in new versions
+    "anstream",
+    "anstyle-parse",
+    "syn",
+    "toml",
+    "toml_datetime",
+    "winnow",
+
+    # Duplicated by cssparser which brings in new versions
+    "phf",
+    "phf_generator",
+    "phf_macros",
+    "phf_shared",
+
+    # Duplicated by serde_with crate (proc macro helpers, so no binary size increase)
+    "darling",
+    "darling_core",
+    "darling_macro",
 ]
 
 # github.com organizations to allow git sources for
@@ -224,3 +222,8 @@ skip = [
 github = [
     "servo",
 ]
+
+# On our releases we switch to crates.io dependencies,
+# so explicitly allow unused allow-org entries to avoid errors.
+[sources]
+unused-allowed-org = "allow"

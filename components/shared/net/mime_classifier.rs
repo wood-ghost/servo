@@ -9,7 +9,7 @@ use vstd::std_specs::iter::IteratorSpec;
 use vstd::assert_seqs_equal;
 
 
-use mime::{self, Mime, Name};
+use mime::{self, Mime};
 
 use crate::LoadContext;
 
@@ -134,6 +134,7 @@ impl Default for MimeClassifier {
 impl MimeClassifier {
     /// <https://mimesniff.spec.whatwg.org/#mime-type-sniffing-algorithm>
     #[verifier::auto_reveal_strlit]
+    #[verifier::rlimit(20)]
     pub fn classify<'a>(
         &'a self,
         context: LoadContext,
@@ -163,12 +164,12 @@ impl MimeClassifier {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
         }
         let supplied_type_or_octet_stream = supplied_type
-            .clone()
-            .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+            .as_ref()
+            .unwrap_or(&mime::APPLICATION_OCTET_STREAM);
         // Step 1. If the supplied MIME type is an XML MIME type or HTML MIME type,
         // the computed MIME type is the supplied MIME type.
-        if Self::is_xml(&supplied_type_or_octet_stream) ||
-            Self::is_html(&supplied_type_or_octet_stream)
+        if Self::is_xml(supplied_type_or_octet_stream) ||
+            Self::is_html(supplied_type_or_octet_stream)
         {
             proof {
                 reveal_strlit("application/octet-stream");
@@ -182,10 +183,10 @@ impl MimeClassifier {
                     apache_bug_flag,
                     supplied_type,
                     data@,
-                    SpecMime::view(&supplied_type_or_octet_stream),
+                    SpecMime::view(supplied_type_or_octet_stream),
                 ); 
             }
-            return supplied_type_or_octet_stream;
+            return supplied_type_or_octet_stream.clone();
         }
 
         let ghost supplied_type_input = supplied_type;
@@ -286,7 +287,7 @@ impl MimeClassifier {
                             // Step 8. If matched-type is not undefined, the computed MIME type is matched-type.
                             self.audio_video_classifier.classify(data)
                         },
-                        // Some(MediaType::Html) | Some(MediaType::Xml) => unreachable!(),
+                        Some(MediaType::Html) | Some(MediaType::Xml) => unreachable!(),
                         _ => None,
                     }
                     // Step 9. The computed MIME type is the supplied MIME type.
@@ -296,7 +297,7 @@ impl MimeClassifier {
             LoadContext::Image => {
                 let ghost result = match self.image_classifier.classify_spec(data@) {
                     Some(mt) => mt,
-                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                    None => SpecMime::view(supplied_type_or_octet_stream),
                 };
 
                 proof {
@@ -308,18 +309,22 @@ impl MimeClassifier {
                     );
                 } 
 
-                // result
+                // Section 8.2 Sniffing an image context
                 match MimeClassifier::maybe_get_media_type(supplied_type) {
                     Some(MediaType::Xml) => None,
                     _ => self.image_classifier.classify(data),
                 }
-                // self.image_classifier.classify(data)
-                .unwrap_or(supplied_type_or_octet_stream)
+                .unwrap_or_else(|| -> (r: Mime)
+                    ensures
+                        SpecMime::view(&r) == SpecMime::view(supplied_type_or_octet_stream),
+                {
+                    supplied_type_or_octet_stream.clone()
+                })
             },
             LoadContext::AudioVideo => {
                 let ghost result = match self.audio_video_classifier.classify_spec(data@) {
                     Some(mt) => mt,
-                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                    None => SpecMime::view(supplied_type_or_octet_stream),
                 };
                 proof {
                     SpecClassifier::lemma_mime_classify_audio_video_result(
@@ -338,7 +343,12 @@ impl MimeClassifier {
                     },
                     _ => self.audio_video_classifier.classify(data),
                 }
-                .unwrap_or(supplied_type_or_octet_stream)
+                .unwrap_or_else(|| -> (r: Mime)
+                    ensures
+                        SpecMime::view(&r) == SpecMime::view(supplied_type_or_octet_stream),
+                {
+                    supplied_type_or_octet_stream.clone()
+                })
             },
             LoadContext::Plugin => {
                 // 8.4 Sniffing in a plugin context
@@ -347,7 +357,7 @@ impl MimeClassifier {
                 // of this implementation.
                 match *supplied_type {
                     None => mime::APPLICATION_OCTET_STREAM,
-                    _ => supplied_type_or_octet_stream,
+                    _ => supplied_type_or_octet_stream.clone(),
                 }
             },
             LoadContext::Style => {
@@ -377,13 +387,13 @@ impl MimeClassifier {
                 // of this implementation.
                 match *supplied_type {
                     None => mime::TEXT_JAVASCRIPT,
-                    _ => supplied_type_or_octet_stream,
+                    _ => supplied_type_or_octet_stream.clone(),
                 }
             },
             LoadContext::Font => {
                 let ghost result = match self.font_classifier.classify_spec(data@) {
                     Some(mt) => mt,
-                    None => SpecMime::view(&supplied_type_or_octet_stream),
+                    None => SpecMime::view(supplied_type_or_octet_stream),
                 };
                 proof {
                     SpecClassifier::lemma_mime_classify_font_result(
@@ -398,7 +408,12 @@ impl MimeClassifier {
                     Some(MediaType::Xml) => None,
                     _ => self.font_classifier.classify(data),
                 }
-                .unwrap_or(supplied_type_or_octet_stream)
+                .unwrap_or_else(|| -> (r: Mime)
+                    ensures
+                        SpecMime::view(&r) == SpecMime::view(supplied_type_or_octet_stream),
+                {
+                    supplied_type_or_octet_stream.clone()
+                })
             },
             LoadContext::TextTrack => {
                 // 8.8 Sniffing in a text track context
@@ -640,7 +655,7 @@ impl MimeClassifier {
             (mt.type_() == mime::APPLICATION &&
                 ([
                     "font-cff",
-                    "font-off",
+                    "font-otf",
                     "font-sfnt",
                     "font-ttf",
                     "font-woff",
@@ -708,10 +723,12 @@ impl MimeClassifier {
     }
 }
 
+// Interface used for composite types
 // Native interface; the verification build imports its annotated counterpart.
 #[cfg(not(verus_only))]
 trait MIMEChecker {
     fn classify(&self, data: &[u8]) -> Option<Mime>;
+    /// Validate the MIME checker configuration
     fn validate(&self) -> Result<(), String>;
 }
 
@@ -727,8 +744,8 @@ struct ByteMatcher {
 pub(crate) struct ByteMatcher {
     pub(crate) pattern: &'static [u8],
     pub(crate) mask: &'static [u8],
-    pub(crate) content_type: Mime,
     pub(crate) leading_ignore: &'static [u8],
+    pub(crate) content_type: Mime,
 }
 
 impl ByteMatcher {
@@ -749,21 +766,20 @@ impl ByteMatcher {
             }
     {
         if data.len() < self.pattern.len() {
-            return None;
+            None
         } else if data == self.pattern {
-            return Some(self.pattern.len());
+            Some(self.pattern.len())
         } else {
             broadcast use SpecByteMatcher::position_not_found_implies_no_pattern_matching;
             data[..data.len() - self.pattern.len() + 1]
                 .iter()
-                .position(|x: &u8| -> (r: bool)
+                .position(|x| -> (r: bool)
                     ensures 
                         r == !self.leading_ignore@.to_set().contains(*x),
-                    { 
-                        !self.leading_ignore.contains(&x) 
-                    },
-                )
-                .and_then(|start: usize| -> (result: Option<usize>)
+                {
+                    !self.leading_ignore.contains(x)
+                })
+                .and_then(|start| -> (result: Option<usize>)
                     requires 
                         SpecByteMatcher::position_found(
                             data@.subrange(0, (data.len() - self.pattern.len() + 1) as int).as_ref(),
@@ -803,13 +819,11 @@ impl ByteMatcher {
                         .iter()
                         .zip(self.pattern.iter())
                         .zip(self.mask.iter())
-                        // .all(|((&data, &pattern), &mask)| (data & mask) == pattern)
-                        .all(|x: ((&u8, &u8), &u8)| -> (r: bool) 
+                        .all(|((&data, &pattern), &mask)| -> (r: bool)
                             ensures
-                                r == ((*x.0.0 & *x.1) == *x.0.1),
+                                r == ((data & mask) == pattern),
                         {
-                            let ((data_p, pattern_p), mask_p) = x;
-                            (*data_p & *mask_p) == *pattern_p
+                            (data & mask) == pattern
                         })
                     {
                         proof {
@@ -868,15 +882,14 @@ impl ByteMatcher {
                         None
                     }
                 })
-            }
+        }
     }
     
 }
 
 impl MIMEChecker for ByteMatcher {
     fn classify(&self, data: &[u8]) -> Option<Mime> {
-        // self.matches(data).map(|_| self.content_type.clone())
-        self.matches(data).map(|x: usize| -> (r: Mime) 
+        self.matches(data).map(|_| -> (r: Mime)
             ensures
                 SpecMime::view(&r)  == SpecMime::view(&self.content_type),
         {
@@ -946,7 +959,7 @@ impl MIMEChecker for TagTerminatedByteMatcher {
             );
         }
 
-        self.matcher.matches(data).and_then(|j: usize| -> (result: Option<Mime>)
+        self.matcher.matches(data).and_then(|j| -> (result: Option<Mime>)
             ensures
                 match result {
                     Some(mt) => {
@@ -964,7 +977,7 @@ impl MIMEChecker for TagTerminatedByteMatcher {
         })
     }
 
-    fn validate(&self) -> (result: Result<(), String>) {
+    fn validate(&self) -> Result<(), String> {
         self.matcher.validate()
     }
 }
@@ -1026,7 +1039,7 @@ impl Mp4Matcher {
                         && #[trigger] SpecMP4Matcher::has_mp4_at(input, bytes_read)),
             // Step 11. Increment bytes-read by 4.
             {
-                data.chunks(4).any(|chunk: &[u8]| -> (r:bool)
+                data.chunks(4).any(|chunk| -> (r: bool)
                     ensures
                         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
                 {
@@ -1040,7 +1053,7 @@ impl Mp4Matcher {
                 // .any(|chunk: &[u8]| -> (r: bool)
                 //     ensures
                 //         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
-                // { 
+                // {
                 //     chunk.starts_with(&mp4)
                 // }
         // Step 12. Return false.
@@ -1056,7 +1069,7 @@ impl MIMEChecker for Mp4Matcher {
         }
     }
 
-    fn validate(&self) -> (result: Result<(), String>) {
+    fn validate(&self) -> Result<(), String> {
         Ok(())
     }
 }
@@ -1971,7 +1984,7 @@ impl ByteMatcher {
             r.validate_spec(),
     {
         ByteMatcher {
-            pattern: b"Rar \x1A\x07\x00",
+            pattern: b"Rar!\x1A\x07\x00",
             mask: b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
             content_type: "application/x-rar-compressed".parse().unwrap(),
             leading_ignore: &[],

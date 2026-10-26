@@ -137,11 +137,11 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
 
     /// <https://xhr.spec.whatwg.org/#dom-formdata-append>
     // As [`Append_`] needs &mut JSContext, we also need to have it for [`Append`]
-    fn Append(&self, _cx: &mut JSContext, name: USVString, str_value: USVString) {
-        self.data.borrow_mut().push((
+    fn Append(&self, cx: &mut JSContext, name: USVString, str_value: USVString) {
+        self.data.safe_borrow_mut(cx.no_gc()).push((
             NoTrace(LocalName::from(name.0.clone())),
             FormDatumUnrooted {
-                ty: DOMString::from("string"),
+                ty: DOMString::from_static("string"),
                 name: DOMString::from(name.0),
                 value: FormDatumValueUnrooted::String(DOMString::from(str_value.0)),
             },
@@ -158,10 +158,10 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
     ) {
         let file = self.create_an_entry(cx, blob, filename);
 
-        self.data.borrow_mut().push((
+        self.data.safe_borrow_mut(cx.no_gc()).push((
             NoTrace(LocalName::from(name.0.clone())),
             FormDatumUnrooted {
-                ty: DOMString::from("file"),
+                ty: DOMString::from_static("file"),
                 name: DOMString::from(name.0),
                 value: FormDatumValueUnrooted::File(file.as_traced()),
             },
@@ -218,8 +218,8 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
     }
 
     /// <https://xhr.spec.whatwg.org/#dom-formdata-set>
-    fn Set(&self, _cx: &mut JSContext, name: USVString, str_value: USVString) {
-        let mut data = self.data.borrow_mut();
+    fn Set(&self, cx: &mut JSContext, name: USVString, str_value: USVString) {
+        let mut data = self.data.safe_borrow_mut(cx.no_gc());
         let local_name = LocalName::from(name.0.clone());
 
         data.retain(|(datum_name, _)| datum_name.0 != local_name);
@@ -227,7 +227,7 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
         data.push((
             NoTrace(local_name),
             FormDatumUnrooted {
-                ty: DOMString::from("string"),
+                ty: DOMString::from_static("string"),
                 name: DOMString::from(name.0),
                 value: FormDatumValueUnrooted::String(DOMString::from(str_value.0)),
             },
@@ -238,7 +238,7 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
     fn Set_(&self, cx: &mut JSContext, name: USVString, blob: &Blob, filename: Option<USVString>) {
         let file = self.create_an_entry(cx, blob, filename);
 
-        let mut data = self.data.borrow_mut();
+        let mut data = self.data.safe_borrow_mut(cx.no_gc());
         let local_name = LocalName::from(name.0.clone());
 
         data.retain(|(datum_name, _)| datum_name.0 != local_name);
@@ -246,7 +246,7 @@ impl FormDataMethods<crate::DomTypeHolder> for FormData {
         data.push((
             NoTrace(LocalName::from(name.0.clone())),
             FormDatumUnrooted {
-                ty: DOMString::from("file"),
+                ty: DOMString::from_static("file"),
                 name: DOMString::from(name.0),
                 value: FormDatumValueUnrooted::File(file.as_traced()),
             },
@@ -266,7 +266,7 @@ impl FormData {
         let name = match opt_filename {
             Some(filename) => DOMString::from(filename.0),
             None => match blob.downcast::<File>() {
-                None => DOMString::from("blob"),
+                None => DOMString::from_static("blob"),
                 // If it is already a file and no filename was given,
                 // then neither step 3 nor step 4 happens, so instead of
                 // creating a new File object we use the existing one.

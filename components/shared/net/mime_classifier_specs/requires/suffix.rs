@@ -12,7 +12,7 @@ verus! {
 pub open spec fn is_font_requires(mime: &Mime) -> bool {
     view(mime).type_ == "application"@
         && (view(mime).subtype == "font-cff"@
-            || view(mime).subtype == "font-off"@
+            || view(mime).subtype == "font-otf"@
             || view(mime).subtype == "font-sfnt"@
             || view(mime).subtype == "font-ttf"@
             || view(mime).subtype == "font-woff"@
