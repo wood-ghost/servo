@@ -1,15 +1,5 @@
 #!/bin/sh
 
-# MP4 sniffing fixtures: size, "ftyp", and major brand "isom". The 12-byte
-# box is missing its minor version; the 16-byte control has no compatible brands.
-printf '\000\000\000\014ftypisom' > undersized-ftyp.mp4
-printf '\000\000\000\020ftypisom\000\000\000\000' > ftyp-no-compatible-brands.mp4
-
-# Regenerate just the sniffing fixtures without running the media encoders.
-if [ "${1:-}" = "--mp4-sniffing-only" ]; then
-    exit 0
-fi
-
 INPUT=wav.wav
 sox -V -r 44100 -n -b 8 -c 1 wav.wav synth 0.01 sin 330 vol -6db
 ffmpeg -i $INPUT -write_xing 0 -id3v2_version 0 mp3-raw.mp3

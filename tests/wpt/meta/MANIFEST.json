@@ -581323,7 +581323,7 @@
        []
       ],
       "make-vectors.sh": [
-       "a2fb0015be1b5cd72386d7921773e3404aead54b",
+       "2cc0d463b50abca956c7b3ee18a1817c2548c51c",
        []
       ],
       "mp3-raw.mp3": [
@@ -1359710,15 +1359710,45 @@
        {}
       ]
      ],
-     "mp4-invalid-box-size-navigation.html": [
-      "5ebf095b7f3a4e563c34992bcd1095bc85ff7dd2",
+     "unplayable-media-navigation.window.js": [
+      "7c477e8d41b98629c8a9b823f336d7efab58d82b",
       [
-       "mimesniff/media/mp4-invalid-box-size-navigation.html?box_size=12",
-       {}
+       "mimesniff/media/unplayable-media-navigation.window.html?file=ftyp-no-compatible-brands.mp4",
+       {
+        "script_metadata": [
+         [
+          "title",
+          "Navigation to unplayable media"
+         ],
+         [
+          "variant",
+          "?file=undersized-ftyp.mp4"
+         ],
+         [
+          "variant",
+          "?file=ftyp-no-compatible-brands.mp4"
+         ]
+        ]
+       }
       ],
       [
-       "mimesniff/media/mp4-invalid-box-size-navigation.html?box_size=16",
-       {}
+       "mimesniff/media/unplayable-media-navigation.window.html?file=undersized-ftyp.mp4",
+       {
+        "script_metadata": [
+         [
+          "title",
+          "Navigation to unplayable media"
+         ],
+         [
+          "variant",
+          "?file=undersized-ftyp.mp4"
+         ],
+         [
+          "variant",
+          "?file=ftyp-no-compatible-brands.mp4"
+         ]
+        ]
+       }
       ]
      ]
     },
