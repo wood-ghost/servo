@@ -57,6 +57,34 @@ fn test_validate_classifier() {
     classifier.validate().expect("Validation error")
 }
 
+#[test]
+fn test_sniff_mp4_matcher_excluded_inputs_panic() {
+    // Record upstream behavior on the inputs excluded by mp4_matches_requires.
+    // The verification requirement is erased; it is not a runtime check.
+    for size in [0, 4, 8, 12] {
+        let mut data = *b"\x00\x00\x00\x0cftypisom";
+        data[3] = size;
+        assert!(std::panic::catch_unwind(|| Mp4Matcher.matches(&data)).is_err());
+    }
+}
+
+#[test]
+fn test_sniff_mp4_matcher_requirement_boundary_controls() {
+    let cases: &[(&[u8], bool)] = &[
+        (b"", false),
+        (b"\x00\x00\x00\x0cftypiso", false),
+        (b"\x00\x00\x00\x05ftypisom", false),
+        (b"\x00\x00\x00\x14ftypisom", false),
+        (b"\x00\x00\x00\x0cfreeisom", false),
+        (b"\x00\x00\x00\x0cftypmp41", true),
+        (b"\x00\x00\x00\x10ftypisom\x00\x00\x00\x00", false),
+        (b"\x00\x00\x00\x14ftypisom\x00\x00\x00\x00mp41", true),
+    ];
+    for &(data, expected) in cases {
+        assert_eq!(Mp4Matcher.matches(data), expected, "header: {data:?}");
+    }
+}
+
 #[cfg(test)]
 fn test_sniff_with_flags(
     filename_orig: &path::Path,

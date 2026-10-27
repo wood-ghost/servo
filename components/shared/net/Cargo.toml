@@ -27,6 +27,10 @@ path = "tests/mime_classifier_specs/mime_api.rs"
 name = "mime_constants"
 path = "tests/mime_classifier_specs/mime_constants.rs"
 
+[[test]]
+name = "mp4_requires"
+path = "tests/mime_classifier_specs/mp4_requires.rs"
+
 [features]
 test-util = []
 

@@ -147,6 +147,9 @@ impl MimeClassifier {
             SpecClassifier::mime_classifier_validate_spec(self),
             SpecRequires::classifiers_match_whatwg(self, data@), // for servo behavior
             SpecRequires::classify_suffix_requires(context, supplied_type),
+            SpecRequires::classify_input_requires(
+                self, context, no_sniff_flag, apache_bug_flag, supplied_type, data@,
+            ),
             context != LoadContext::Browsing ==> 
                 (supplied_type is Some ==> !Spec::is_html(&supplied_type->Some_0)), // for servo behavior
         ensures
@@ -162,6 +165,9 @@ impl MimeClassifier {
     {
         proof {
             SpecClassifier::lemma_mime_classifier_validate_spec(self);
+            SpecRequires::lemma_classify_input_requires(
+                self, context, no_sniff_flag, apache_bug_flag, supplied_type, data@,
+            );
         }
         let supplied_type_or_octet_stream = supplied_type
             .as_ref()
@@ -454,6 +460,7 @@ impl MimeClassifier {
         requires
             SpecClassifier::mime_classifier_validate_spec(self),
             SpecRequires::classifiers_match_whatwg(self, data@), // for servo behavior
+            SpecRequires::sniff_unknown_type_requires(self, no_sniff_flag, data@),
         ensures
             SpecMime::view(&result)
                 == SpecClassifier::sniff_unknown_type_spec(
@@ -503,6 +510,8 @@ impl MimeClassifier {
         sniffed
             .or_else(
                 || -> (r: Option<Mime>)
+                    requires
+                        self.plaintext_classifier.classify_requires(data@),
                     ensures
                         SpecMime::option_view(&r)
                             == self.plaintext_classifier.classify_spec(data@),
@@ -510,6 +519,8 @@ impl MimeClassifier {
             )
             .or_else(
                 || -> (r: Option<Mime>)
+                    requires
+                        self.image_classifier.classify_requires(data@),
                     ensures
                         SpecMime::option_view(&r)
                             == self.image_classifier.classify_spec(data@),
@@ -517,6 +528,8 @@ impl MimeClassifier {
             )
             .or_else(
                 || -> (r: Option<Mime>)
+                    requires
+                        self.audio_video_classifier.classify_requires(data@),
                     ensures
                         SpecMime::option_view(&r)
                             == self.audio_video_classifier.classify_spec(data@),
@@ -524,6 +537,8 @@ impl MimeClassifier {
             )
             .or_else(
                 || -> (r: Option<Mime>)
+                    requires
+                        self.archive_classifier.classify_requires(data@),
                     ensures
                         SpecMime::option_view(&r)
                             == self.archive_classifier.classify_spec(data@),
@@ -987,6 +1002,8 @@ pub struct Mp4Matcher;
 impl Mp4Matcher {
     /// <https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4>
     pub fn matches(&self, data: &[u8]) -> (result: bool) 
+        requires
+            SpecRequires::mp4_matches_requires(data@),
         ensures
             result == SpecMP4Matcher::matches_mp4_signature(data@),
     {
@@ -1023,39 +1040,22 @@ impl Mp4Matcher {
         // Step 7. If the three bytes from sequence[8] to sequence[10] are equal to 0x6D 0x70 0x34 ("mp4"), return true.
         let mp4 = [0x6D, 0x70, 0x34];
 
-        let ghost input = data@;
         broadcast use SpecMP4Matcher::lemma_chunks_mp4_equivalence;
             
         data[8..].starts_with(&mp4) ||
         // Step 8. Let bytes-read be 16.
         // Step 9. While bytes-read is less than box-size, continuously loop through these steps:
-            data.get(16..box_size).map(|data| -> (r: bool)
-                requires
-                    box_size as int >= 16,
-                    data@ == input.subrange(16, box_size as int),
-                ensures
-                    r == (exists |bytes_read: int| 16 <= bytes_read < (box_size as int)
-                        && bytes_read % 4 == 0
-                        && #[trigger] SpecMP4Matcher::has_mp4_at(input, bytes_read)),
+            data[16..box_size]
             // Step 11. Increment bytes-read by 4.
-            {
-                data.chunks(4).any(|chunk| -> (r: bool)
+                .chunks(4)
+                // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
+                // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
+                .any(|chunk| -> (r: bool)
                     ensures
                         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
                 {
                     chunk.starts_with(&mp4)
                 })
-            }).unwrap_or(false)
-        // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
-        // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
-                // // Step 10. If the three bytes from sequence[bytes-read] to sequence[bytes-read + 2]
-                // // are equal to 0x6D 0x70 0x34 ("mp4"), return true.
-                // .any(|chunk: &[u8]| -> (r: bool)
-                //     ensures
-                //         r == SpecMP4Matcher::has_mp4_prefix(chunk@)
-                // {
-                //     chunk.starts_with(&mp4)
-                // }
         // Step 12. Return false.
     }
 }
@@ -1158,6 +1158,12 @@ struct GroupedClassifier {
 
 #[cfg(verus_only)]
 impl ThreadSafeMIMEChecker for ByteMatcher {
+    open spec fn dyn_classify_requires(&self, data: Seq<u8>) -> bool {
+        self.classify_requires(data)
+    }
+
+    proof fn bridge_classify_requires(tracked &self, data: Seq<u8>) {}
+
     open spec fn dyn_validate_spec(&self) -> bool {
         self.validate_spec()
     }
@@ -1179,6 +1185,12 @@ impl ThreadSafeMIMEChecker for ByteMatcher {
 
 #[cfg(verus_only)]
 impl ThreadSafeMIMEChecker for TagTerminatedByteMatcher {
+    open spec fn dyn_classify_requires(&self, data: Seq<u8>) -> bool {
+        self.classify_requires(data)
+    }
+
+    proof fn bridge_classify_requires(tracked &self, data: Seq<u8>) {}
+
     open spec fn dyn_validate_spec(&self) -> bool {
         self.validate_spec()
     }
@@ -1200,6 +1212,12 @@ impl ThreadSafeMIMEChecker for TagTerminatedByteMatcher {
 
 #[cfg(verus_only)]
 impl ThreadSafeMIMEChecker for Mp4Matcher {
+    open spec fn dyn_classify_requires(&self, data: Seq<u8>) -> bool {
+        self.classify_requires(data)
+    }
+
+    proof fn bridge_classify_requires(tracked &self, data: Seq<u8>) {}
+
     open spec fn dyn_validate_spec(&self) -> bool {
         self.validate_spec()
     }
@@ -1340,6 +1358,7 @@ impl MIMEChecker for GroupedClassifier {
                 |matcher| -> (ret: Option<Mime>)
                     requires
                         matcher.dyn_validate_spec(),
+                        matcher.dyn_classify_requires(data@),
                     ensures
                         SpecMime::option_view(&ret) == matcher.dyn_classify_spec(data@),
                         matcher.dyn_classify_spec(data@) == matcher.classify_spec(data@)
@@ -1347,6 +1366,7 @@ impl MIMEChecker for GroupedClassifier {
                 proof {
                     matcher.bridge_validate_spec();
                     matcher.bridge_classify_spec(data@);
+                    matcher.bridge_classify_requires(data@);
                 }
                 matcher.classify(data)
             })

@@ -89,6 +89,10 @@ pub open spec fn bin_or_plain_classify_spec(data: Seq<u8>) -> MimeView {
 }
 
 impl MIMECheckerSpec for BinaryOrPlaintextClassifier {
+    open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
+        true
+    }
+
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         Some(bin_or_plain_classify_spec(data))
     }
@@ -169,6 +173,10 @@ pub(crate) broadcast proof fn lemma_classify_group_from_all_none(
 }
 
 impl MIMECheckerSpec for GroupedClassifier {
+    open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
+        crate::mime_classifier_specs::requires::grouped_classify_requires(self, data)
+    }
+
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         classify_group_from(self.byte_matchers@, data)
     }

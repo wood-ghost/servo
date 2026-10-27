@@ -144,6 +144,56 @@ Rust 1.95.0 Cargo driver:
 - Independent ordinary-Rust execution against `mime 0.3.17`: **9 reference inputs
   passed**, comprising the seven mismatch inputs and the two SVG inputs.
 
+### Upstream MP4 body and input requirement, 2026-10-26
+
+Follow-up to merge `0980cbb355e2ce51bd125f6dda83db3763f304b0`: the MP4 matcher
+uses upstream's `data[16..box_size].chunks(4).any(...)` executable expression.
+Its added contract calls `SpecRequires::mp4_matches_requires(data@)`, defined in
+`mime_classifier_specs/requires/mp4.rs` and exported by the existing umbrella.
+The WHATWG result predicate and the method's result postcondition are unchanged.
+
+The requirement allows all early returns. When the input has at least 12 bytes,
+the decoded box size fits the input and is divisible by four, the header contains
+`ftyp`, and the primary brand does not start with `mp4`, it requires the box size
+to be at least 16. This excludes the reversed-range slice reached for box sizes
+0, 4, 8, and 12. It narrows the theorem's input domain; it does not repair the
+upstream behavior or insert a runtime check.
+
+The verification-only checker traits carry a data-dependent `classify_requires`
+predicate and proved dynamic/static bridges. Byte and tag matchers and the
+binary/plaintext classifier impose no additional input restriction. A grouped
+classifier requires input safety for every member, including members after the
+first successful match, as required by the current vstd `find_map` contract.
+`sniff_unknown_type_requires` follows the short-circuit chain between groups;
+the public `classify_input_requires` also accounts for context and early exits.
+The public requirement is closed because it refers to private classifier types;
+a proved unfolding lemma exposes it within the implementation.
+
+Callers must establish these input requirements in addition to configuration
+validation, suffix restrictions, and the existing WHATWG-agreement premise.
+The ordinary browser callers are not proved to satisfy the new requirement.
+No `assume`, external body, or trusted external contract was added in this work.
+
+Checked with the same Verus revision and resource limits as the merge baseline:
+
+```bash
+cargo +1.99.1 verus focus --locked -p servo-net-traits -- \
+  --no-lifetime --no-trait-conflicts --expand-errors --multiple-errors 20
+cargo +1.97.1 test --locked -p servo-net-traits --test mime_classifier --message-format=short -- --quiet
+TMPDIR=/tmp/opencode cargo +1.99.1 test --locked -p servo-net-traits \
+  --test mp4_requires --message-format=short -- --test-threads=2
+```
+
+- Package verification: **206 verified, 0 errors**, with both lifetime and
+  trait-conflict checking disabled and dependency proofs skipped.
+- Native MIME tests: **76 passed**. One added test explicitly observes the
+  upstream panics on excluded inputs using `catch_unwind`; another executes
+  eight permitted early-return and valid-range controls.
+- Requirement regressions: **4 passed**. Three verify the rejected/accepted
+  input families using the actual production helper. The negative control
+  expects one assertion failure when it claims that an excluded input is allowed.
+  These snippet checks retain lifetime and trait-conflict checking.
+
 ### Upstream integration baseline, 2026-10-26
 
 Merged official Servo `bb25871aba7785abfa98c06b57a5f57bc6b30964` into the

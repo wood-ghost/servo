@@ -18,6 +18,10 @@ pub use crate::mime_classifier_specs::predicates::signature::{
 verus! {
 
 impl MIMECheckerSpec for Mp4Matcher {
+    open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
+        crate::mime_classifier_specs::requires::mp4_matches_requires(data)
+    }
+
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         if matches_mp4_signature(data) {
             Some(video_mp4_identity())

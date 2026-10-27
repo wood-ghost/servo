@@ -49,6 +49,7 @@ verus! {
 pub(crate) trait MIMECheckerSpec {
     spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView>;
     spec fn validate_spec(&self) -> bool;
+    spec fn classify_requires(&self, data: Seq<u8>) -> bool;
 }
 
 // Interface used for composite types. Keep the trait declarations outside the
@@ -57,6 +58,7 @@ pub(crate) trait MIMEChecker: MIMECheckerSpec {
     fn classify(&self, data: &[u8]) -> (r: Option<Mime>)
         requires
             self.validate_spec(),
+            self.classify_requires(data@),
         ensures
             option_view(&r) == self.classify_spec(data@),
     ;
@@ -71,6 +73,7 @@ pub(crate) trait MIMEChecker: MIMECheckerSpec {
 pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
     spec fn dyn_classify_spec(&self, data: Seq<u8>) -> Option<MimeView>;
     spec fn dyn_validate_spec(&self) -> bool;
+    spec fn dyn_classify_requires(&self, data: Seq<u8>) -> bool;
     spec fn dyn_content_type(&self) -> MimeView;
     proof fn bridge_validate_spec(tracked &self)
         ensures
@@ -78,6 +81,9 @@ pub(crate) trait ThreadSafeMIMEChecker: MIMEChecker + Send + Sync {
     proof fn bridge_classify_spec(tracked &self, data: Seq<u8>)
         ensures
             self.dyn_classify_spec(data) == self.classify_spec(data);
+    proof fn bridge_classify_requires(tracked &self, data: Seq<u8>)
+        ensures
+            self.dyn_classify_requires(data) == self.classify_requires(data);
 }
 
 pub trait MimeClassifierModel {

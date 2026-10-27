@@ -175,6 +175,10 @@ pub proof fn match_return_none(data: Seq<u8>, pattern: Seq<u8>, mask: Seq<u8>, i
 
 // impl
 impl MIMECheckerSpec for ByteMatcher {
+    open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
+        true
+    }
+
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         if data == self.pattern@
             || pattern_matching_success(data,
@@ -195,6 +199,10 @@ impl MIMECheckerSpec for ByteMatcher {
 }
 
 impl MIMECheckerSpec for TagTerminatedByteMatcher {
+    open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
+        true
+    }
+
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
         if exists |r: int| #![trigger data[r]]
             0 <= r < data.len()
