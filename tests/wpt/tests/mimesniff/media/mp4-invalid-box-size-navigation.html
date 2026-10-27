@@ -11,24 +11,23 @@
 <script>
 const boxSize = new URLSearchParams(location.search).get("box_size") || "12";
 
-promise_test(async t => {
+async_test(t => {
   assert_in_array(boxSize, ["12", "16"]);
+  const filename = boxSize === "12" ?
+    "undersized-ftyp.mp4" : "ftyp-no-compatible-brands.mp4";
   const iframe = document.createElement("iframe");
   t.add_cleanup(() => iframe.remove());
-  const loaded = new Promise((resolve, reject) => {
-    iframe.onload = resolve;
-    iframe.onerror = () => reject(new Error("The MP4 navigation failed"));
+  iframe.onload = t.step_func_done(() => {
+    assert_equals(iframe.contentWindow.location.href, iframe.src,
+                  "The iframe must finish navigating to the MP4 response");
+    assert_not_equals(iframe.contentDocument.querySelector("video"), null,
+                      "The supplied video/mp4 type must produce a media document");
   });
+  iframe.onerror = t.unreached_func("The MP4 navigation failed");
 
   // Navigate to exercise MIME sniffing before creating the media document.
   // An audio/video element alone does not exercise the navigation sniffer.
-  iframe.src = `resources/mp4-invalid-box-size.py?box_size=${boxSize}`;
+  iframe.src = `resources/${filename}?pipe=header(Content-Type,video/mp4)`;
   document.body.append(iframe);
-  await loaded;
-
-  assert_equals(iframe.contentWindow.location.href, iframe.src,
-                "The iframe must finish navigating to the MP4 response");
-  assert_not_equals(iframe.contentDocument.querySelector("video"), null,
-                    "The supplied video/mp4 type must produce a media document");
 }, `Navigation completes for an ftyp/isom box with box_size ${boxSize}`);
 </script>
