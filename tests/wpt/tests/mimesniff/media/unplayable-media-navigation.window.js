@@ -21,9 +21,8 @@ tests.vectors.forEach(vector => {
       });
       iframe.onerror = t.unreached_func("The media navigation failed");
 
-      // An audio/video element alone does not exercise the navigation sniffer.
-      iframe.src = `resources/${vector}?pipe=header(Content-Type,${type})`;
+      iframe.src = "resources/" + vector + "?pipe=header(Content-Type,"+type+")";
       document.body.append(iframe);
-    }, `${vector} can be navigated to when served with Content-Type ${type}`);
+    }, vector + " can be navigated to when served with Content-Type " + type);
   });
 });
