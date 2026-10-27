@@ -1359711,44 +1359711,10 @@
       ]
      ],
      "unplayable-media-navigation.window.js": [
-      "7c477e8d41b98629c8a9b823f336d7efab58d82b",
+      "745a3b5ba337760c619ae2a8cf3c6cced7949fd3",
       [
-       "mimesniff/media/unplayable-media-navigation.window.html?file=ftyp-no-compatible-brands.mp4",
-       {
-        "script_metadata": [
-         [
-          "title",
-          "Navigation to unplayable media"
-         ],
-         [
-          "variant",
-          "?file=undersized-ftyp.mp4"
-         ],
-         [
-          "variant",
-          "?file=ftyp-no-compatible-brands.mp4"
-         ]
-        ]
-       }
-      ],
-      [
-       "mimesniff/media/unplayable-media-navigation.window.html?file=undersized-ftyp.mp4",
-       {
-        "script_metadata": [
-         [
-          "title",
-          "Navigation to unplayable media"
-         ],
-         [
-          "variant",
-          "?file=undersized-ftyp.mp4"
-         ],
-         [
-          "variant",
-          "?file=ftyp-no-compatible-brands.mp4"
-         ]
-        ]
-       }
+       "mimesniff/media/unplayable-media-navigation.window.html",
+       {}
       ]
      ]
     },

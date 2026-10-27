@@ -1,10 +1,3 @@
-// META: title=Navigation to unplayable media
-// META: variant=?file=undersized-ftyp.mp4
-// META: variant=?file=ftyp-no-compatible-brands.mp4
-
-// https://mimesniff.spec.whatwg.org/#matches-the-signature-for-mp4
-// https://html.spec.whatwg.org/multipage/#navigate-media
-
 const tests = {
   "vectors": [
     "undersized-ftyp.mp4",
@@ -15,14 +8,7 @@ const tests = {
   ]
 };
 
-// Add a variant above for each vector so crashes are reported per file.
-const selectedFile = new URLSearchParams(location.search).get("file");
-
 tests.vectors.forEach(vector => {
-  if (selectedFile !== null && vector !== selectedFile) {
-    return;
-  }
-
   tests.contentTypes.forEach(type => {
     async_test(t => {
       const iframe = document.createElement("iframe");
