@@ -581330,6 +581330,10 @@
        "a6a24512406e96248a094b27803c8cce4415f8e3",
        []
       ],
+      "mp4-invalid-box-size.py": [
+       "caa0ddceac252f63542a6905e136b4b36f7a37dc",
+       []
+      ],
       "mp4.mp4": [
        "abefb4f71b82a384918e8e5337c2d391db3d8629",
        []
@@ -1359699,6 +1359703,17 @@
       "8e9bf9a27e829a00a70d227b5480b995726e3b60",
       [
        "mimesniff/media/media-sniff.window.html",
+       {}
+      ]
+     ],
+     "mp4-invalid-box-size-navigation.html": [
+      "4fa36a55be0fe2f580758ee2558db6399d398f11",
+      [
+       "mimesniff/media/mp4-invalid-box-size-navigation.html?box_size=12",
+       {}
+      ],
+      [
+       "mimesniff/media/mp4-invalid-box-size-navigation.html?box_size=16",
        {}
       ]
      ]
