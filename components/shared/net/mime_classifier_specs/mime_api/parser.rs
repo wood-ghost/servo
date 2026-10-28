@@ -29,7 +29,7 @@ pub open spec fn mime_parse_requires(input: Seq<char>) -> bool {
 }
 
 // Parser-contract structure:
-// input -> completed MimeParseAutomaton state -> Done/MimeView or Failure.
+// input -> completed mime_parse_automaton state -> Done/MimeView or Failure.
 //
 // The runner below selects states through the generated initialize and next relations.
 // mime_parse_final_state_properties proves that it reaches a terminal state along
@@ -37,12 +37,12 @@ pub open spec fn mime_parse_requires(input: Seq<char>) -> bool {
 // TODO: Reconcile the remaining WHATWG-shaped transitions (e.g. duplicate-name
 // filtering) with mime 0.3.17 before establishing general library correspondence.
 #[verifier::opaque]
-pub open spec fn mime_parse_final_state(input: Seq<char>) -> MimeParseAutomaton::State {
+pub open spec fn mime_parse_final_state(input: Seq<char>) -> mime_parse_automaton::State {
     // Reuse the DSL's initialization relation as the single source of field values.
     // The generated initializer supplies a witness. mime_parse_initialize_properties
     // proves that every state satisfying the relation gives this same run.
-    let initial = choose|state: MimeParseAutomaton::State|
-        MimeParseAutomaton::State::initialize(state, input);
+    let initial = choose|state: mime_parse_automaton::State|
+        mime_parse_automaton::State::initialize(state, input);
     mime_parse_run(initial)
 }
 
@@ -65,7 +65,7 @@ pub open spec fn mime_parse_subtype_and_suffix(
 
 // Project a successful state into the shared view. Parameters are already an
 // ordered sequence; an empty sequence represents a successful parse with no parameters.
-pub open spec fn mime_parse_done_view(final_state: MimeParseAutomaton::State) -> MimeView
+pub open spec fn mime_parse_done_view(final_state: mime_parse_automaton::State) -> MimeView
     recommends final_state.state == MimeParseState::Done,
 {
     let (subtype, suffix) = mime_parse_subtype_and_suffix(final_state.subtype);
@@ -122,7 +122,7 @@ pub ghost enum MimeParseState {
 
 // https://mimesniff.spec.whatwg.org/#parsing-a-mime-type
 state_machine! {
-    MimeParseAutomaton {
+    mime_parse_automaton {
         fields {
             pub input: Seq<char>,
             pub type_: Seq<char>,
@@ -633,13 +633,13 @@ state_machine! {
 // The supplied initial state is also a witness that the choice in final_state exists.
 pub proof fn mime_parse_initialize_properties(
     input: Seq<char>,
-    initial: MimeParseAutomaton::State,
+    initial: mime_parse_automaton::State,
 )
-    requires MimeParseAutomaton::State::initialize(initial, input),
+    requires mime_parse_automaton::State::initialize(initial, input),
     ensures
         initial.invariant(),
-        forall|state: MimeParseAutomaton::State|
-            #[trigger] MimeParseAutomaton::State::initialize(state, input) ==> state == initial,
+        forall|state: mime_parse_automaton::State|
+            #[trigger] mime_parse_automaton::State::initialize(state, input) ==> state == initial,
         mime_parse_final_state(input) == mime_parse_run(initial),
 {
     hide(mime_parse_run);
@@ -652,11 +652,11 @@ pub open spec fn mime_parse_terminal(state: MimeParseState) -> bool {
 
 // Select a successor using the DSL's transition relation. Existence, uniqueness,
 // invariant preservation, and progress are proved below for valid nonterminal states.
-pub open spec fn mime_parse_step(pre: MimeParseAutomaton::State) -> MimeParseAutomaton::State {
+pub open spec fn mime_parse_step(pre: mime_parse_automaton::State) -> mime_parse_automaton::State {
     if mime_parse_terminal(pre.state) {
         pre
     } else {
-        choose|post: MimeParseAutomaton::State| MimeParseAutomaton::State::next(pre, post)
+        choose|post: mime_parse_automaton::State| mime_parse_automaton::State::next(pre, post)
     }
 }
 
@@ -685,102 +685,102 @@ pub open spec fn mime_parse_phase_rank(state: MimeParseState) -> nat {
 }
 
 // Select an enabled generated proof helper. All field updates remain in the DSL.
-pub proof fn mime_parse_next_exists(pre: MimeParseAutomaton::State) -> (post: MimeParseAutomaton::State)
+pub proof fn mime_parse_next_exists(pre: mime_parse_automaton::State) -> (post: mime_parse_automaton::State)
     requires pre.invariant(), !mime_parse_terminal(pre.state),
     ensures
-        MimeParseAutomaton::State::next(pre, post),
+        mime_parse_automaton::State::next(pre, post),
         post.invariant(),
 {
     match pre.state {
         MimeParseState::Init => {
-            let post = MimeParseAutomaton::take_step::remove_whitespace(pre);
-            MimeParseAutomaton::show::remove_whitespace(pre, post);
+            let post = mime_parse_automaton::take_step::remove_whitespace(pre);
+            mime_parse_automaton::show::remove_whitespace(pre, post);
             post
         },
         MimeParseState::HttpWhitespaceRemoved => {
-            let post = MimeParseAutomaton::take_step::collect_type(pre);
-            MimeParseAutomaton::show::collect_type(pre, post);
+            let post = mime_parse_automaton::take_step::collect_type(pre);
+            mime_parse_automaton::show::collect_type(pre, post);
             post
         },
         MimeParseState::TypeCollected => {
-            let post = MimeParseAutomaton::take_step::validate_type_and_skip_slash(pre);
-            MimeParseAutomaton::show::validate_type_and_skip_slash(pre, post);
+            let post = mime_parse_automaton::take_step::validate_type_and_skip_slash(pre);
+            mime_parse_automaton::show::validate_type_and_skip_slash(pre, post);
             post
         },
         MimeParseState::AwaitingSubtype => {
-            let post = MimeParseAutomaton::take_step::collect_subtype(pre);
-            MimeParseAutomaton::show::collect_subtype(pre, post);
+            let post = mime_parse_automaton::take_step::collect_subtype(pre);
+            mime_parse_automaton::show::collect_subtype(pre, post);
             post
         },
         MimeParseState::SubtypeCollected => {
-            let post = MimeParseAutomaton::take_step::trim_and_validate_subtype(pre);
-            MimeParseAutomaton::show::trim_and_validate_subtype(pre, post);
+            let post = mime_parse_automaton::take_step::trim_and_validate_subtype(pre);
+            mime_parse_automaton::show::trim_and_validate_subtype(pre, post);
             post
         },
         MimeParseState::SubtypeValidated => {
-            let post = MimeParseAutomaton::take_step::create_mime_record(pre);
-            MimeParseAutomaton::show::create_mime_record(pre, post);
+            let post = mime_parse_automaton::take_step::create_mime_record(pre);
+            mime_parse_automaton::show::create_mime_record(pre, post);
             post
         },
         MimeParseState::AwaitingParameters => {
-            let post = MimeParseAutomaton::take_step::enter_loop(pre);
-            MimeParseAutomaton::show::enter_loop(pre, post);
+            let post = mime_parse_automaton::take_step::enter_loop(pre);
+            mime_parse_automaton::show::enter_loop(pre, post);
             post
         },
         MimeParseState::LoopHead => {
-            let post = MimeParseAutomaton::take_step::check_loop_continuation(pre);
-            MimeParseAutomaton::show::check_loop_continuation(pre, post);
+            let post = mime_parse_automaton::take_step::check_loop_continuation(pre);
+            mime_parse_automaton::show::check_loop_continuation(pre, post);
             post
         },
         MimeParseState::SemicolonSkipped => {
-            let post = MimeParseAutomaton::take_step::skip_http_whitespace(pre);
-            MimeParseAutomaton::show::skip_http_whitespace(pre, post);
+            let post = mime_parse_automaton::take_step::skip_http_whitespace(pre);
+            mime_parse_automaton::show::skip_http_whitespace(pre, post);
             post
         },
         MimeParseState::HttpWhitespaceSkipped => {
-            let post = MimeParseAutomaton::take_step::collect_parameter_name(pre);
-            MimeParseAutomaton::show::collect_parameter_name(pre, post);
+            let post = mime_parse_automaton::take_step::collect_parameter_name(pre);
+            mime_parse_automaton::show::collect_parameter_name(pre, post);
             post
         },
         MimeParseState::ParameterNameCollected => {
-            let post = MimeParseAutomaton::take_step::lowercase_parameter_name(pre);
-            MimeParseAutomaton::show::lowercase_parameter_name(pre, post);
+            let post = mime_parse_automaton::take_step::lowercase_parameter_name(pre);
+            mime_parse_automaton::show::lowercase_parameter_name(pre, post);
             post
         },
         MimeParseState::ParameterNameLowercased => {
-            let post = MimeParseAutomaton::take_step::handle_parameter_name_delimiter(pre);
-            MimeParseAutomaton::show::handle_parameter_name_delimiter(pre, post);
+            let post = mime_parse_automaton::take_step::handle_parameter_name_delimiter(pre);
+            mime_parse_automaton::show::handle_parameter_name_delimiter(pre, post);
             post
         },
         MimeParseState::AwaitingParameterValue => {
-            let post = MimeParseAutomaton::take_step::check_parameter_value_available(pre);
-            MimeParseAutomaton::show::check_parameter_value_available(pre, post);
+            let post = mime_parse_automaton::take_step::check_parameter_value_available(pre);
+            mime_parse_automaton::show::check_parameter_value_available(pre, post);
             post
         },
         MimeParseState::ReadyToParseParameterValue => {
-            let post = MimeParseAutomaton::take_step::collect_parameter_value(pre);
-            MimeParseAutomaton::show::collect_parameter_value(pre, post);
+            let post = mime_parse_automaton::take_step::collect_parameter_value(pre);
+            mime_parse_automaton::show::collect_parameter_value(pre, post);
             post
         },
         MimeParseState::UnquotedParameterValueCollected => {
-            let post = MimeParseAutomaton::take_step::trim_unquoted_parameter_value(pre);
-            MimeParseAutomaton::show::trim_unquoted_parameter_value(pre, post);
+            let post = mime_parse_automaton::take_step::trim_unquoted_parameter_value(pre);
+            mime_parse_automaton::show::trim_unquoted_parameter_value(pre, post);
             post
         },
         MimeParseState::UnquotedParameterValueTrimmed => {
             if pre.parameter_value.len() == 0 {
-                let post = MimeParseAutomaton::take_step::continue_after_empty_unquoted_value(pre);
-                MimeParseAutomaton::show::continue_after_empty_unquoted_value(pre, post);
+                let post = mime_parse_automaton::take_step::continue_after_empty_unquoted_value(pre);
+                mime_parse_automaton::show::continue_after_empty_unquoted_value(pre, post);
                 post
             } else {
-                let post = MimeParseAutomaton::take_step::store_parameter_if_valid(pre);
-                MimeParseAutomaton::show::store_parameter_if_valid(pre, post);
+                let post = mime_parse_automaton::take_step::store_parameter_if_valid(pre);
+                mime_parse_automaton::show::store_parameter_if_valid(pre, post);
                 post
             }
         },
         MimeParseState::QuotedParameterValueCollected => {
-            let post = MimeParseAutomaton::take_step::store_parameter_if_valid(pre);
-            MimeParseAutomaton::show::store_parameter_if_valid(pre, post);
+            let post = mime_parse_automaton::take_step::store_parameter_if_valid(pre);
+            mime_parse_automaton::show::store_parameter_if_valid(pre, post);
             post
         },
         _ => pre,
@@ -789,10 +789,10 @@ pub proof fn mime_parse_next_exists(pre: MimeParseAutomaton::State) -> (post: Mi
 
 // Prove progress from the generated transition relations, not from copied updates.
 pub proof fn mime_parse_next_properties(
-    pre: MimeParseAutomaton::State,
-    post: MimeParseAutomaton::State,
+    pre: mime_parse_automaton::State,
+    post: mime_parse_automaton::State,
 )
-    requires pre.invariant(), MimeParseAutomaton::State::next(pre, post),
+    requires pre.invariant(), mime_parse_automaton::State::next(pre, post),
     ensures
         post.invariant(),
         !mime_parse_terminal(pre.state),
@@ -804,7 +804,7 @@ pub proof fn mime_parse_next_properties(
                 mime_parse_phase_rank(post.state) < mime_parse_phase_rank(pre.state)
         },
 {
-    case_on_next! { pre, post, MimeParseAutomaton => {
+    case_on_next! { pre, post, mime_parse_automaton => {
         remove_whitespace() => {}
         collect_type() => {
             collect_code_points_position_bounds(pre.input, 0, |c: char| c != '\u{002F}');
@@ -843,23 +843,23 @@ pub proof fn mime_parse_next_properties(
 }
 
 pub proof fn mime_parse_next_is_deterministic(
-    pre: MimeParseAutomaton::State,
-    left: MimeParseAutomaton::State,
-    right: MimeParseAutomaton::State,
+    pre: mime_parse_automaton::State,
+    left: mime_parse_automaton::State,
+    right: mime_parse_automaton::State,
 )
     requires
-        MimeParseAutomaton::State::next(pre, left),
-        MimeParseAutomaton::State::next(pre, right),
+        mime_parse_automaton::State::next(pre, left),
+        mime_parse_automaton::State::next(pre, right),
     ensures left == right,
 {
-    reveal(MimeParseAutomaton::State::next);
-    reveal(MimeParseAutomaton::State::next_by);
+    reveal(mime_parse_automaton::State::next);
+    reveal(mime_parse_automaton::State::next_by);
 }
 
-pub broadcast proof fn mime_parse_step_correct(pre: MimeParseAutomaton::State)
+pub broadcast proof fn mime_parse_step_correct(pre: mime_parse_automaton::State)
     requires pre.invariant(), !mime_parse_terminal(pre.state),
     ensures
-        MimeParseAutomaton::State::next(pre, #[trigger] mime_parse_step(pre)),
+        mime_parse_automaton::State::next(pre, #[trigger] mime_parse_step(pre)),
         mime_parse_step(pre).invariant(),
         mime_parse_step(pre).state != MimeParseState::Init,
         pre.state != MimeParseState::Init ==> {
@@ -877,7 +877,7 @@ pub broadcast proof fn mime_parse_step_correct(pre: MimeParseAutomaton::State)
 
 // The first measure component handles the one-time input trimming. Afterwards,
 // input is fixed and either the cursor advances or the phase rank decreases.
-pub open spec fn mime_parse_run(pre: MimeParseAutomaton::State) -> MimeParseAutomaton::State
+pub open spec fn mime_parse_run(pre: mime_parse_automaton::State) -> mime_parse_automaton::State
     decreases
         (if pre.state == MimeParseState::Init { 1nat } else { 0nat }),
         pre.input.len() - pre.position,
@@ -894,7 +894,7 @@ pub open spec fn mime_parse_run(pre: MimeParseAutomaton::State) -> MimeParseAuto
 }
 
 #[verifier::decreases_by]
-proof fn mime_parse_run_decreases(pre: MimeParseAutomaton::State) {
+proof fn mime_parse_run_decreases(pre: mime_parse_automaton::State) {
     if pre.invariant() && !mime_parse_terminal(pre.state) {
         mime_parse_step_correct(pre);
     }
@@ -902,12 +902,12 @@ proof fn mime_parse_run_decreases(pre: MimeParseAutomaton::State) {
 
 // Expose one step to clients without unfolding the recursive runner many times.
 // On a terminal state, step is the identity and the final result stays the same.
-pub proof fn mime_parse_run_one_step(pre: MimeParseAutomaton::State) -> (post: MimeParseAutomaton::State)
+pub proof fn mime_parse_run_one_step(pre: mime_parse_automaton::State) -> (post: mime_parse_automaton::State)
     requires pre.invariant(),
     ensures
         post == mime_parse_step(pre),
         post.invariant(),
-        !mime_parse_terminal(pre.state) ==> MimeParseAutomaton::State::next(pre, post),
+        !mime_parse_terminal(pre.state) ==> mime_parse_automaton::State::next(pre, post),
         mime_parse_run(pre) == mime_parse_run(post),
         mime_parse_terminal(post.state) ==> mime_parse_run(pre) == post,
 {
@@ -917,29 +917,29 @@ pub proof fn mime_parse_run_one_step(pre: MimeParseAutomaton::State) -> (post: M
     mime_parse_step(pre)
 }
 
-pub open spec fn mime_parse_steps(trace: Seq<MimeParseAutomaton::State>) -> bool {
+pub open spec fn mime_parse_steps(trace: Seq<mime_parse_automaton::State>) -> bool {
     forall|i: int| 0 <= i && i + 1 < trace.len() ==>
-        #[trigger] MimeParseAutomaton::State::next(trace[i], trace[i + 1])
+        #[trigger] mime_parse_automaton::State::next(trace[i], trace[i + 1])
 }
 
-pub proof fn mime_parse_step_at(trace: Seq<MimeParseAutomaton::State>, i: int)
+pub proof fn mime_parse_step_at(trace: Seq<mime_parse_automaton::State>, i: int)
     requires mime_parse_steps(trace), 0 <= i, i + 1 < trace.len(),
-    ensures MimeParseAutomaton::State::next(trace[i], trace[i + 1]),
+    ensures mime_parse_automaton::State::next(trace[i], trace[i + 1]),
 {
     reveal(mime_parse_steps);
 }
 
 pub open spec fn mime_parse_complete_trace(
-    input: Seq<char>, trace: Seq<MimeParseAutomaton::State>,
+    input: Seq<char>, trace: Seq<mime_parse_automaton::State>,
 ) -> bool {
     &&& trace.len() > 0
-    &&& MimeParseAutomaton::State::initialize(trace.first(), input)
+    &&& mime_parse_automaton::State::initialize(trace.first(), input)
     &&& mime_parse_steps(trace)
     &&& mime_parse_terminal(trace.last().state)
 }
 
 // Construct a real execution witness for the runner, including failure paths.
-pub proof fn mime_parse_run_trace(pre: MimeParseAutomaton::State) -> (trace: Seq<MimeParseAutomaton::State>)
+pub proof fn mime_parse_run_trace(pre: mime_parse_automaton::State) -> (trace: Seq<mime_parse_automaton::State>)
     requires pre.invariant(),
     ensures
         trace.len() > 0,
@@ -961,7 +961,7 @@ pub proof fn mime_parse_run_trace(pre: MimeParseAutomaton::State) -> (trace: Seq
         let rest = mime_parse_run_trace(post);
         let trace = seq![pre] + rest;
         assert forall|i: int| 0 <= i && i + 1 < trace.len() implies
-            #[trigger] MimeParseAutomaton::State::next(trace[i], trace[i + 1]) by {
+            #[trigger] mime_parse_automaton::State::next(trace[i], trace[i + 1]) by {
             if i > 0 {
                 mime_parse_step_at(rest, i - 1);
             }
@@ -974,11 +974,11 @@ pub proof fn mime_parse_final_state_properties(input: Seq<char>)
     ensures
         mime_parse_final_state(input).invariant(),
         mime_parse_terminal(mime_parse_final_state(input).state),
-        exists|trace: Seq<MimeParseAutomaton::State>|
+        exists|trace: Seq<mime_parse_automaton::State>|
             #[trigger] mime_parse_complete_trace(input, trace)
                 && trace.last() == mime_parse_final_state(input),
 {
-    let initial = MimeParseAutomaton::take_step::initialize(input);
+    let initial = mime_parse_automaton::take_step::initialize(input);
     mime_parse_initialize_properties(input, initial);
     let trace = mime_parse_run_trace(initial);
     // Expose the constructed trace as the existential postcondition's witness.
@@ -1021,13 +1021,13 @@ pub broadcast proof fn lemma_mime_parse_plain(input: Seq<char>)
 {
     hide(mime_parse_run);
     hide(collect_code_points);
-    reveal(MimeParseAutomaton::State::next);
-    reveal(MimeParseAutomaton::State::next_by);
+    reveal(mime_parse_automaton::State::next);
+    reveal(mime_parse_automaton::State::next_by);
     let slash = input.index_of('/');
     collect_code_points_range(input, 0, slash, |c: char| c != '/');
     collect_code_points_range(input, slash + 1, input.len() as int, |c: char| c != ';');
     // assert(remove_http_whitespace(input) == input);
-    let initial = MimeParseAutomaton::take_step::initialize(input);
+    let initial = mime_parse_automaton::take_step::initialize(input);
     mime_parse_initialize_properties(input, initial);
     let s = mime_parse_run_one_step(initial);
     let s = mime_parse_run_one_step(s);
@@ -1174,7 +1174,7 @@ pub proof fn collect_code_points_stopping_condition(
 // Interpret a completed accumulator as the parent's optional parameter map.
 // None represents WHATWG's empty map, including when all parameters were ignored.
 pub open spec fn parameter_result(
-    final_state: MimeParseAutomaton::State,
+    final_state: mime_parse_automaton::State,
 ) -> Option<Seq<(Seq<char>, Seq<char>)>>
     recommends final_state.state == MimeParseState::Done,
 {
@@ -1187,15 +1187,15 @@ pub open spec fn parameter_result(
 
 // Once trimming is complete, every step preserves input and cannot return to Init.
 pub proof fn input_preserved_after_trimming(
-    pre: MimeParseAutomaton::State,
-    post: MimeParseAutomaton::State,
+    pre: mime_parse_automaton::State,
+    post: mime_parse_automaton::State,
 )
     requires
-        MimeParseAutomaton::State::next(pre, post),
+        mime_parse_automaton::State::next(pre, post),
         pre.state != MimeParseState::Init,
     ensures post.input == pre.input, post.state != MimeParseState::Init,
 {
-    case_on_next! { pre, post, MimeParseAutomaton => {
+    case_on_next! { pre, post, mime_parse_automaton => {
         remove_whitespace() => {}
         collect_type() => {}
         validate_type_and_skip_slash() => {}
@@ -1217,14 +1217,14 @@ pub proof fn input_preserved_after_trimming(
 }
 
 pub proof fn done_is_terminal(
-    pre: MimeParseAutomaton::State,
-    post: MimeParseAutomaton::State,
+    pre: mime_parse_automaton::State,
+    post: mime_parse_automaton::State,
 )
     requires pre.state == MimeParseState::Done,
-    ensures !MimeParseAutomaton::State::next(pre, post),
+    ensures !mime_parse_automaton::State::next(pre, post),
 {
-    if MimeParseAutomaton::State::next(pre, post) {
-        case_on_next! { pre, post, MimeParseAutomaton => {
+    if mime_parse_automaton::State::next(pre, post) {
+        case_on_next! { pre, post, mime_parse_automaton => {
             remove_whitespace() => {}
             collect_type() => {}
             validate_type_and_skip_slash() => {}
@@ -1248,14 +1248,14 @@ pub proof fn done_is_terminal(
 
 // Failure has no outgoing transitions.
 pub proof fn failure_is_terminal(
-    pre: MimeParseAutomaton::State,
-    post: MimeParseAutomaton::State,
+    pre: mime_parse_automaton::State,
+    post: mime_parse_automaton::State,
 )
     requires pre.state == MimeParseState::Failure,
-    ensures !MimeParseAutomaton::State::next(pre, post),
+    ensures !mime_parse_automaton::State::next(pre, post),
 {
-    if MimeParseAutomaton::State::next(pre, post) {
-        case_on_next! { pre, post, MimeParseAutomaton => {
+    if mime_parse_automaton::State::next(pre, post) {
+        case_on_next! { pre, post, mime_parse_automaton => {
             remove_whitespace() => {}
             collect_type() => {}
             validate_type_and_skip_slash() => {}

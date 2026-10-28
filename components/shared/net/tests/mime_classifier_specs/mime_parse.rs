@@ -268,7 +268,7 @@ test_verify_one_file! {
     #[test] model_mime_parse_final_state_plain verus_code! {
         use vstd::prelude::*;
         use crate::mime_api::{
-            MimeView, MimeParseAutomaton, MimeParseState, ascii_lowercase, collect_code_points,
+            MimeView, mime_parse_automaton, MimeParseState, ascii_lowercase, collect_code_points,
             mime_parse_done_view, mime_parse_final_state, mime_parse_initialize_properties, mime_parse_run,
             mime_parse_run_one_step,
         };
@@ -288,8 +288,8 @@ test_verify_one_file! {
         {
             hide(mime_parse_run);
             hide(collect_code_points);
-            reveal(MimeParseAutomaton::State::next);
-            reveal(MimeParseAutomaton::State::next_by);
+            reveal(mime_parse_automaton::State::next);
+            reveal(mime_parse_automaton::State::next_by);
             assert(collect_code_points(
                 seq!['t', 'e', 'x', 't', '/', 'h', 't', 'm', 'l'],
                 0, |c: char| c != '/',
@@ -301,7 +301,7 @@ test_verify_one_file! {
             assert(ascii_lowercase(seq!['t', 'e', 'x', 't']) =~= seq!['t', 'e', 'x', 't']) by (compute);
             assert(ascii_lowercase(seq!['h', 't', 'm', 'l']) =~= seq!['h', 't', 'm', 'l']) by (compute);
             let input = seq!['t', 'e', 'x', 't', '/', 'h', 't', 'm', 'l'];
-            let initial = MimeParseAutomaton::take_step::initialize(input);
+            let initial = mime_parse_automaton::take_step::initialize(input);
             mime_parse_initialize_properties(input, initial);
             let s = mime_parse_run_one_step(initial);
             let s = mime_parse_run_one_step(s);
@@ -344,7 +344,7 @@ test_verify_one_file! {
     #[test] model_mime_parse_final_state_svg verus_code! {
         use vstd::prelude::*;
         use crate::mime_api::{
-            MimeView, MimeParseAutomaton, MimeParseState, ascii_lowercase,
+            MimeView, mime_parse_automaton, MimeParseState, ascii_lowercase,
             collect_code_points, mime_parse_done_view, mime_parse_final_state,
             mime_parse_initialize_properties, mime_parse_run, mime_parse_run_one_step,
         };
@@ -374,8 +374,8 @@ test_verify_one_file! {
         {
             hide(mime_parse_run);
             hide(collect_code_points);
-            reveal(MimeParseAutomaton::State::next);
-            reveal(MimeParseAutomaton::State::next_by);
+            reveal(mime_parse_automaton::State::next);
+            reveal(mime_parse_automaton::State::next_by);
             assert(collect_code_points(svg_input(false), 0, |c: char| c != '/')
                 =~~= (seq!['i', 'm', 'a', 'g', 'e'], 5int)) by (compute_only);
             assert(collect_code_points(svg_input(true), 0, |c: char| c != '/')
@@ -392,7 +392,7 @@ test_verify_one_file! {
                 =~= seq!['s', 'v', 'g', '+', 'x', 'm', 'l']) by (compute);
             assert(ascii_lowercase(seq!['S', 'V', 'G', '+', 'X', 'M', 'L'])
                 =~= seq!['s', 'v', 'g', '+', 'x', 'm', 'l']) by (compute);
-            let initial = MimeParseAutomaton::take_step::initialize(input);
+            let initial = mime_parse_automaton::take_step::initialize(input);
             mime_parse_initialize_properties(input, initial);
             let s = mime_parse_run_one_step(initial);
             let s = mime_parse_run_one_step(s);
@@ -436,7 +436,7 @@ test_verify_one_file! {
     #[test] model_mime_parse_final_state_failures verus_code! {
         use vstd::prelude::*;
         use crate::mime_api::{
-            MimeParseAutomaton, MimeParseState, collect_code_points, mime_parse_final_state,
+            mime_parse_automaton, MimeParseState, collect_code_points, mime_parse_final_state,
             mime_parse_initialize_properties, mime_parse_run, mime_parse_run_one_step,
         };
 
@@ -447,9 +447,9 @@ test_verify_one_file! {
         {
             hide(mime_parse_run);
             reveal_with_fuel(collect_code_points, 12);
-            reveal(MimeParseAutomaton::State::next);
-            reveal(MimeParseAutomaton::State::next_by);
-            let initial = MimeParseAutomaton::take_step::initialize(input);
+            reveal(mime_parse_automaton::State::next);
+            reveal(mime_parse_automaton::State::next_by);
+            let initial = mime_parse_automaton::take_step::initialize(input);
             mime_parse_initialize_properties(input, initial);
             let s = mime_parse_run_one_step(initial);
             let s = mime_parse_run_one_step(s);
@@ -470,7 +470,7 @@ test_verify_one_file! {
         use vstd::prelude::*;
         broadcast use crate::mime_api::mime_parse_step_correct;
         use crate::mime_api::{
-            MimeParseAutomaton, MimeParseState, ascii_lowercase, collect_code_points,
+            mime_parse_automaton, MimeParseState, ascii_lowercase, collect_code_points,
             is_http_whitespace, mime_parse_final_state,
             mime_parse_initialize_properties, mime_parse_run, mime_parse_run_one_step, mime_parse_step,
             mime_parse_terminal,
@@ -480,7 +480,7 @@ test_verify_one_file! {
             seq!['t', '/', 's', ';', 'a', '=', 'b', ';', 'c', '=', 'd']
         }
 
-        proof fn four_steps(pre: MimeParseAutomaton::State) -> (post: MimeParseAutomaton::State)
+        proof fn four_steps(pre: mime_parse_automaton::State) -> (post: mime_parse_automaton::State)
             requires pre.invariant(),
             ensures
                 post == mime_parse_step(mime_parse_step(mime_parse_step(mime_parse_step(pre)))),
@@ -499,8 +499,8 @@ test_verify_one_file! {
             hide(mime_parse_run);
             hide(collect_code_points);
             hide(ascii_lowercase);
-            reveal(MimeParseAutomaton::State::next);
-            reveal(MimeParseAutomaton::State::next_by);
+            reveal(mime_parse_automaton::State::next);
+            reveal(mime_parse_automaton::State::next_by);
             assert(collect_code_points(sample_input(), 0, |c: char| c != '/')
                 =~~= (seq!['t'], 1int)) by (compute_only);
             assert(collect_code_points(sample_input(), 2, |c: char| c != ';')
@@ -522,7 +522,7 @@ test_verify_one_file! {
             assert(ascii_lowercase(seq!['a']) =~= seq!['a']) by (compute);
             assert(ascii_lowercase(seq!['c']) =~= seq!['c']) by (compute);
             let input = sample_input();
-            let initial = MimeParseAutomaton::take_step::initialize(input);
+            let initial = mime_parse_automaton::take_step::initialize(input);
             mime_parse_initialize_properties(input, initial);
             let s = four_steps(initial);
             assert(s.state == MimeParseState::SubtypeCollected);

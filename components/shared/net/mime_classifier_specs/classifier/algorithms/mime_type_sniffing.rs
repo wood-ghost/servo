@@ -58,7 +58,7 @@ pub ghost enum MimeTypeSniffState {
 }
 
 state_machine! {
-    MimeClassifierAutomaton<C: MimeClassifierModel> {
+    mime_classifier_automaton<C: MimeClassifierModel> {
         fields {
             // Immutable inputs for one execution of the algorithm.
             pub classifier: C,
@@ -343,10 +343,10 @@ pub(crate) open spec fn mime_type_sniffing_trace<C: MimeClassifierModel>(
     no_sniff_flag: NoSniffFlag,
     apache_bug_flag: ApacheBugFlag,
     data: Seq<u8>,
-    trace: Seq<MimeClassifierAutomaton::State<C>>,
+    trace: Seq<mime_classifier_automaton::State<C>>,
 ) -> bool {
     &&& trace.len() > 0
-    &&& MimeClassifierAutomaton::State::<C>::initialize(
+    &&& mime_classifier_automaton::State::<C>::initialize(
         trace.first(),
         classifier,
         supplied_type,
@@ -357,7 +357,7 @@ pub(crate) open spec fn mime_type_sniffing_trace<C: MimeClassifierModel>(
     &&& forall |i: int|
         0 <= i && i + 1 < trace.len() ==>
             #[trigger]
-            MimeClassifierAutomaton::State::<C>::next(
+            mime_classifier_automaton::State::<C>::next(
                 trace[i],
                 trace[i + 1],
             )
@@ -372,7 +372,7 @@ pub(crate) open spec fn mime_type_sniffing_result<C: MimeClassifierModel>(
     data: Seq<u8>,
     result: MimeView,
 ) -> bool {
-    exists |trace: Seq<MimeClassifierAutomaton::State<C>>|
+    exists |trace: Seq<mime_classifier_automaton::State<C>>|
         #[trigger]
         mime_type_sniffing_trace(
             classifier,

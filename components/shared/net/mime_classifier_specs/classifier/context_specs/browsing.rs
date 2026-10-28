@@ -31,7 +31,7 @@ use crate::mime_classifier_specs::classifier::checker_trait::{
     lemma_model_audio_video_type_matches_spec,
 };
 use crate::mime_classifier_specs::classifier::algorithms::mime_type_sniffing::{
-    MimeClassifierAutomaton,
+    mime_classifier_automaton,
     MimeTypeSniffState,
     mime_type_sniffing_trace,
     mime_type_sniffing_result,
@@ -69,7 +69,7 @@ pub(crate) open spec fn mime_classify_browsing_result_from_trace<'a>(
     supplied_type: &Option<Mime>,
     data: Seq<u8>,
     result: MimeView,
-    trace: Seq<MimeClassifierAutomaton::State<&'a MimeClassifier>>,
+    trace: Seq<mime_classifier_automaton::State<&'a MimeClassifier>>,
 ) -> bool {
     &&& mime_type_sniffing_trace(
         classifier,
@@ -139,7 +139,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_step1_result<'a>(
         ),
 {
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             *supplied_type,
             no_sniff_flag,
@@ -147,9 +147,9 @@ pub(crate) proof fn lemma_mime_classify_browsing_step1_result<'a>(
             data,
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step1(state0, state1);
 
     let trace = seq![state0, state1];
 
@@ -187,7 +187,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_none_result<'a>(
 {
 
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             *supplied_type,
             no_sniff_flag,
@@ -195,11 +195,11 @@ pub(crate) proof fn lemma_mime_classify_browsing_none_result<'a>(
             data
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
-    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
+    let state2 = mime_classifier_automaton::take_step::step2(state1);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
-    MimeClassifierAutomaton::show::step2(state1, state2);
+    mime_classifier_automaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step2(state1, state2);
 
     let trace = seq![state0, state1, state2];
 
@@ -243,7 +243,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_explicit_unknown_result<'a>(
 {
 
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             *supplied_type_input,
             no_sniff_flag,
@@ -251,11 +251,11 @@ pub(crate) proof fn lemma_mime_classify_browsing_explicit_unknown_result<'a>(
             data
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
-    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
+    let state2 = mime_classifier_automaton::take_step::step2(state1);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
-    MimeClassifierAutomaton::show::step2(state1, state2);
+    mime_classifier_automaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step2(state1, state2);
 
     let trace = seq![state0, state1, state2];
 
@@ -299,7 +299,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_no_sniff_result<'a>(
         ),
 {
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             *supplied_type_input,
             no_sniff_flag,
@@ -307,13 +307,13 @@ pub(crate) proof fn lemma_mime_classify_browsing_no_sniff_result<'a>(
             data,
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
-    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
-    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
+    let state2 = mime_classifier_automaton::take_step::step2(state1);
+    let state3 = mime_classifier_automaton::take_step::step3(state2);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
-    MimeClassifierAutomaton::show::step2(state1, state2);
-    MimeClassifierAutomaton::show::step3(state2, state3);
+    mime_classifier_automaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step2(state1, state2);
+    mime_classifier_automaton::show::step3(state2, state3);
 
     let trace = seq![state0, state1, state2, state3];
 
@@ -357,7 +357,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_apache_bug_result<'a>(
 {
 
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             *supplied_type_input,
             no_sniff_flag,
@@ -365,15 +365,15 @@ pub(crate) proof fn lemma_mime_classify_browsing_apache_bug_result<'a>(
             data,
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
-    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
-    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
-    let state4 = MimeClassifierAutomaton::take_step::step4(state3);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
+    let state2 = mime_classifier_automaton::take_step::step2(state1);
+    let state3 = mime_classifier_automaton::take_step::step3(state2);
+    let state4 = mime_classifier_automaton::take_step::step4(state3);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
-    MimeClassifierAutomaton::show::step2(state1, state2);
-    MimeClassifierAutomaton::show::step3(state2, state3);
-    MimeClassifierAutomaton::show::step4(state3, state4);
+    mime_classifier_automaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step2(state1, state2);
+    mime_classifier_automaton::show::step3(state2, state3);
+    mime_classifier_automaton::show::step4(state3, state4);
 
     let trace = seq![state0, state1, state2, state3, state4];
 
@@ -433,7 +433,7 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
     SpecRequires::lemma_audio_or_video_classifier_matches_whatwg(classifier, data);
 
     let state0 =
-        MimeClassifierAutomaton::take_step::initialize(
+        mime_classifier_automaton::take_step::initialize(
             classifier,
             supplied_type_input,
             no_sniff_flag,
@@ -441,19 +441,19 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
             data
         );
 
-    let state1 = MimeClassifierAutomaton::take_step::step1(state0);
-    let state2 = MimeClassifierAutomaton::take_step::step2(state1);
-    let state3 = MimeClassifierAutomaton::take_step::step3(state2);
-    let state4 = MimeClassifierAutomaton::take_step::step4(state3);
-    let state5 = MimeClassifierAutomaton::take_step::step5(state4);
-    let state6 = MimeClassifierAutomaton::take_step::step6(state5);
+    let state1 = mime_classifier_automaton::take_step::step1(state0);
+    let state2 = mime_classifier_automaton::take_step::step2(state1);
+    let state3 = mime_classifier_automaton::take_step::step3(state2);
+    let state4 = mime_classifier_automaton::take_step::step4(state3);
+    let state5 = mime_classifier_automaton::take_step::step5(state4);
+    let state6 = mime_classifier_automaton::take_step::step6(state5);
 
-    MimeClassifierAutomaton::show::step1(state0, state1);
-    MimeClassifierAutomaton::show::step2(state1, state2);
-    MimeClassifierAutomaton::show::step3(state2, state3);
-    MimeClassifierAutomaton::show::step4(state3, state4);
-    MimeClassifierAutomaton::show::step5(state4, state5);
-    MimeClassifierAutomaton::show::step6(state5, state6);
+    mime_classifier_automaton::show::step1(state0, state1);
+    mime_classifier_automaton::show::step2(state1, state2);
+    mime_classifier_automaton::show::step3(state2, state3);
+    mime_classifier_automaton::show::step4(state3, state4);
+    mime_classifier_automaton::show::step5(state4, state5);
+    mime_classifier_automaton::show::step6(state5, state6);
 
     if state6.state == MimeTypeSniffState::Final {
         let trace = seq![state0, state1, state2, state3, state4, state5, state6];
@@ -470,11 +470,11 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
             )
         );
     } else {
-        let state7 = MimeClassifierAutomaton::take_step::step7(state6);
-        let state8 = MimeClassifierAutomaton::take_step::step8(state7);
+        let state7 = mime_classifier_automaton::take_step::step7(state6);
+        let state8 = mime_classifier_automaton::take_step::step8(state7);
 
-        MimeClassifierAutomaton::show::step7(state6, state7);
-        MimeClassifierAutomaton::show::step8(state7, state8);
+        mime_classifier_automaton::show::step7(state6, state7);
+        mime_classifier_automaton::show::step8(state7, state8);
 
         if state8.state == MimeTypeSniffState::Final {
             let trace = seq![state0, state1, state2, state3, state4, state5, state6, state7, state8];
@@ -490,9 +490,9 @@ pub(crate) proof fn lemma_mime_classify_browsing_after_step4_trace<'a>(
                 )
             );
         } else {
-            let state9 = MimeClassifierAutomaton::take_step::step9(state8);
+            let state9 = mime_classifier_automaton::take_step::step9(state8);
 
-            MimeClassifierAutomaton::show::step9(state8, state9);
+            mime_classifier_automaton::show::step9(state8, state9);
             
             let trace = seq![state0, state1, state2, state3, state4, state5, state6, state7, state8, state9];
 

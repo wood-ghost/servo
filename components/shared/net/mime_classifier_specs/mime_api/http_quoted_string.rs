@@ -45,7 +45,7 @@ pub open spec fn collect_http_quoted_string(
     // This only skips the opening quote and returns an empty value; it does not parse quotes.
     // The former stub above is now replaced by completed-trace selection.
     if 0 <= position < input.len() && input[position] == '\u{0022}' {
-        let trace = choose|trace: Seq<HttpQuotedStringAutomaton::State>|
+        let trace = choose|trace: Seq<http_quoted_string_automaton::State>|
             http_quoted_string_complete_trace(input, position, trace);
         http_quoted_string_output(trace.last(), extract_value)
     } else {
@@ -66,7 +66,7 @@ pub ghost enum HttpQuotedStringState {
 }
 
 state_machine! {
-    HttpQuotedStringAutomaton {
+    http_quoted_string_automaton {
         fields {
             pub input: Seq<char>,
             pub position: int,
@@ -290,24 +290,24 @@ state_machine! {
 
 // The explicit finish guards follow from the phase invariant, so they cannot block
 // a valid execution after the closing quote has been consumed.
-pub proof fn http_quoted_string_finish_enabled(pre: HttpQuotedStringAutomaton::State)
+pub proof fn http_quoted_string_finish_enabled(pre: http_quoted_string_automaton::State)
     requires
         pre.invariant(),
         pre.state == HttpQuotedStringState::ClosingQuoteConsumed,
-    ensures HttpQuotedStringAutomaton::State::finish_enabled(pre),
+    ensures http_quoted_string_automaton::State::finish_enabled(pre),
 {
 }
 
 // A finite execution prefix. Initialization is independent of compatibility requirements,
 // so error-reaching executions remain available when defining those requirements.
-pub open spec fn http_quoted_string_steps(trace: Seq<HttpQuotedStringAutomaton::State>) -> bool {
+pub open spec fn http_quoted_string_steps(trace: Seq<http_quoted_string_automaton::State>) -> bool {
     forall|i: int| 0 <= i && i + 1 < trace.len() ==>
-        #[trigger] HttpQuotedStringAutomaton::State::next(trace[i], trace[i + 1])
+        #[trigger] http_quoted_string_automaton::State::next(trace[i], trace[i + 1])
 }
 
-pub proof fn http_quoted_string_step_at(trace: Seq<HttpQuotedStringAutomaton::State>, i: int)
+pub proof fn http_quoted_string_step_at(trace: Seq<http_quoted_string_automaton::State>, i: int)
     requires http_quoted_string_steps(trace), 0 <= i, i + 1 < trace.len(),
-    ensures HttpQuotedStringAutomaton::State::next(trace[i], trace[i + 1]),
+    ensures http_quoted_string_automaton::State::next(trace[i], trace[i + 1]),
 {
     reveal(http_quoted_string_steps);
 }
@@ -315,10 +315,10 @@ pub proof fn http_quoted_string_step_at(trace: Seq<HttpQuotedStringAutomaton::St
 pub open spec fn http_quoted_string_trace(
     input: Seq<char>,
     position: int,
-    trace: Seq<HttpQuotedStringAutomaton::State>,
+    trace: Seq<http_quoted_string_automaton::State>,
 ) -> bool {
     &&& trace.len() > 0
-    &&& HttpQuotedStringAutomaton::State::initialize(trace.first(), input, position)
+    &&& http_quoted_string_automaton::State::initialize(trace.first(), input, position)
     &&& http_quoted_string_steps(trace)
 }
 
@@ -331,7 +331,7 @@ pub open spec fn http_quoted_string_terminal(state: HttpQuotedStringState) -> bo
 pub open spec fn http_quoted_string_complete_trace(
     input: Seq<char>,
     position: int,
-    trace: Seq<HttpQuotedStringAutomaton::State>,
+    trace: Seq<http_quoted_string_automaton::State>,
 ) -> bool {
     http_quoted_string_trace(input, position, trace)
         && http_quoted_string_terminal(trace.last().state)
@@ -339,8 +339,8 @@ pub open spec fn http_quoted_string_complete_trace(
 
 pub open spec fn http_quoted_string_initial_state(
     input: Seq<char>, position: int,
-) -> HttpQuotedStringAutomaton::State {
-    HttpQuotedStringAutomaton::State {
+) -> http_quoted_string_automaton::State {
+    http_quoted_string_automaton::State {
         input,
         position,
         position_start: position,
@@ -352,15 +352,15 @@ pub open spec fn http_quoted_string_initial_state(
 // A deterministic witness for a single transition. Its relationship to `next`
 // is proved below; it is used to construct a terminating witness trace.
 pub open spec fn http_quoted_string_step(
-    pre: HttpQuotedStringAutomaton::State,
-) -> HttpQuotedStringAutomaton::State {
+    pre: http_quoted_string_automaton::State,
+) -> http_quoted_string_automaton::State {
     match pre.state {
-        HttpQuotedStringState::Init => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::Init => http_quoted_string_automaton::State {
             position: pre.position + 1,
             state: HttpQuotedStringState::ReadingValue,
             ..pre
         },
-        HttpQuotedStringState::ReadingValue => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::ReadingValue => http_quoted_string_automaton::State {
             state: if pre.position >= pre.input.len() {
                 HttpQuotedStringState::MissingQuote
             } else if pre.input[pre.position] == '\u{0022}'
@@ -373,22 +373,22 @@ pub open spec fn http_quoted_string_step(
             },
             ..pre
         },
-        HttpQuotedStringState::ContentReady => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::ContentReady => http_quoted_string_automaton::State {
             value: pre.value.push(pre.input[pre.position]),
             state: HttpQuotedStringState::ContentAppended,
             ..pre
         },
-        HttpQuotedStringState::ContentAppended => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::ContentAppended => http_quoted_string_automaton::State {
             position: pre.position + 1,
             state: HttpQuotedStringState::ReadingValue,
             ..pre
         },
-        HttpQuotedStringState::ClosingQuoteReady => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::ClosingQuoteReady => http_quoted_string_automaton::State {
             position: pre.position + 1,
             state: HttpQuotedStringState::ClosingQuoteConsumed,
             ..pre
         },
-        HttpQuotedStringState::ClosingQuoteConsumed => HttpQuotedStringAutomaton::State {
+        HttpQuotedStringState::ClosingQuoteConsumed => http_quoted_string_automaton::State {
             state: HttpQuotedStringState::Done,
             ..pre
         },
@@ -409,8 +409,8 @@ pub open spec fn http_quoted_string_phase_rank(state: HttpQuotedStringState) -> 
 }
 
 pub open spec fn http_quoted_string_trace_from(
-    pre: HttpQuotedStringAutomaton::State,
-) -> Seq<HttpQuotedStringAutomaton::State>
+    pre: http_quoted_string_automaton::State,
+) -> Seq<http_quoted_string_automaton::State>
     decreases pre.input.len() - pre.position, http_quoted_string_phase_rank(pre.state),
 {
     // Totalize the witness constructor on malformed states without making its
@@ -426,11 +426,11 @@ pub open spec fn http_quoted_string_trace_from(
     }
 }
 
-pub proof fn http_quoted_string_step_correct(pre: HttpQuotedStringAutomaton::State)
+pub proof fn http_quoted_string_step_correct(pre: http_quoted_string_automaton::State)
     requires pre.invariant(), !http_quoted_string_terminal(pre.state),
     ensures
         http_quoted_string_step(pre).invariant(),
-        HttpQuotedStringAutomaton::State::next(pre, http_quoted_string_step(pre)),
+        http_quoted_string_automaton::State::next(pre, http_quoted_string_step(pre)),
         http_quoted_string_step(pre).input == pre.input,
         http_quoted_string_step(pre).position_start == pre.position_start,
         pre.position <= http_quoted_string_step(pre).position <= pre.input.len(),
@@ -438,35 +438,35 @@ pub proof fn http_quoted_string_step_correct(pre: HttpQuotedStringAutomaton::Sta
     let post = http_quoted_string_step(pre);
     match pre.state {
         HttpQuotedStringState::Init => {
-            HttpQuotedStringAutomaton::show::skip_opening_quote(pre, post);
+            http_quoted_string_automaton::show::skip_opening_quote(pre, post);
         },
         HttpQuotedStringState::ReadingValue => {
-            HttpQuotedStringAutomaton::show::check_position_1(pre, post);
+            http_quoted_string_automaton::show::check_position_1(pre, post);
         },
         HttpQuotedStringState::ContentReady => {
-            HttpQuotedStringAutomaton::show::append_content(pre, post);
+            http_quoted_string_automaton::show::append_content(pre, post);
         },
         HttpQuotedStringState::ContentAppended => {
-            HttpQuotedStringAutomaton::show::advance_value_position(pre, post);
+            http_quoted_string_automaton::show::advance_value_position(pre, post);
         },
         HttpQuotedStringState::ClosingQuoteReady => {
-            HttpQuotedStringAutomaton::show::skip_past_delimiter(pre, post);
+            http_quoted_string_automaton::show::skip_past_delimiter(pre, post);
         },
         HttpQuotedStringState::ClosingQuoteConsumed => {
-            HttpQuotedStringAutomaton::show::finish(pre, post);
+            http_quoted_string_automaton::show::finish(pre, post);
         },
         _ => {},
     }
 }
 
 pub proof fn http_quoted_string_next_is_deterministic(
-    pre: HttpQuotedStringAutomaton::State,
-    post: HttpQuotedStringAutomaton::State,
+    pre: http_quoted_string_automaton::State,
+    post: http_quoted_string_automaton::State,
 )
-    requires HttpQuotedStringAutomaton::State::next(pre, post),
+    requires http_quoted_string_automaton::State::next(pre, post),
     ensures post == http_quoted_string_step(pre), !http_quoted_string_terminal(pre.state),
 {
-    case_on_next! { pre, post, HttpQuotedStringAutomaton => {
+    case_on_next! { pre, post, http_quoted_string_automaton => {
         skip_opening_quote() => {}
         check_position_1() => {}
         append_content() => {}
@@ -476,7 +476,7 @@ pub proof fn http_quoted_string_next_is_deterministic(
     }}
 }
 
-pub proof fn http_quoted_string_trace_from_properties(pre: HttpQuotedStringAutomaton::State)
+pub proof fn http_quoted_string_trace_from_properties(pre: http_quoted_string_automaton::State)
     requires pre.invariant(),
     ensures ({
         let trace = http_quoted_string_trace_from(pre);
@@ -498,7 +498,7 @@ pub proof fn http_quoted_string_trace_from_properties(pre: HttpQuotedStringAutom
         let rest = http_quoted_string_trace_from(post);
         let trace = seq![pre] + rest;
         assert forall|i: int| 0 <= i && i + 1 < trace.len() implies
-            #[trigger] HttpQuotedStringAutomaton::State::next(trace[i], trace[i + 1]) by {
+            #[trigger] http_quoted_string_automaton::State::next(trace[i], trace[i + 1]) by {
             if i > 0 {
                 http_quoted_string_step_at(rest, i - 1);
             }
@@ -507,8 +507,8 @@ pub proof fn http_quoted_string_trace_from_properties(pre: HttpQuotedStringAutom
 }
 
 pub proof fn http_quoted_string_complete_trace_unique(
-    pre: HttpQuotedStringAutomaton::State,
-    trace: Seq<HttpQuotedStringAutomaton::State>,
+    pre: http_quoted_string_automaton::State,
+    trace: Seq<http_quoted_string_automaton::State>,
 )
     requires
         pre.invariant(),
@@ -530,7 +530,7 @@ pub proof fn http_quoted_string_complete_trace_unique(
 }
 
 pub open spec fn http_quoted_string_output(
-    final_state: HttpQuotedStringAutomaton::State,
+    final_state: http_quoted_string_automaton::State,
     extract_value: bool,
 ) -> Result<(Seq<char>, int), QuotedStringError> {
     match final_state.state {
@@ -569,22 +569,22 @@ pub proof fn collect_http_quoted_string_properties(
     let witness = http_quoted_string_trace_from(initial);
     // Supply an explicit witness for the completed-trace choice.
     assert(http_quoted_string_complete_trace(input, position, witness));
-    let trace = choose|trace: Seq<HttpQuotedStringAutomaton::State>|
+    let trace = choose|trace: Seq<http_quoted_string_automaton::State>|
         http_quoted_string_complete_trace(input, position, trace);
     http_quoted_string_complete_trace_unique(initial, trace);
 }
 
 pub proof fn http_quoted_string_input_and_start_preserved(
-    pre: HttpQuotedStringAutomaton::State,
-    post: HttpQuotedStringAutomaton::State,
+    pre: http_quoted_string_automaton::State,
+    post: http_quoted_string_automaton::State,
 )
-    requires HttpQuotedStringAutomaton::State::next(pre, post),
+    requires http_quoted_string_automaton::State::next(pre, post),
     ensures
         post.input == pre.input,
         post.position_start == pre.position_start,
         post.state != HttpQuotedStringState::Init,
 {
-    case_on_next! { pre, post, HttpQuotedStringAutomaton => {
+    case_on_next! { pre, post, http_quoted_string_automaton => {
         skip_opening_quote() => {}
         append_content() => {}
         advance_value_position() => {}
@@ -595,14 +595,14 @@ pub proof fn http_quoted_string_input_and_start_preserved(
 }
 
 pub proof fn http_quoted_string_missing_quote_is_terminal(
-    pre: HttpQuotedStringAutomaton::State,
-    post: HttpQuotedStringAutomaton::State,
+    pre: http_quoted_string_automaton::State,
+    post: http_quoted_string_automaton::State,
 )
     requires pre.state == HttpQuotedStringState::MissingQuote,
-    ensures !HttpQuotedStringAutomaton::State::next(pre, post),
+    ensures !http_quoted_string_automaton::State::next(pre, post),
 {
-    if HttpQuotedStringAutomaton::State::next(pre, post) {
-        case_on_next! { pre, post, HttpQuotedStringAutomaton => {
+    if http_quoted_string_automaton::State::next(pre, post) {
+        case_on_next! { pre, post, http_quoted_string_automaton => {
             skip_opening_quote() => {}
             append_content() => {}
             advance_value_position() => {}
@@ -614,14 +614,14 @@ pub proof fn http_quoted_string_missing_quote_is_terminal(
 }
 
 pub proof fn http_quoted_string_done_is_terminal(
-    pre: HttpQuotedStringAutomaton::State,
-    post: HttpQuotedStringAutomaton::State,
+    pre: http_quoted_string_automaton::State,
+    post: http_quoted_string_automaton::State,
 )
     requires pre.state == HttpQuotedStringState::Done,
-    ensures !HttpQuotedStringAutomaton::State::next(pre, post),
+    ensures !http_quoted_string_automaton::State::next(pre, post),
 {
-    if HttpQuotedStringAutomaton::State::next(pre, post) {
-        case_on_next! { pre, post, HttpQuotedStringAutomaton => {
+    if http_quoted_string_automaton::State::next(pre, post) {
+        case_on_next! { pre, post, http_quoted_string_automaton => {
             skip_opening_quote() => {}
             append_content() => {}
             advance_value_position() => {}
