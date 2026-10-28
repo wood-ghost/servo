@@ -42,11 +42,16 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 verus! {
 
+// Setup-only boundaries: external items are excluded from verification. External bodies
+// retain an opaque type or callable signature without checking their fields or code.
+// The TODOs below identify the call-chain proofs to enable after modeling dependencies.
+
 trait ValueForKeyInLinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool;
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str>;
 }
 
+#[verifier::external]
 impl ValueForKeyInLinkHeader for LinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool {
         self.params.iter().any(|p| p.key == key)
@@ -64,6 +69,8 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
+// Its external field types will need models before verified code can inspect the options.
+#[verifier::external_body]
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -101,6 +108,7 @@ pub(crate) struct LinkProcessingOptions {
 
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
+    #[verifier::external]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -153,6 +161,7 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
     // TODO: Verify that the guarded call satisfies preload's entry condition.
+    #[verifier::external]
     fn process_link_header(self, rel: &str, document: &Document) {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -167,7 +176,7 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#translate-a-preload-destination>
     // Verus does not yet support string patterns in this match.
-    #[verifier::external_body]
+    #[verifier::external]
     pub(crate) fn translate_a_preload_destination(
         potential_destination: &str,
     ) -> Option<Destination> {
@@ -186,6 +195,7 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-link-request>
+    #[verifier::external]
     pub(crate) fn create_link_request(
         self,
         webview_id: WebViewId,
@@ -232,6 +242,7 @@ impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
     // TODO: Specify and verify MIME/destination matching, including the MIME classifier's
     // preconditions.
+    #[verifier::external_body]
     pub(crate) fn type_matches_destination(&self) -> bool {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
@@ -283,9 +294,9 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
-    // TODO: Verify the type_matches_destination assertion; this body is temporarily trusted
-    // via external_body because Verus does not yet support its let-chain.
-    #[verifier::external_body]
+    // TODO: Verify the type_matches_destination assertion; this function is temporarily
+    // excluded because its DOM types and let-chain lack Verus support.
+    #[verifier::external]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
@@ -342,7 +353,7 @@ impl LinkProcessingOptions {
 }
 
 // match_ignore_ascii_case! expands to a const block that Verus does not yet support.
-#[verifier::external_body]
+#[verifier::external]
 pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSettings> {
     match_ignore_ascii_case! { token,
         "anonymous" => Some(CorsSettings::Anonymous),
@@ -352,6 +363,7 @@ pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSetti
 }
 
 /// <https://html.spec.whatwg.org/multipage/#extract-links-from-headers>
+#[verifier::external]
 pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> Vec<LinkHeader> {
     // Step 1. Let links be a new list.
     let mut links = Vec::new();
@@ -383,7 +395,7 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // Verus does not yet support the let-chains in this body.
-#[verifier::external_body]
+#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -461,6 +473,7 @@ pub(crate) fn process_link_headers(
     }
 }
 
+#[verifier::external]
 #[derive(Clone, IntoStaticStr)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum LinkFetchContextType {
@@ -468,6 +481,7 @@ pub(crate) enum LinkFetchContextType {
     Preload,
 }
 
+#[verifier::external]
 impl From<LinkFetchContextType> for InitiatorType {
     fn from(other: LinkFetchContextType) -> Self {
         let name: &'static str = other.into();
@@ -475,6 +489,7 @@ impl From<LinkFetchContextType> for InitiatorType {
     }
 }
 
+#[verifier::external]
 pub(crate) struct LinkFetchContext {
     /// The `<link>` element (if any) that caused this fetch
     pub(crate) link: Option<Trusted<HTMLLinkElement>>,
@@ -488,11 +503,11 @@ pub(crate) struct LinkFetchContext {
     pub(crate) response_body: BytesMut,
 }
 
+#[verifier::external]
 impl FetchResponseListener for LinkFetchContext {
     fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
 
     // Verus does not yet support the `_ = fetch_metadata` assignment in this body.
-    #[verifier::external_body]
     fn process_response(
         &mut self,
         _: &mut js::context::JSContext,
@@ -555,6 +570,7 @@ impl FetchResponseListener for LinkFetchContext {
     }
 }
 
+#[verifier::external]
 impl ResourceTimingListener for LinkFetchContext {
     fn resource_timing_information(&self) -> (InitiatorType, ServoUrl) {
         (self.type_.clone().into(), self.url.clone())
