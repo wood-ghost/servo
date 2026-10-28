@@ -56,6 +56,7 @@ pub struct MimeClassifier {
 }
 
 #[derive(PartialEq)]
+#[cfg_attr(verus_only, derive(Structural))]
 pub enum MediaType {
     Xml,
     Html,
@@ -766,8 +767,7 @@ pub(crate) struct ByteMatcher {
 impl ByteMatcher {
     fn matches(&self, data: &[u8]) -> (result: Option<usize>)
         requires
-            self.pattern.len() > 0,
-            self.pattern.len() == self.mask.len(),
+            SpecByteMatcher::matches_requires(self.pattern@, self.mask@),
         ensures
             match result {
                 Some(r) => {
@@ -968,10 +968,9 @@ pub(crate) struct TagTerminatedByteMatcher {
 impl MIMEChecker for TagTerminatedByteMatcher {
     fn classify(&self, data: &[u8]) -> Option<Mime> {
         proof {
-            assert(self.matcher.pattern@.len() > 0);
-            assert(
-                self.matcher.pattern@.len() == self.matcher.mask@.len()
-            );
+            assert(SpecByteMatcher::matches_requires(
+                self.matcher.pattern@, self.matcher.mask@,
+            ));
         }
 
         self.matcher.matches(data).and_then(|j| -> (result: Option<Mime>)

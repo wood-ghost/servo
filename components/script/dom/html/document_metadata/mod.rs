@@ -8,3 +8,5 @@ pub(crate) mod htmlmetaelement;
 pub(crate) mod htmlstyleelement;
 pub(crate) mod htmltitleelement;
 pub(crate) mod processingoptions;
+#[cfg(verus_only)]
+pub(crate) mod processingoptions_specs;

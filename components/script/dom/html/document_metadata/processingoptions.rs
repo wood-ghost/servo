@@ -25,6 +25,15 @@ use servo_url::{ImmutableOrigin, ServoUrl};
 use strum::IntoStaticStr;
 use vstd::prelude::*;
 
+#[cfg(verus_only)]
+use super::processingoptions_specs as Spec;
+#[cfg(verus_only)]
+use super::processingoptions_specs as SpecRequires;
+#[cfg(verus_only)]
+use net_traits::mime_classifier_specs::{
+    classifier as SpecClassifier, mime_api as SpecMime, requires as MimeRequires,
+};
+
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
 use crate::dom::document::Document;
@@ -51,11 +60,14 @@ trait ValueForKeyInLinkHeader {
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str>;
 }
 
-#[verifier::external]
 impl ValueForKeyInLinkHeader for LinkHeader {
+    // TODO: Specify key membership and verify this temporarily trusted body.
+    #[verifier::external_body]
     fn has_key_in_link_header(&self, key: &str) -> bool {
         self.params.iter().any(|p| p.key == key)
     }
+    // TODO: Specify first-match lookup and verify this temporarily trusted body.
+    #[verifier::external_body]
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str> {
         let param = self.params.iter().find(|p| p.key == key)?;
         param.val.as_deref()
@@ -69,8 +81,7 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
-// Its external field types will need models before verified code can inspect the options.
-#[verifier::external_body]
+// Field types needed by the contracts are declared in processingoptions_specs::servo_support.
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -108,7 +119,8 @@ pub(crate) struct LinkProcessingOptions {
 
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
-    #[verifier::external]
+    // TODO: Specify the field updates and verify this temporarily trusted body.
+    #[verifier::external_body]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -160,9 +172,10 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
-    // TODO: Verify that the guarded call satisfies preload's entry condition.
-    #[verifier::external]
-    fn process_link_header(self, rel: &str, document: &Document) {
+    fn process_link_header(self, rel: &str, document: &Document)
+        requires
+            SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
+    {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
             // The process a link header step for this type of link given a link processing options options
@@ -240,10 +253,12 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
-    // TODO: Specify and verify MIME/destination matching, including the MIME classifier's
-    // preconditions.
-    #[verifier::external_body]
-    pub(crate) fn type_matches_destination(&self) -> bool {
+    pub(crate) fn type_matches_destination(&self) -> (result: bool)
+        requires
+            SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+        // ensures
+        //     result == Spec::type_matches_destination_result(self),
+    {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
             return true;
@@ -294,15 +309,18 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
-    // TODO: Verify the type_matches_destination assertion; this function is temporarily
-    // excluded because its DOM types and let-chain lack Verus support.
-    #[verifier::external]
+    // trusted via external_body because its let-chain lacks Verus support.
+    #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
         link: Option<Trusted<HTMLLinkElement>>,
         document: &Document,
-    ) {
+    )
+        requires
+            SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+            Spec::type_matches_destination_result(&self),
+    {
         // Step 1. If options's type doesn't match options's destination, then return.
         //
         // Handled by callers, since we need to check the previous destination type
@@ -395,7 +413,6 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // Verus does not yet support the let-chains in this body.
-#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -429,10 +446,16 @@ pub(crate) fn process_link_headers(
             continue;
         }
         // Step 2.5. If attribs["media"] exists and attribs["media"] does not match the environment, then continue.
-        if let Some(media) = link_object.value_for_key_in_link_header("media") &&
-            !MediaList::matches_environment(document, media)
-        {
-            continue;
+        // TODO: adaption applied due to lacking support of let-chain in Verus
+        // if let Some(media) = link_object.value_for_key_in_link_header("media") &&
+        //     !MediaList::matches_environment(document, media)
+        // {
+        //     continue;
+        // }
+        if let Some(media) = link_object.value_for_key_in_link_header("media") {
+            if !MediaList::matches_environment(document, media) {
+                continue;
+            }
         }
         // Step 2.6. Let options be a new link processing options with
         let mut options = LinkProcessingOptions {
@@ -458,15 +481,26 @@ pub(crate) fn process_link_headers(
         // Step 2.8. If attribs["imagesrcset"] exists and attribs["imagesizes"] exists,
         // then set options's source set to the result of creating a source set given
         // linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
-        if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") &&
-            let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes")
-        {
-            options.source_set = Some(SourceSet::create_source_set(
-                &link_object.url,
-                imagesrcset,
-                imagesizes,
-                document,
-            ))
+        // TODO: adaption applied due to lacking support of let-chain in Verus
+        // if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") &&
+        //     let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes")
+        // {
+        //     options.source_set = Some(SourceSet::create_source_set(
+        //         &link_object.url,
+        //         imagesrcset,
+        //         imagesizes,
+        //         document,
+        //     ))
+        // }
+        if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") {
+            if let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes") {
+                options.source_set = Some(SourceSet::create_source_set(
+                    &link_object.url,
+                    imagesrcset,
+                    imagesizes,
+                    document,
+                ));
+            }
         }
         // Step 2.9. Run the process a link header steps for rel given options.
         options.process_link_header(rel, document);

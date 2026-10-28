@@ -12,9 +12,14 @@ use crate::mime_classifier_specs::mime_api::{
 
 verus! {
 
+/// Shape requirements inherited by byte-matcher validation and matching callers.
+pub open spec fn matches_requires(pattern: Seq<u8>, mask: Seq<u8>) -> bool {
+    &&& pattern.len() > 0
+    &&& pattern.len() == mask.len()
+}
+
 pub open spec fn validate_ok(pattern: Seq<u8>, mask:Seq<u8>) -> bool {
-    &&& pattern.len() != 0
-    &&& pattern.len() == mask.len() 
+    &&& matches_requires(pattern, mask)
     &&& forall |i: int| #![trigger pattern[i]] 0 <= i < pattern.len() ==> (pattern[i] & mask[i]) == pattern[i]  
 }
 
@@ -22,8 +27,7 @@ pub open spec fn validate_ok(pattern: Seq<u8>, mask:Seq<u8>) -> bool {
 /// bytes. Callers establish the premises from the matcher fields.
 pub(crate) broadcast proof fn lemma_byte_matcher_valid(bm: &ByteMatcher)
     requires
-        bm.pattern@.len() > 0,
-        bm.pattern@.len() == bm.mask@.len(),
+        matches_requires(bm.pattern@, bm.mask@),
         forall|i: int| #![trigger bm.pattern@[i]] 0 <= i < bm.pattern@.len() ==>
             bm.mask@[i] == 0xFFu8
             || (bm.mask@[i] == 0x00u8 && bm.pattern@[i] == 0x00u8)
@@ -200,7 +204,7 @@ impl MIMECheckerSpec for ByteMatcher {
 
 impl MIMECheckerSpec for TagTerminatedByteMatcher {
     open spec fn classify_requires(&self, data: Seq<u8>) -> bool {
-        true
+        self.matcher.classify_requires(data)
     }
 
     open spec fn classify_spec(&self, data: Seq<u8>) -> Option<MimeView> {
