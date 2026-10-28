@@ -9507,6 +9507,7 @@ dependencies = [
  "url",
  "urlpattern",
  "uuid",
+ "vstd",
  "web_atoms",
  "webdriver",
  "webrender_api",

@@ -23,6 +23,7 @@ use nom_rfc8288::complete::link_lenient as parse_link_header;
 use servo_base::id::WebViewId;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use strum::IntoStaticStr;
+use vstd::prelude::*;
 
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
@@ -38,6 +39,8 @@ use crate::fetch::network_listener::{
     FetchResponseListener, ResourceTimingListener, submit_timing,
 };
 use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
+
+verus! {
 
 trait ValueForKeyInLinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool;
@@ -149,6 +152,7 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
+    // TODO: Verify that the guarded call satisfies preload's entry condition.
     fn process_link_header(self, rel: &str, document: &Document) {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -162,6 +166,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#translate-a-preload-destination>
+    // Verus does not yet support string patterns in this match.
+    #[verifier::external_body]
     pub(crate) fn translate_a_preload_destination(
         potential_destination: &str,
     ) -> Option<Destination> {
@@ -224,6 +230,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
+    // TODO: Specify and verify MIME/destination matching, including the MIME classifier's
+    // preconditions.
     pub(crate) fn type_matches_destination(&self) -> bool {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
@@ -275,6 +283,9 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
+    // TODO: Verify the type_matches_destination assertion; this body is temporarily trusted
+    // via external_body because Verus does not yet support its let-chain.
+    #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
@@ -330,6 +341,8 @@ impl LinkProcessingOptions {
     }
 }
 
+// match_ignore_ascii_case! expands to a const block that Verus does not yet support.
+#[verifier::external_body]
 pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSettings> {
     match_ignore_ascii_case! { token,
         "anonymous" => Some(CorsSettings::Anonymous),
@@ -369,6 +382,8 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 }
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
+// Verus does not yet support the let-chains in this body.
+#[verifier::external_body]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -476,6 +491,8 @@ pub(crate) struct LinkFetchContext {
 impl FetchResponseListener for LinkFetchContext {
     fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
 
+    // Verus does not yet support the `_ = fetch_metadata` assignment in this body.
+    #[verifier::external_body]
     fn process_response(
         &mut self,
         _: &mut js::context::JSContext,
@@ -543,3 +560,5 @@ impl ResourceTimingListener for LinkFetchContext {
         (self.type_.clone().into(), self.url.clone())
     }
 }
+
+} // verus!

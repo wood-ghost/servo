@@ -10,6 +10,9 @@ rust-version.workspace = true
 repository.workspace = true
 description.workspace = true
 
+[package.metadata.verus]
+verify = true
+
 [lib]
 name = "script"
 path = "lib.rs"
@@ -161,6 +164,7 @@ unicode-script = { workspace = true }
 url = { workspace = true }
 urlpattern = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
+vstd = "0.0.0-2026-07-12-0122"
 web_atoms = { workspace = true }
 webdriver = { workspace = true }
 webgpu_traits = { workspace = true, optional = true }
