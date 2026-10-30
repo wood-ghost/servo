@@ -31,7 +31,7 @@ processing/algorithms/headers.rs
           -> select-image-source                      external image algorithm
           -> request.rs: create_link_request           steps 1–11
              -> encoding-parse-a-URL                   external URL algorithm
-             -> cors.rs: create_a_potential_cors_request   steps 1–5
+              -> potential_cors.rs: create_a_potential_cors_request   steps 1–5
           -> create_preload_key
           -> callbacks.rs: report_timing               step 10
           -> callbacks.rs: preload_response            steps 11.1–11.6
@@ -39,9 +39,11 @@ processing/algorithms/headers.rs
        -> link_types/preconnect.rs: preconnect         steps 1–8
 ```
 
-The outer algorithm bodies preserve the standard's variables, conditions, ordering,
-and numbered comments. Functional shadowing represents updates. Recursion represents
-the extraction loop; ordered trace positions represent the processing loop. Trace
+Migrated algorithms use one state-machine transition per numbered step, with
+verbatim text and derived result proofs. The task log identifies remaining legacy
+algorithms that still use functional shadowing, recursion, or coarse trace checks.
+In that legacy layer, recursion represents the extraction loop and ordered trace
+positions represent the processing loop. Trace
 format checks live in `processing/trace.rs`, rather than determining the visible
 structure of the standard algorithms.
 

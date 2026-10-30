@@ -615,3 +615,28 @@ boundary. Resolved integration diagnostic: Verus permits one module-level
 `broadcast use` declaration; combine the proved laws in one declaration.
 Findings: none new. Not done: native request-body conformance, potential-CORS
 machine migration, preload effects and the remaining link algorithms.
+
+## Task: potential-CORS request state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request>,
+snapshot/inspection 2026-10-30. Row 1: mode and credentialsMode are updated
+across steps. `potential_cors.rs` preserves strings and the optional fallback
+flag; the Fetch request constructor remains a separately named operation over
+the supplied default record. `cors.rs` retains the shared keyword/state adapters
+and re-exports the constructor for existing callers.
+
+| Step | `potential_cors_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: initialize mode from No CORS |
+| 2 | step2 / Step2 | Yes: optional same-origin fallback update |
+| 3 | step3 / Step3 | Yes: initialize credentialsMode to include |
+| 4 | step4 / Step4 | Yes: Anonymous updates credentialsMode |
+| 5 | step5 / Step5 | Yes: complete verbatim request-construction sentence |
+
+The runner selects generated successors; its proof establishes termination and
+the resulting fields. Existing mode/fallback/credentials and request/preload
+regressions use the derived computation theorem. Full focused command:
+**64 verified, 0 errors**. Labels added/removed: none. No executable edits,
+new preconditions, findings or Verus limitations. Self-check 1–11: yes for this
+algorithm. Not done: native Fetch builder/default correspondence, remaining
+attribute/header/preload/callback migrations and native effect proofs.

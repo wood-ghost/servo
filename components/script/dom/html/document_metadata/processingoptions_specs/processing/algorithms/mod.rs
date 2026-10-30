@@ -11,6 +11,7 @@ pub(crate) mod origin;
 pub(crate) mod url;
 pub(crate) mod enumerated_attributes;
 pub(crate) mod cors;
+pub(crate) mod potential_cors;
 pub(crate) mod request;
 pub(crate) mod callbacks;
 pub(crate) mod link_types;
