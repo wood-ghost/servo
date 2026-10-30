@@ -210,13 +210,25 @@ pub(crate) open spec fn link_response_callback(link: &Option<Trusted<HTMLLinkEle
     }
 }
 
-/// Existing native effect boundary until an actual preload plan/trace is recorded.
-pub(crate) uninterp spec fn preload_execution_ensures(
+// TRUSTED(scope): not verified yet; remove when native preload execution-plan observation is verified
+pub(crate) uninterp spec fn observed_preload_plan(
     options: &LinkProcessingOptions,
     webview_id: WebViewId,
     link: &Option<Trusted<HTMLLinkElement>>,
     document: &Document,
-) -> bool;
+) -> SpecModel::PreloadPlan;
+
+/// Exact standard plan relation. The observed-plan producer and the native body
+/// remain trusted; no hypothetical reference run is asserted to be execution.
+pub(crate) open spec fn preload_execution_ensures(
+    options: &LinkProcessingOptions,
+    webview_id: WebViewId,
+    link: &Option<Trusted<HTMLLinkElement>>,
+    document: &Document,
+) -> bool {
+    preload_ensures(options, webview_id, link, document,
+        observed_preload_plan(options, webview_id, link, document))
+}
 
 /// Compatibility predicate for Servo's current classifier-side acceptance. This
 /// is useful for an agreement proof, but is not the WHATWG preload-type algorithm.

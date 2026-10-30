@@ -1152,3 +1152,18 @@ or executable changes. The prior eleven-step URL/snapshot/form/map and self-chec
 remain authoritative. Self-check 1/7/9–11 yes for this contract connection; the
 nonempty-href assertion remains a precondition. Not done: proving this native
 request body or the opaque/context-free view bridges, and remaining effect hooks.
+
+## Task: connect native preload postcondition to standard plan (2026-10-30)
+
+Replaced the uninterpreted preload-result Boolean with the canonical
+`preload_ensures` relation over an explicitly named `observed_preload_plan`.
+That observation producer has its own scope label. The native body is still
+external-body, so its plan correspondence is **assumed**, not a consequence of
+the proved reference runner. Actual per-invocation trace/event capture remains
+unimplemented; the declaration must not be treated as an event collector.
+
+Full focused command: **86 verified, 0 errors**. Added the observation scope label;
+no runtime edits or new requirements. The prior thirteen-step/child-callback
+URL/snapshot/form/step audit remains unchanged. Self-check 1/7/9–11 yes for the
+contract connection. Native source/request/effect correspondence and the final
+header-loop effect hook remain outstanding trusted boundaries.

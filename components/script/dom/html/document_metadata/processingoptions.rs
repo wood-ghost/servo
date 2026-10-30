@@ -407,7 +407,7 @@ impl LinkProcessingOptions {
             // INHERITED from SourceSet selection and create_link_request, accounting for href replacement.
             SpecRequires::preload_selection_requires(&self, document),
         ensures
-            // TODO: Capture the operation plan required by the standard preload_ensures.
+            // Standard plan relation; producing the actual observed plan remains trusted.
             Spec::preload_execution_ensures(&self, webview_id, &link, document),
     {
         // Step 1. If options's type doesn't match options's destination, then return.
