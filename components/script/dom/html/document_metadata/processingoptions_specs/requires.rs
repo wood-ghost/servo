@@ -80,7 +80,12 @@ pub(crate) open spec fn process_link_header_requires(
     link_type: Seq<char>,
     destination: Destination,
 ) -> bool {
-    rel == "preload"@ ==> type_matches_destination_requires(link_type, destination)
+    rel == "preload"@ ==> {
+        // INHERITED from type_matches_destination and preload.
+        &&& type_matches_destination_requires(link_type, destination)
+        // INHERITED from type_matches_destination and preload; witnesses are at the definition.
+        &&& type_matches_standard_requires(link_type, destination)
+    }
 }
 
 pub(crate) proof fn lemma_type_matches_destination_requires_short_circuits(

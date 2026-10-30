@@ -508,3 +508,19 @@ conditional implementation theorem, not proof that all browser inputs meet those
 premises. Existing MIME external-library contracts remain trusted dependencies.
 No new findings/Verus limitations. Not done: caller requirement propagation,
 native preload/effects, other algorithms and remaining origin/URL operations.
+
+## Task: inherit type-checker correspondence at immediate callers (2026-10-30)
+
+Native `preload` now explicitly inherits `type_matches_standard_requires` before
+its runtime assertion/call. `process_link_header_requires` inherits both safety
+and standard-correspondence requirements only when rel is `preload`. The guard
+and prior option state, not later request creation, determine these obligations.
+The witnesses and assumptions are unchanged from the clause table above.
+
+Full focused command: **56 verified, 0 errors**. Labels added: INHERITED comments;
+none removed. No runtime body edits or standard-result weakening. These callers
+remain labelled trusted, so adding their contracts does not prove call-site
+discharge. Self-check 1, 9–11 yes; no new numbered algorithm, other items refer
+to the unchanged standard specs and their reported legacy gaps. Findings and
+Verus limitations: none new. Not done: header-loop and DOM-input propagation,
+caller/effect proofs and remaining algorithm migrations.

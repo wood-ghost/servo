@@ -380,6 +380,8 @@ impl LinkProcessingOptions {
         requires
             // INHERITED from type_matches_destination.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+            // INHERITED from type_matches_destination; per-input standard correspondence.
+            SpecRequires::type_matches_standard_requires(self.link_type@, self.destination),
             // IMPLICIT: Servo asserts a match instead of returning on mismatch; witness: type = "invalid", destination = Style.
             Spec::type_matches_destination_result(&self),
         ensures
