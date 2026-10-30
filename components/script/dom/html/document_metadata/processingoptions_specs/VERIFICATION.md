@@ -1286,3 +1286,26 @@ record/constructor layout, with the key-domain finding stated above; existing
 numbered algorithm mappings are unchanged. Remaining work is the consolidated
 status/review report; the explicitly trusted implementation/model boundaries
 remain unproved rather than being labelled complete.
+
+## Task: connect worker readiness and performance-origin owners (2026-10-30)
+
+Final environment review connected two components already represented elsewhere
+in Servo instead of leaving their production solely as supplemental inputs:
+`WorkerGlobalScope::is_execution_ready` and `Performance::time_origin`. Their
+external types/getter contracts are scope-labelled, and defined adapters fill
+the matching supplement components from those observations.
+
+Worker readiness is an **atomic-read result relation**, with the observed bool
+passed explicitly to the adapter. It does not assume successive reads of a
+mutable worker always return one immutable value. Time origin is related to the
+returned CrossProcessInstant through a labelled clock-coordinate observation;
+the native epoch is platform-specific, so no Unix-epoch, rounding, granularity
+or clock-arithmetic property is invented. Owner/global association remains an
+explicit caller/model obligation.
+
+Full focused command: **86 verified, 0 errors**. Added 8 scope labels; no runtime
+edits or new executable input restrictions. Audit now covers **286 labelled
+boundary items in 80 files**, with **0 missing labels**; label totals are
+external-lib 119, scope 172, verus-gap 2, rewrite 3. Self-check 1/9–11 yes for
+this view-binding task; HTML environment/settings definitions and their field
+map are unchanged. These getter/clock/ownership relations remain trusted-only.

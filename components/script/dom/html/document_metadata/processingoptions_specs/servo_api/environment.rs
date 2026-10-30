@@ -13,12 +13,29 @@
 use std::sync::Arc;
 use net_traits::request::RequestClient;
 use servo_url::ServoUrl;
+use servo_base::cross_process_instant::CrossProcessInstant;
 use vstd::prelude::*;
 use crate::dom::globalscope::GlobalScope;
+use crate::dom::types::{Performance, WorkerGlobalScope};
 use super::views::url_view;
 use super::super::processing::types::*;
 
 verus! {
+
+// TRUSTED(scope): not verified yet; remove when WorkerGlobalScope's environment correspondence is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExWorkerGlobalScope(WorkerGlobalScope);
+
+// TRUSTED(scope): not verified yet; remove when Performance's time-origin correspondence is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExPerformance(Performance);
+
+// TRUSTED(scope): not verified yet; remove when servo_base::CrossProcessInstant is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExCrossProcessInstant(CrossProcessInstant);
 
 /// Fields absent from RequestClient and from the inspected GlobalScope getters.
 /// Values are explicit inputs, not assumed defaults for every environment.
@@ -49,6 +66,30 @@ pub(crate) uninterp spec fn api_base_url(global: &GlobalScope) -> ServoUrlView;
 pub(crate) uninterp spec fn client_origin(client: &RequestClient) -> OriginView;
 // TRUSTED(scope): not verified yet; remove when RequestClient.policy_container correspondence is verified
 pub(crate) uninterp spec fn client_policy_container(client: &RequestClient) -> Arc<PolicyContainerView>;
+
+// TRUSTED(scope): not verified yet; remove when WorkerGlobalScope.execution_ready observation is verified
+pub(crate) uninterp spec fn worker_readiness_observed(worker: &WorkerGlobalScope, ready: bool) -> bool;
+// TRUSTED(scope): not verified yet; remove when Performance.time_origin observation is verified
+pub(crate) uninterp spec fn performance_time_origin(performance: &Performance) -> real;
+// CrossProcessInstant has a platform-specific monotonic epoch. No Unix-epoch,
+// granularity, rounding or clock-arithmetic property is asserted by this mapping.
+// TRUSTED(scope): not verified yet; remove when CrossProcessInstant's model-clock coordinate is verified
+pub(crate) uninterp spec fn instant_clock_coordinate(instant: CrossProcessInstant) -> real;
+
+/// Fill the component from one native atomic read. A result relation permits
+/// distinct reads to observe different values; no immutable getter/ordering
+/// assumption is made. The caller supplies the matching environment/worker.
+pub(crate) open spec fn with_worker_readiness(context: EnvironmentSupplement, worker: &WorkerGlobalScope, ready: bool) -> EnvironmentSupplement
+    recommends worker_readiness_observed(worker, ready),
+{
+    EnvironmentSupplement { execution_ready_flag: ready, ..context }
+}
+
+/// Fill the time-origin component from the matching native Performance owner.
+/// Ownership and clock-coordinate correspondence remain explicit boundaries.
+pub(crate) open spec fn with_performance_time_origin(context: SettingsSupplement, performance: &Performance) -> SettingsSupplement {
+    SettingsSupplement { time_origin: performance_time_origin(performance), ..context }
+}
 
 pub(crate) open spec fn environment_with_context(global: &GlobalScope, context: EnvironmentSupplement) -> EnvironmentView {
     EnvironmentView {
@@ -92,5 +133,13 @@ pub(crate) assume_specification[GlobalScope::top_level_creation_url](global: &Gl
 // TRUSTED(scope): not verified yet; remove when GlobalScope::api_base_url is verified
 pub(crate) assume_specification[GlobalScope::api_base_url](global: &GlobalScope) -> (result: ServoUrl)
     ensures url_view(&result) == api_base_url(global);
+
+// TRUSTED(scope): not verified yet; remove when WorkerGlobalScope::is_execution_ready is verified
+pub(crate) assume_specification[WorkerGlobalScope::is_execution_ready](worker: &WorkerGlobalScope) -> (result: bool)
+    ensures worker_readiness_observed(worker, result);
+
+// TRUSTED(scope): not verified yet; remove when Performance::time_origin is verified
+pub(crate) assume_specification[Performance::time_origin](performance: &Performance) -> (result: CrossProcessInstant)
+    ensures instant_clock_coordinate(result) == performance_time_origin(performance);
 
 } // verus!
