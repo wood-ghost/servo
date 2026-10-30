@@ -520,6 +520,8 @@ impl VirtualMethods for HTMLLinkElement {
 }
 
 impl HTMLLinkElement {
+    // TRUSTED(scope): not verified yet; remove when HTMLLinkElement::compute_destination_for_attribute is verified
+    #[cfg_attr(verus_only, verifier::external)]
     fn compute_destination_for_attribute(&self) -> Option<Destination> {
         // Let destination be the result of translating the keyword
         // representing the state of el's as attribute.
@@ -533,6 +535,8 @@ impl HTMLLinkElement {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-link-options-from-element>
+    // TRUSTED(scope): not verified yet; remove when HTMLLinkElement::processing_options is verified
+    #[cfg_attr(verus_only, verifier::external)]
     fn processing_options(&self) -> LinkProcessingOptions {
         let element = self.upcast::<Element>();
 
@@ -586,6 +590,10 @@ impl HTMLLinkElement {
     ///
     /// This method does not implement Step 7 (fetching the request) and instead returns the [RequestBuilder],
     /// as the fetch context that should be used depends on the link type.
+    // INHERITED from create_link_request: href must be nonempty before its call;
+    // the DOM caller boundary is not verified by this excluded helper.
+    // TRUSTED(scope): not verified yet; remove when HTMLLinkElement::default_fetch_and_process_the_linked_resource is verified
+    #[cfg_attr(verus_only, verifier::external)]
     fn default_fetch_and_process_the_linked_resource(&self) -> Option<RequestBuilder> {
         // Step 1. Let options be the result of creating link options from el.
         let options = self.processing_options();
@@ -928,9 +936,18 @@ impl HTMLLinkElement {
         }
     }
 
+    vstd::prelude::verus! {
     /// <https://html.spec.whatwg.org/multipage/#link-type-preload:fetch-and-process-the-linked-resource-2>
     /// and type matching destination steps of <https://html.spec.whatwg.org/multipage/#preload>
-    fn handle_preload_url(&self, no_gc: &NoGC) {
+    // TRUSTED(scope): not verified yet; remove when HTMLLinkElement::handle_preload_url and its DOM/effect correspondence are verified
+    #[verifier::external_body]
+    fn handle_preload_url(&self, no_gc: &NoGC)
+        requires
+            // INHERITED from type_matches_destination and preload; DOM-input assumptions and witnesses are itemized at the boundary.
+            super::processingoptions_specs::servo_api::link_element::element_preload_requires(self),
+        ensures
+            super::processingoptions_specs::servo_api::link_element::element_preload_ensures(self),
+    {
         // Step 1. Update the source set for el.
         self.source_set
             .safe_borrow_mut(no_gc)
@@ -962,8 +979,11 @@ impl HTMLLinkElement {
             &document,
         );
     }
+    } // verus!
 
     /// <https://html.spec.whatwg.org/multipage/#link-type-preload:fetch-and-process-the-linked-resource-2>
+    // TRUSTED(scope): not verified yet; remove when HTMLLinkElement::fire_event_after_response is verified
+    #[cfg_attr(verus_only, verifier::external)]
     pub(crate) fn fire_event_after_response(
         &self,
         cx: &mut JSContext,

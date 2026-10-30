@@ -14,5 +14,6 @@ pub(crate) mod views;
 pub(crate) mod url;
 pub(crate) mod environment;
 pub(crate) mod policy_container;
+pub(crate) mod link_element;
 
 pub(crate) use self::external_specs::*;

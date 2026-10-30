@@ -974,3 +974,43 @@ still records real-browser event differences; this spec follows the literal
 error/load rule. Native handle_preload_url attachment and DOM-input assumptions
 are the next task; source-set update and element-option construction are not
 claimed independently verified.
+
+## Task: native link-element boundary and DOM assumptions (2026-10-30)
+
+Wrapped only `HTMLLinkElement::handle_preload_url` in `verus!` with a labelled
+external body, inherited/implicit requirements and the standard reference-plan
+postcondition. Original executable expressions, previous-type bookkeeping,
+guards and comments are preserved. Its helper functions for destination lookup,
+option creation, default fetch/request creation and response events are explicitly
+scope-labelled exclusions. The existing six-step caller spec and callback 6.1
+remain the standard contracts (URL/snapshot/form/step map in the prior task).
+
+`servo_api/link_element.rs` labels both input and effect observations. These are
+unfinished single-execution correspondence hooks; attaching the trusted contract
+does not establish actual native mutation or network events. The native hoisted
+type guard may produce the same no-fetch outcome as the standard preload's
+TypeMismatch, without claiming the native function invoked preload on that path.
+
+| DOM-boundary clause | Witness / status | Propagation stop |
+| --- | --- | --- |
+| Raw as translation agrees with enumerated-state keyword | candidate `as="SCRIPT"`; source inspection, browser execution not tested | DOM attribute input |
+| MIME safety and parser/UA/category/CSS agreement | witnesses from the type-checker task | DOM type/as input and decoder/model configuration |
+| Nonempty href after source selection | inherited request assertion | DOM href/imagesrcset plus contextual selection |
+| Missing native fetch priority only observes Auto on fetching paths | `fetchpriority="high"` | DOM attribute input |
+| Native source selection has a nonempty set with density descriptors | empty set / missing density cause remove/unwrap obligations | DOM source-set construction and selection boundary |
+
+Per Section 7, these are **assumptions about external input/context**, not proofs
+that all DOM input satisfies them. Stop propagating them into arbitrary web input.
+The default-fetch helper's separate nonempty-href caller obligation is explicitly
+recorded as unverified rather than inferred from code after its request call.
+
+Checks: full focused command **82 verified, 0 errors**; native
+`cargo +1.97.1 check -p servo-script --lib --locked --offline` with the same clang
+environment **passed**. Added scope labels for five native methods and two
+observation hooks, plus IMPLICIT/INHERITED clause comments. No trust removed.
+Self-check: 1 and 9–11 yes for annotations; standard step checks use the prior
+reference proof. Native bodies remain trusted-only. Native check adds the expected
+existing-style `verus_only` cfg warnings; none suppressed. Remaining work:
+HTTP-boundary requirements, local/transitive trust audit, small linked definition
+comments and final report. No runtime meaning change is claimed from compilation
+alone; the diff also preserves every executable expression in this task.
