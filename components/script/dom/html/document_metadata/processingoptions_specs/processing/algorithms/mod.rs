@@ -15,4 +15,5 @@ pub(crate) mod cors;
 pub(crate) mod potential_cors;
 pub(crate) mod request;
 pub(crate) mod callbacks;
+pub(crate) mod preload_response;
 pub(crate) mod link_types;

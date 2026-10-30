@@ -27,6 +27,7 @@ broadcast use {
     super::algorithms::potential_cors::potential_cors_result,
     super::algorithms::apply_attributes::attribute_result,
     super::algorithms::link_types::preload_machine::preload_result,
+    super::algorithms::preload_response::response_result,
 };
 
 pub(crate) struct Fixture {

@@ -10,6 +10,7 @@ use vstd::prelude::*;
 use super::super::model::*;
 use super::super::types::DocumentView;
 use super::super::model_trait::LinkProcessingModel;
+pub(crate) use super::preload_response::preload_response;
 
 verus! {
 
@@ -26,36 +27,29 @@ pub(crate) open spec fn report_timing<M: LinkProcessingModel>(
     }
 }
 
-// 11. processResponseConsumeBody, given response and bodyBytes.
+// Derived computation helper for the separate preload_response machine.
 // State is supplied at invocation time: controller/entry are not frozen at their
 // initial values when the callback is defined.
-pub(crate) open spec fn preload_response<M: LinkProcessingModel>(
+pub(crate) open spec fn preload_response_computation<M: LinkProcessingModel>(
     model: M,
     state: PreloadCallbackState,
     response: ResponseView,
     body_bytes: BodyResult,
 ) -> CallbackResult {
     let effects = Seq::empty();
-    // 11.1. If bodyBytes is a byte sequence, set response's body to those bytes as a body.
-    // 11.2. Otherwise, set response to a network error.
     let response = match body_bytes {
         BodyResult::Bytes { bytes } => ResponseView { body: Some(bytes), ..response },
         _ => model.network_error(),
     };
-    // 11.3. Set unsafeEndTime to the unsafe shared current time.
     let state = PreloadCallbackState { unsafe_end_time: model.unsafe_shared_current_time(), ..state };
-    // 11.4. If document is non-null, call reportTiming given document.
     let effects = match state.document {
         Some(document) => effects.push(report_timing(model, state.controller, document)),
         None => effects,
     };
-    // 11.5. If entry's on-response-available is null, set entry's response;
-    // otherwise, call on-response-available with response.
     let (entry, effects) = match state.entry.on_response_available {
         None => (PreloadEntryView { response: Some(response), ..state.entry }, effects),
         Some(callback) => (state.entry, effects.push(CallbackEffect::InvokeResponse { callback, response })),
     };
-    // 11.6. If processResponse was given, call it with response.
     let effects = match state.process_response {
         Some(callback) => effects.push(CallbackEffect::InvokeResponse { callback, response }),
         None => effects,

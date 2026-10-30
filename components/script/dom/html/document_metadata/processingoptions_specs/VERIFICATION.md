@@ -740,3 +740,26 @@ correspondence still explicit. Native preload remains trusted: a valid operation
 plan does not establish that native fetching, callback installation or commit ran.
 Not done: native effects, nested callback migrations, headers and remaining
 linked algorithms/requirement propagation. No new Verus limitation.
+
+## Task: preload response-consumption callback (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#preload>, callback
+11.1–11.6, snapshot/inspection 2026-10-30. Row 1: response/entry/time mutation
+and ordered callback effects. `preload_response.rs` maps 11.1→step11_1,
+11.2→step11_2, 11.3→step11_3, 11.4→step11_4, 11.5→step11_5,
+11.6→step11_6, each with its complete verbatim sentence. Step 11.1 skips 11.2
+on its successful branch; the alternative is its own transition. No merged steps.
+
+State is supplied at callback invocation. The machine records timing before
+on-response-available before processResponse, updates the entry only on the
+null-callback branch, and preserves the other invocation fields. The generated
+successor theorem establishes termination/result equivalence; existing callback
+ordering/failure/storage regression proofs consume the machine.
+
+Full focused command: **68 verified, 0 errors**. Added scope label for the
+byte-sequence-as-body projection: this view observes bytes, while Fetch stream/
+source/length correspondence remains unverified. No other labels, executable
+edits, new preconditions, findings or limitations. Self-check 1–11: yes for
+these six substeps. Native callback execution and shared-state observation remain
+outside this operation-plan proof. Remaining work includes commit callback,
+header algorithms, linked cleanup and native/boundary accounting.
