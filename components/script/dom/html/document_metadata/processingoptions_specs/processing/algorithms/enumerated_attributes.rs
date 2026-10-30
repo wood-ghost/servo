@@ -33,6 +33,10 @@ pub(crate) open spec fn matching_keyword<State>(
 
 /// To determine the state of an attribute, use the following steps:
 /// None means the attribute is not specified; Some("") means a present empty value.
+// https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#enumerated-attribute
+// Snapshot/inspection 2026-10-30.
+// Form: row 3, direct spec fn; every step returns or falls through without
+// carrying a temporary. The missing-attribute block always returns a state/no state.
 pub(crate) open spec fn determine_the_state_of_an_attribute<State>(
     attribute: EnumerateAttribute<State>,
     value: Option<Seq<char>>,
@@ -50,16 +54,16 @@ pub(crate) open spec fn determine_the_state_of_an_attribute<State>(
             EnumeratedAttributeState::NoState
         }
     } else {
-        let value = value->Some_0;
         // 2. If the attribute's value is an ASCII case-insensitive match for one
         // of the keywords defined for the attribute, then return the state
         // represented by that keyword.
-        let keyword = matching_keyword(attribute, value);
-        if keyword is Some {
-            EnumeratedAttributeState::State { value: attribute.keyword_states[keyword->Some_0] }
+        if matching_keyword(attribute, value->Some_0) is Some {
+            EnumeratedAttributeState::State {
+                value: attribute.keyword_states[matching_keyword(attribute, value->Some_0)->Some_0],
+            }
         // 3. If the attribute has an empty value default state defined and the
         // attribute's value is the empty string, then return that empty value default state.
-        } else if attribute.empty_value_default is Some && value == ""@ {
+        } else if attribute.empty_value_default is Some && value->Some_0 == ""@ {
             EnumeratedAttributeState::State { value: attribute.empty_value_default->Some_0 }
         // 4. If the attribute has an invalid value default state defined, then
         // return that invalid value default state.

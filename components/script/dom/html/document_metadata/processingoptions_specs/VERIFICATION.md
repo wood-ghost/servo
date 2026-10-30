@@ -640,3 +640,21 @@ regressions use the derived computation theorem. Full focused command:
 new preconditions, findings or Verus limitations. Self-check 1–11: yes for this
 algorithm. Not done: native Fetch builder/default correspondence, remaining
 attribute/header/preload/callback migrations and native effect proofs.
+
+## Task: enumerated-attribute direct-step layout (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#enumerated-attribute>,
+snapshot/inspection 2026-10-30. Row 3: each step returns or falls through;
+the absent-attribute block always returns. Removed implementation-only local
+value/keyword bindings so step 2's comment immediately precedes its conditional.
+Matching-keyword selection remains a separate specification term, with no
+normalization beyond the referenced ASCII case-insensitive comparison.
+
+Step map in `determine_the_state_of_an_attribute`: 1→absent branch,
+1.1→missing-default branch, 1.2→no-state alternative, 2→keyword branch,
+3→empty-default branch, 4→invalid-default branch, 5→final no-state.
+Every step retains its complete text and order. Full focused command:
+**64 verified, 0 errors**. Existing generic/CORS/fetch-priority proofs pass.
+Self-check 1–11: yes for this algorithm. No labels added/removed, runtime changes,
+new preconditions, findings or limitations. Other migration/native-effect work
+remains as recorded above.
