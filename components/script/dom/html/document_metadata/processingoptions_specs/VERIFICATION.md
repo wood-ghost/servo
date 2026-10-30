@@ -1064,3 +1064,21 @@ token translation and native referrer conversion contracts remain trusted.
 Self-check 1–11: yes for this native proof and its existing standard model. No
 new standard finding. Next: inherit the restrictions and request/source-selection
 obligations at the header input boundary, and finish the trust audit.
+
+## Task: source-selection dependency contract (2026-10-30)
+
+Native dependency: `SourceSet::select_image_source_from_source_set`, linked to
+<https://html.spec.whatwg.org/multipage/images.html#select-an-image-source-from-a-source-set>.
+Inspected native code unwraps each density and removes a chosen vector index;
+empty or unnormalized sets violate those implicit domains. The trusted contract
+now states that domain explicitly and relates the returned href component to
+the same contextual model choice used by preload. It returns Some on this domain.
+
+Full focused command: **84 verified, 0 errors**. The existing scope label remains;
+an IMPLICIT requirement with empty-set/missing-density witnesses was added. This
+is deliberately **trusted-only**: native CSS/f64/URL choice correspondence has
+not been proved or independently tested, and the contextual view is assumed.
+No standard selection step or executable expression was changed. Self-check
+1/9–11 yes for this dependency contract; no new numbered algorithm is claimed.
+Next: inherit normalization and nonempty selected href into preload/dispatch,
+then quantify the construction-result obligation at the HTTP boundary.

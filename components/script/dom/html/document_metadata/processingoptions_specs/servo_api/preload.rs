@@ -28,6 +28,10 @@ use crate::dom::document::Document;
 use crate::dom::html::document_metadata::processingoptions::{LinkFetchContext, LinkFetchContextType};
 use crate::dom::srcset::SourceSet;
 use crate::fetch::network_listener::FetchResponseListener;
+use super::views::{StandardModel, source_set_view_in_context};
+use super::super::processing::context_specs::link_headers_document_state;
+use super::super::processing::model_trait::LinkProcessingModel;
+use super::super::processing::types::ImageSourceDescriptorView;
 
 verus! {
 
@@ -51,13 +55,36 @@ pub assume_specification[<String as From<USVString>>::from](value: USVString) ->
     ensures result@ == value.0@,
 ;
 
-// Signature support only. Source-set normalization, selection, and possible
-// failure/unwinding need separate contracts in the source-set model.
+/// Native selection unwraps densities and removes its chosen vector index.
+/// The context relation is still trusted; this predicate is not a proof that
+/// arbitrary srcset input produces a nonempty normalized set.
+pub closed spec fn source_selection_precondition(source_set: &SourceSet, document: &Document) -> bool {
+    let view = source_set_view_in_context(source_set, link_headers_document_state(document).document);
+    &&& view.well_formed()
+    &&& view.image_sources.entries.len() > 0
+    &&& (forall|i: int| 0 <= i < view.image_sources.entries.len() ==>
+        (#[trigger] view.image_sources.entries[i]).descriptor matches Some(ImageSourceDescriptorView::PixelDensity { .. }))
+}
+
+/// Chosen href component at the same document snapshot used by native selection.
+pub closed spec fn selected_source_href(source_set: &SourceSet, document: &Document) -> Seq<char> {
+    StandardModel.select_image_source(source_set_view_in_context(source_set, link_headers_document_state(document).document))
+}
+
+// This contract assumes the contextual UA choice agrees with the native choice;
+// it does not verify CSS evaluation, float conversion or URL/string correspondence.
 // TRUSTED(scope): not verified yet; remove when SourceSet::select_image_source_from_source_set is verified
 pub assume_specification[SourceSet::select_image_source_from_source_set](
     source_set: &SourceSet,
     document: &Document,
-) -> Option<(USVString, f64)>;
+) -> (result: Option<(USVString, f64)>)
+    requires
+        // IMPLICIT: native selection unwraps densities/removes a vector element; witnesses: empty source set or missing density.
+        source_selection_precondition(source_set, document),
+    ensures
+        result is Some,
+        result->Some_0.0.0@ == selected_source_href(source_set, document),
+;
 
 // ----------------------------------------
 // Preload identity and key
