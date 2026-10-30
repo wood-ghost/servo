@@ -1035,3 +1035,32 @@ proved application machine. Self-check 1–11 passes for the requirement-only
 change; no standard-result weakening or runtime edits. Findings are the known
 implementation differences above, not new standard ambiguity. Next: attempt
 the native body, then inherit the applicable condition at the HTTP boundary.
+
+## Task: native attribute updater verified conditionally (2026-10-30)
+
+Removed the external-body annotation and scope label from
+`apply_link_options_from_parsed_header`. Its complete state-update postcondition
+still refers to the canonical application machine (HTML snapshot 2026-10-30,
+same URL/form/step table as above). Original executable expressions are unchanged.
+
+The missing bridge was between native first-value lookup and the finite valued-
+attribute map. `valued_attributes_lookup` proves membership iff lookup returns
+Some, plus exact mapped value, by induction on the ordered parameter sequence.
+The executable body calls that lemma for its seven known attribute names in an
+erased proof block. This does not assume RFC normalization or discard duplicate
+native parameters. The machine's proved computation law supplies the postcondition.
+
+Validation progression: initial active-body run **82 verified, 1 postcondition
+failure**; adding the storage lemma yielded **83 verified, 1 resource-limit
+failure**, including after replacing broad instantiation with explicit calls.
+A local `#[verifier::rlimit(30)]` on this function then passed the unchanged
+full focused command: **84 verified, 0 errors**. The resource adjustment changes
+solver effort, not assumptions or the theorem. No global verifier flags changed.
+
+Labels removed: the native attribute updater's scope label/external body. Labels
+added: none. Existing invalid-CORS/referrer/priority restrictions remain explicit;
+the theorem is conditional, not unrestricted header conformance. Header lookup,
+token translation and native referrer conversion contracts remain trusted.
+Self-check 1–11: yes for this native proof and its existing standard model. No
+new standard finding. Next: inherit the restrictions and request/source-selection
+obligations at the header input boundary, and finish the trust audit.

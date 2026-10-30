@@ -43,4 +43,29 @@ pub(crate) open spec fn valued_attributes(params: Seq<LinkParamOwned>) -> LinkAt
     )
 }
 
+/// Relate the native first-valued lookup to the finite attribute-map adapter.
+/// This is a storage lemma, not an assumption about RFC normalization.
+pub(crate) broadcast proof fn valued_attributes_lookup(params: Seq<LinkParamOwned>, key: Seq<char>)
+    ensures
+        valued_attributes(params).dom().contains(key) == ((#[trigger] first_value(params, key)) is Some),
+        first_value(params, key) is Some ==> valued_attributes(params)[key] == first_value(params, key)->Some_0,
+    decreases params.len(),
+{
+    let keys = params.map_values(|param: LinkParamOwned| param.key@);
+    if first_value(params, key) is Some {
+        assert(params.len() > 0);
+        if params[0].key@ == key {
+            assert(keys[0] == key);
+        } else {
+            let rest = params.drop_first();
+            valued_attributes_lookup(rest, key);
+            let rest_keys = rest.map_values(|param: LinkParamOwned| param.key@);
+            assert(rest_keys.to_set().contains(key));
+            let i = choose|i: int| 0 <= i < rest_keys.len() && rest_keys[i] == key;
+            assert(keys[i + 1] == key);
+        }
+        assert(keys.to_set().contains(key));
+    }
+}
+
 } // verus!

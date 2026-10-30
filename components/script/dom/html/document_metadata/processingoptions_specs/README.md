@@ -187,17 +187,18 @@ algorithm is defined over the header/parser model interface.
   Request construction and preload keep explicitly named native execution hooks
   until their result/effect observations are connected to the reference contracts.
 
-The current setup temporarily marks three of the originally excluded native bodies
+The current setup temporarily marks two of the originally excluded native bodies
 `#[verifier::external_body]`:
 
-- `apply_link_options_from_parsed_header`
 - `process_link_header`
 - `process_link_headers`
 
 Native `type_matches_destination` is now checked under the explicit implicit
 requirements in `requires.rs`; see the dated task report for its conditional scope.
+Native `apply_link_options_from_parsed_header` is also checked under its explicit
+invalid-keyword/priority restrictions, with a proved finite-map lookup bridge.
 The other pre/postconditions are retained as trusted call contracts. Skipping the last
-body also suspends its internal MIME caller-precondition check. Remove these three
+body also suspends its internal MIME caller-precondition check. Remove these two
 attributes to resume the native proofs. Reference algorithms, model regression
 proofs, and requirement lemmas remain enabled. The separate `external_body`
 attribute on native `preload` is active in the current saved setup; the earlier

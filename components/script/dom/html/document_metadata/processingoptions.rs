@@ -30,6 +30,8 @@ use super::processingoptions_specs as Spec;
 #[cfg(verus_only)]
 use super::processingoptions_specs as SpecRequires;
 #[cfg(verus_only)]
+use super::processingoptions_specs::servo_api::link_header as SpecLinkHeader;
+#[cfg(verus_only)]
 use net_traits::mime_classifier_specs::{
     classifier as SpecClassifier, mime_api as SpecMime, requires as MimeRequires,
 };
@@ -53,7 +55,10 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 verus! {
 
-broadcast use super::processingoptions_specs::processing::algorithms::link_types::match_preload_type::runner_finishes;
+broadcast use {
+    super::processingoptions_specs::processing::algorithms::link_types::match_preload_type::runner_finishes,
+    super::processingoptions_specs::processing::algorithms::apply_attributes::attribute_result,
+};
 
 // Setup-only boundaries: external items are excluded from verification. External bodies
 // retain an opaque type or callable signature without checking their fields or code.
@@ -143,9 +148,8 @@ impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
     // The standard field-update contract is a proof obligation for this body.
     // In particular, invalid attributes and fetch priority require conformance checks.
-    // Abstraction-only: remove external_body to resume the native field-update proof.
-    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::apply_link_options_from_parsed_header is verified
-    #[verifier::external_body]
+    // The native body is checked under the explicit implicit requirements below.
+    #[verifier::rlimit(30)]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -160,6 +164,16 @@ impl LinkProcessingOptions {
                 old(self), final(self), link_object, rel@, result,
             ),
     {
+        proof {
+            let parameters = link_object.params@;
+            SpecLinkHeader::valued_attributes_lookup(parameters, "as"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "crossorigin"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "integrity"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "referrerpolicy"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "nonce"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "type"@);
+            SpecLinkHeader::valued_attributes_lookup(parameters, "fetchpriority"@);
+        }
         // Step 1. If rel is "preload":
         if rel == "preload" {
             // Step 1.1. If attribs["as"] does not exist, then return false.
