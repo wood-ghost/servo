@@ -527,6 +527,9 @@ pub(crate) fn process_link_headers(
     document: &Document,
     phase: LinkProcessingPhase,
 )
+    requires
+        // INHERITED from attribute application and preload; stops here as an assumption about HTTP headers and the linked models.
+        SpecRequires::process_link_headers_requires(link_headers, document, phase),
     ensures
         // TODO: Capture a ghost trace and connect it to process_link_headers_ensures.
         Spec::process_link_headers_execution_ensures(link_headers, document, phase),
@@ -536,7 +539,10 @@ pub(crate) fn process_link_headers(
     //
     // Already performed once when parsing headers by caller
     // Step 2. For each linkObject in links:
-    for link_object in link_headers {
+    for link_object in link_headers
+        invariant
+            SpecRequires::process_link_headers_requires(link_headers, document, phase),
+    {
         // Step 2.1. Let rel be linkObject["relation_type"].
         let Some(rel) = link_object.value_for_key_in_link_header("rel") else {
             continue;

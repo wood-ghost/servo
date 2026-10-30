@@ -1104,3 +1104,37 @@ removed or executable edits. Witnesses remain empty/missing-density source sets
 and empty selected/original href. Self-check 1/9–11 yes for propagation, with
 standard steps unchanged. Preload/dispatch effects remain trusted. Next task
 terminates these obligations at the HTTP-header boundary as input/model assumptions.
+
+## Task: HTTP-header boundary requirements and loop invariant (2026-10-30)
+
+Native `process_link_headers` now inherits `process_link_headers_requires` and
+records it as an erased `for`-loop invariant. `header_input_requires` uses raw
+input parameters, phase checks and whether the media API contract permits a true
+result. It does not use effects after dispatch to justify earlier calls.
+
+| Inherited clause | Where established / boundary |
+| --- | --- |
+| Invalid CORS/referrer reset compatibility | New `header_defaults_discharge_attribute_resets` proves caller's initial None/EmptyString fields suffice |
+| Supported priority representation | Header fetchpriority must be Auto or unrecognized on paths past application checks; high/low remain witness restrictions |
+| MIME safety/standard agreement | Type/as input to a valid preload destination before type-checking/dispatch |
+| Nonempty request href | Target URI when selection does not replace it |
+| Normalized nonempty source selection and nonempty selected href | Every result allowed by the preceding SourceSet::create_source_set contract for those input attributes/document |
+
+The construction-result quantifier follows the same modular pattern as the MIME
+parser requirement: an actual returned value must meet the callee's domain before
+the later call. These requirements stop here as assumptions about external HTTP
+input and linked models. They are not asserted to hold for arbitrary headers and
+do not add runtime filtering. The flat candidate condition is **conservative**:
+it can require a later header's domain even when an earlier application failure
+would already return. It is a sufficient domain, not a weakest precondition.
+
+Full focused command: **86 verified, 0 errors**. Added INHERITED comments; no trust
+removed. No executable expressions changed (only requires/invariant annotations).
+The native loop remains external-body: its recorded invariant and all call-site
+discharges are **not** a native body proof. The reference loop's prefix/state
+invariant was independently proved in the earlier machine task. Self-check
+1/9–11 yes for annotations/requirements; standard algorithm mapping is unchanged.
+HTTP ingress callers in ServoParser remain outside verification. RFC normalization
+and singular/plural parser correspondence remain separate labelled model gaps.
+Remaining work: exact standard-result hook connections, trust inventory and final
+native build/report.

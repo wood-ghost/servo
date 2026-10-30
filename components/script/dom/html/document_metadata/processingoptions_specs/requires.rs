@@ -4,7 +4,7 @@ use net_traits::request::Destination;
 use vstd::prelude::*;
 
 use super::super::processingoptions::LinkProcessingOptions;
-use super::super::processingoptions::LinkHeader;
+use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
 use super::processing::model_trait::LinkProcessingModel;
 use super::servo_api::views::{StandardModel, destination_name};
 use super::predicates::is_preload_destination;
@@ -134,6 +134,102 @@ pub(crate) open spec fn process_link_header_requires(
         // INHERITED from type_matches_destination and preload; witnesses are at the definition.
         &&& type_matches_standard_requires(link_type, destination)
     }
+}
+
+/// Sufficient native attribute domain when the loop has just initialized the
+/// CORS/referrer fields. This is not a restriction on unrecognized keywords.
+pub(crate) open spec fn header_priority_requires(link_object: &LinkHeader) -> bool {
+    // INHERITED from apply_link_options_requires; native fetch priority is absent.
+    match super::servo_api::link_header::first_value(link_object.params@, "fetchpriority"@) {
+        Some(value) => match super::processing::algorithms::options::fetch_priority_keyword_state(value) {
+            Some(priority) => priority == super::processing::types::LinkFetchPriorityView::Auto,
+            None => true,
+        },
+        None => true,
+    }
+}
+
+pub(crate) proof fn header_defaults_discharge_attribute_resets(options: &LinkProcessingOptions, link_object: &LinkHeader, rel: Seq<char>)
+    requires
+        // These are the fields set by the caller before apply_link_options.
+        options.cross_origin is None,
+        options.referrer_policy == net_traits::ReferrerPolicy::EmptyString,
+        // INHERITED from apply_link_options_requires at the external header boundary.
+        header_priority_requires(link_object),
+    ensures apply_link_options_requires(options, link_object, rel),
+{}
+
+/// Conditions for one candidate header, using only input parameters and the
+/// contracts of operations that precede dispatch. No later effect establishes
+/// an earlier callee requirement.
+pub(crate) open spec fn header_input_requires(link_object: &LinkHeader, document: &crate::dom::document::Document,
+    phase: LinkProcessingPhase) -> bool {
+    let parameters = link_object.params@;
+    let media_phase = super::servo_api::link_header::has_key(parameters, "srcset"@)
+        || super::servo_api::link_header::has_key(parameters, "imagesrcset"@)
+        || super::servo_api::link_header::has_key(parameters, "media"@);
+    let phase_matches = match phase { LinkProcessingPhase::Media => media_phase, LinkProcessingPhase::PreMedia => !media_phase };
+    let may_match_media = match super::servo_api::link_header::first_value(parameters, "media"@) {
+        None => true,
+        Some(query) => super::processing::context_specs::media_list_matches_environment_ensures(document, query, true),
+    };
+    if !phase_matches || !may_match_media { true } else {
+        match super::servo_api::link_header::first_value(parameters, "rel"@) {
+            None => true,
+            Some(rel) => if !super::processing::context_specs::apply_link_options_from_parsed_header_result(link_object, rel) {
+                true
+            } else {
+                // INHERITED from apply_link_options_requires; default CORS/referrer fields discharge its other clauses.
+                &&& header_priority_requires(link_object)
+                &&& if rel == "preload"@ {
+                    match super::servo_api::link_header::first_value(parameters, "as"@) {
+                        None => true,
+                        Some(as_) => match super::processing::context_specs::translate_a_preload_destination_result(as_) {
+                            None => true,
+                            Some(destination) => {
+                                let type_ = super::servo_api::link_header::first_value(parameters, "type"@).unwrap_or(Seq::empty());
+                                // INHERITED from type_matches_destination before the dispatch guard.
+                                &&& type_matches_destination_requires(type_, destination)
+                                // INHERITED from type_matches_destination; explicit model/configuration agreement.
+                                &&& type_matches_standard_requires(type_, destination)
+                                &&& (super::processing::algorithms::link_types::preload::type_matches_destination(
+                                    StandardModel, type_, super::processing::types::DestinationView::from_native(destination)) ==> {
+                                    if destination == Destination::Image {
+                                        match (super::servo_api::link_header::first_value(parameters, "imagesrcset"@),
+                                            super::servo_api::link_header::first_value(parameters, "imagesizes"@)) {
+                                            (Some(srcset), Some(sizes)) => {
+                                                // INHERITED from preload through the preceding SourceSet construction contract.
+                                                forall|source_set: crate::dom::srcset::SourceSet|
+                                                    #[trigger] super::processing::context_specs::source_set_create_source_set_ensures(
+                                                        link_object.url@, srcset, sizes, document, &source_set) ==> {
+                                                        &&& super::servo_api::preload::source_selection_precondition(&source_set, document)
+                                                        &&& super::servo_api::preload::selected_source_href(&source_set, document).len() > 0
+                                                    }
+                                            },
+                                            // INHERITED from create_link_request when href is not replaced.
+                                            _ => link_object.url@.len() > 0,
+                                        }
+                                    } else {
+                                        // INHERITED from create_link_request when href is not replaced.
+                                        link_object.url@.len() > 0
+                                    }
+                                })
+                            },
+                        },
+                    }
+                } else { true }
+            },
+        }
+    }
+}
+
+/// External HTTP-header/input-model assumption. It covers every phase-matching
+/// candidate that may pass media checking, conservatively including headers
+/// after a possible earlier return. It is not asserted for arbitrary network data.
+pub(crate) open spec fn process_link_headers_requires(link_headers: &[LinkHeader], document: &crate::dom::document::Document,
+    phase: LinkProcessingPhase) -> bool {
+    // INHERITED from attribute application and preload dispatch for each candidate.
+    forall|i: int| 0 <= i < link_headers@.len() ==> #[trigger] header_input_requires(&link_headers@[i], document, phase)
 }
 
 pub(crate) proof fn lemma_type_matches_destination_requires_short_circuits(
