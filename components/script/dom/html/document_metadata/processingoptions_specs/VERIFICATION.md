@@ -1233,3 +1233,24 @@ exclusions remain in force. Self-check 1/9–11 yes for this annotation audit;
 standard algorithms/results unchanged. Remaining work: small definition-comment
 cleanup, final review/report, and any separately recorded native-effect/model
 correspondence work that is explicitly trusted rather than completed.
+
+## Task: correct native buffer-capacity adapter (2026-10-30)
+
+Final source review found an error in the implementation-specific observation
+predicate for `LinkFetchContext::process_content_length`: native code reserves
+`size.saturating_sub(current_length)`, not `size` additional bytes. The adapter
+incorrectly required capacity≥current_length+size. It now requires preservation
+of previous capacity and enough total capacity for current bytes and size.
+
+Witness: one buffered byte, previous capacity 4, reported total size 8, resulting
+capacity 8 is valid; the old model wrongly demanded 9. The existing adapter
+regression now checks this discriminator and the no-growth size-zero case.
+This corrects a **native bookkeeping model error**, not a Servo implementation
+defect or a weakened WHATWG step. Capacity reservation has no separately named
+WHATWG algorithm; no step numbering is invented and no executable postcondition
+was changed (the native listener body is still scope-excluded).
+
+Full focused command: **86 verified, 0 errors**. Labels/requirements unchanged.
+Self-check 1/9–11 yes for this adapter correction; normative step checks are not
+applicable. No native code or allocation-success guarantee was added. Independent
+BytesMut implementation verification remains outside this task.

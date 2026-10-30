@@ -712,6 +712,10 @@ proof fn native_buffering_and_notification_adapter() {
     let before = LinkFetchContextView { kind: LinkFetchContextTypeView::Preload, url: fixture_url(7), link: Some(8int), response_body: seq![1u8], capacity: 4 };
     let after = LinkFetchContextView { response_body: seq![1u8, 2u8], ..before };
     assert(fetch_context::process_response_chunk_ensures(before, seq![2u8], after));
+    // A total size of 8 with one buffered byte requires total capacity 8, not 9.
+    let reserved = LinkFetchContextView { capacity: 8, ..before };
+    assert(fetch_context::process_content_length_ensures(before, 8, reserved));
+    assert(fetch_context::process_content_length_ensures(before, 0, before));
     assert(fetch_context::resource_timing_information(before) == ("preload"@, fixture_url(7)));
     let eof = fetch_context::process_response_eof_effects(before, 3, 4, true);
     assert(eof.len() == 2 && eof[0] is SubmitTiming);

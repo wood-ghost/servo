@@ -46,7 +46,10 @@ pub(crate) open spec fn process_content_length_ensures(
     // BytesMut::reserve changes allocation capacity, not the accumulated bytes.
     &&& after == LinkFetchContextView { capacity: after.capacity, ..before }
     &&& after.capacity >= before.capacity
-    &&& after.capacity >= before.response_body.len() + size
+    // Native code reserves size.saturating_sub(current_length), not size
+    // additional bytes. On return the total capacity covers size/current_length.
+    &&& after.capacity >= before.response_body.len()
+    &&& after.capacity >= size
 }
 
 pub(crate) open spec fn link_fetch_context_type_into_initiator(
