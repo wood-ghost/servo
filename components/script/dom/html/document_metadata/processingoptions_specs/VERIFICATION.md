@@ -922,3 +922,28 @@ extra implementation requirements or new findings. Native string-pattern
 translation remains labelled trusted for the freshly reproduced Verus gap.
 Remaining work: preconnect/secondary caller and small linked definitions,
 trust/input-boundary audit, native build and final report.
+
+## Task: preconnect state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#preconnect>, snapshot/
+inspection 2026-10-30. Row 1: URL/partitionKey temporaries and useCredentials
+update. Steps 1–8 map one-to-one to `preconnect_machine::step1`–`step8`:
+empty-href return, URL parse, failure return, HTTP(S) guard, partition key,
+credentials initialization, anonymous cross-origin update, connection plan.
+Each complete sentence is verbatim and directly above its transition.
+
+The standard's paragraph permitting partial handshakes or skipping entirely is
+retained, so `MayConnect` describes permission/recommendation rather than a
+mandatory network effect. The HTTP(S) test reads the URL record and same-origin
+calls the separate proved predicate. URL origin and network partition key remain
+linked model operations. Prove all early returns and final result from generated
+relations; existing preconnect/dispatch regression proofs pass.
+
+Full focused command: **81 verified, 0 errors**. No new labels, executable changes,
+input restrictions or findings. Self-check 1–11: yes for the eight-step algorithm.
+An initial result-proof failure exposed the closed request input adapters:
+`reveal` cannot open a closed function from another module. A theorem in their
+owning module exposes their defined projections; no external assumption or
+visibility widening was introduced. Native connection effects remain outside
+the plan proof. Remaining work: secondary caller/small linked definitions and
+trust/input-boundary audit/native build/report.

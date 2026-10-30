@@ -23,6 +23,14 @@ pub closed spec fn href(options: LinkProcessingOptionsView) -> Seq<char> { optio
 pub closed spec fn encoding_parse<M: LinkProcessingModel>(model: M, options: LinkProcessingOptionsView) -> Option<ServoUrlView> {
     model.encoding_parse_url(options.href, options.base_url)
 }
+
+/// Expose the closed input adapters to other specification modules by proof,
+/// without widening the private record or assuming an external relation.
+pub(crate) proof fn request_input_projections<M: LinkProcessingModel>(model: M, options: LinkProcessingOptionsView)
+    ensures
+        href(options) == options.href,
+        encoding_parse(model, options) == model.encoding_parse_url(options.href, options.base_url),
+{}
 // https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request
 pub closed spec fn potential_cors_request<M: LinkProcessingModel>(model: M, url: ServoUrlView, options: LinkProcessingOptionsView) -> RequestView {
     create_a_potential_cors_request(model, url, options.destination, options.crossorigin, false)

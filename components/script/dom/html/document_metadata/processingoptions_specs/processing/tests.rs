@@ -29,6 +29,7 @@ broadcast use {
     super::algorithms::link_types::preload_machine::preload_result,
     super::algorithms::preload_response::response_result,
     super::algorithms::callbacks::commit_result,
+    super::algorithms::link_types::preconnect::preconnect_result,
 };
 
 pub(crate) struct Fixture {
