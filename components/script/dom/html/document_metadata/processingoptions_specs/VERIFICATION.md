@@ -330,3 +330,20 @@ updates, loops, new executable preconditions or trust boundaries. Labels
 added/removed: none. Findings/Verus limitations: none new. Native host/opaque
 correspondence remains trusted as recorded above. Not done: same-origin-domain,
 effective domain, serialization/site rules, other views and native caller proofs.
+
+## Task: effective domain (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-effective-domain>,
+snapshot/inspection 2026-10-30. Form: row 3, sequential returns without carried
+variables. `algorithms/origin.rs::effective_domain` maps step 1→opaque/null,
+step 2→non-null domain, step 3→host, each with verbatim text. Full focused
+command: **54 verified, 0 errors**. Self-check 1–11: yes for this task; no
+new trust labels, implicit preconditions, runtime changes or findings.
+No claim of native domain accessor verification. Remaining tasks are unchanged.
+
+Additional limitation probe (2026-10-30): `spec fn f(a: bool) -> bool {
+if a { return true; } false }` is rejected with **"return is not allowed in
+pure context"**. Reproduced with the installed `verus` in
+`/tmp/opencode/spec_return_probe.rs`; no verifier code changed. This affects
+literal nested returns in same-origin-domain; its control-flow representation
+must preserve the parent step and both substeps rather than merging conditions.

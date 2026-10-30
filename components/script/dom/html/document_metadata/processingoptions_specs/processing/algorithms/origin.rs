@@ -5,7 +5,7 @@
 //! Origin operations from HTML, snapshot and inspection 2026-10-30.
 
 use vstd::prelude::*;
-use super::super::types::{OriginView, host_equals};
+use super::super::types::{OriginView, HostView, host_equals};
 
 verus! {
 
@@ -44,5 +44,22 @@ pub(crate) proof fn domain_does_not_change_same_origin(a: OriginView, domain: Op
 pub(crate) proof fn same_origin_is_symmetric(a: OriginView, b: OriginView)
     ensures same_origin(a, b) == same_origin(b, a),
 {}
+
+// https://html.spec.whatwg.org/multipage/browsers.html#concept-origin-effective-domain
+// Snapshot/inspection 2026-10-30.
+// Form: row 3, direct spec fn; ordered returns with no temporary shared by steps.
+// The effective domain of an origin origin is computed as follows:
+pub(crate) open spec fn effective_domain(origin: OriginView) -> Option<HostView> {
+    // 1. If origin is an opaque origin, then return null.
+    if origin is Opaque {
+        None
+    // 2. If origin's domain is non-null, then return origin's domain.
+    } else if origin->Tuple_domain is Some {
+        origin->Tuple_domain
+    } else {
+        // 3. Return origin's host.
+        Some(origin->Tuple_host)
+    }
+}
 
 } // verus!
