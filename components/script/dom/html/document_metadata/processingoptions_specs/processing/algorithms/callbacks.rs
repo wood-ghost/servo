@@ -75,11 +75,7 @@ pub(crate) open spec fn commit_preload_computation<M: LinkProcessingModel>(
 // links.html#link-type-preload: fetch-and-process-the-linked-resource, step 6.1.
 // Also the corresponding prefetch process-response callback.
 pub(crate) open spec fn link_response_event(element: int, response: ResponseView) -> CallbackEffect {
-    // If response is a network error, fire "error"; otherwise fire "load".
-    CallbackEffect::FireEvent {
-        element,
-        name: if response.network_error { "error"@ } else { "load"@ },
-    }
+    super::link_types::preload_element::element_response_event(element, response)
 }
 
 pub(crate) open spec fn preload_response_ensures<M: LinkProcessingModel>(

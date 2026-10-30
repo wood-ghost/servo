@@ -236,6 +236,22 @@ pub(crate) enum LinkHeaderPlan {
     Preconnect { preconnect: PreconnectPlan },
 }
 
+/// Supplied observations at the link-element caller boundary. The options are
+/// observed after source-set update, when create-link-options runs. raw_as is a
+/// native correspondence observation, not a field of HTML link processing options.
+pub(crate) struct LinkElementPreloadObservations {
+    pub element: int,
+    pub options_after_source_update: LinkProcessingOptionsView,
+    pub as_keyword: Option<Seq<char>>,
+    pub raw_as: Option<Seq<char>>,
+    pub response_callback: int,
+}
+
+pub(crate) struct LinkElementPreloadPlan {
+    pub source_set_updated: bool,
+    pub preload: Option<PreloadPlan>,
+}
+
 pub(crate) enum CallbackEffect {
     ReportTiming { controller: Option<int>, global: int },
     InvokeResponse { callback: int, response: ResponseView },

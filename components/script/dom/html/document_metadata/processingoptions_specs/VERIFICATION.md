@@ -947,3 +947,30 @@ owning module exposes their defined projections; no external assumption or
 visibility widening was introduced. Native connection effects remain outside
 the plan proof. Remaining work: secondary caller/small linked definitions and
 trust/input-boundary audit/native build/report.
+
+## Task: link-element preload caller reference machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#link-type-preload:fetch-and-process-the-linked-resource-2>,
+snapshot/inspection 2026-10-30. Row 1: options/destination temporaries and update.
+`preload_element.rs` maps 1→step1 (source-set update operation), 2→step2
+(create options observation after that update), 3→step3 (translate as-state
+keyword), 4→step4 (null return), 5→step5 (destination update), 6→step6
+(linked preload with response callback). The single response callback substep
+6.1 is a direct branch specification with its complete text; the existing event
+adapter now delegates to it.
+
+The source-set update flag records the **planned operation**, not evidence of
+native mutation. The options and attribute-state observations are supplied by
+the unverified element/DOM boundary. Both linked source-update/create-options
+boundaries have scope labels and URLs. The machine requires preload's href
+obligation at Step 6 after assigning the translated destination. A general proof
+establishes termination, the ordered update marker and the selected preload plan.
+
+Full focused command: **82 verified, 0 errors**. Labels added: two scope labels
+for linked element observations; none removed. Self-check 1–11: yes for the
+six-step caller relative to those explicit boundaries. No executable edits or
+new external-input restrictions in this reference-only task. HTML issue #1142
+still records real-browser event differences; this spec follows the literal
+error/load rule. Native handle_preload_url attachment and DOM-input assumptions
+are the next task; source-set update and element-option construction are not
+claimed independently verified.
