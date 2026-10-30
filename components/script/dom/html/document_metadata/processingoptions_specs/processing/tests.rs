@@ -86,6 +86,24 @@ pub(crate) open spec fn fixture_url(port: u16) -> ServoUrlView {
     }
 }
 
+pub(crate) open spec fn fixture_source_set(identity: int) -> SourceSetView {
+    SourceSetView {
+        image_sources: OrderedImageSourcesView { entries: seq![ImageSourceView {
+            identity, url: fixture_url(7), descriptor: None,
+        }] },
+        source_size: SourceSizeView { css_value: "100px"@, used_css_pixels: 100real },
+    }
+}
+
+proof fn source_set_ordered_identity_distinguishes_equal_urls() {
+    let first = ImageSourceView { identity: 1, url: fixture_url(7), descriptor: None };
+    let second = ImageSourceView { identity: 2, ..first };
+    let distinct = OrderedImageSourcesView { entries: seq![first, second] };
+    let repeated = OrderedImageSourcesView { entries: seq![first, first] };
+    assert(distinct.well_formed());
+    assert(!repeated.well_formed());
+}
+
 /// An arbitrary shared policy view; tests require preservation, not a particular
 /// policy identity or an assumption about allocation/reference counting.
 pub(crate) uninterp spec fn fixture_policy_container() -> Arc<PolicyContainerView>;
@@ -408,7 +426,7 @@ proof fn attribute_updates_and_frame() {
     assert(ascii_case_insensitive_match("ANONYMOUS"@, "anonymous"@));
     assert(ascii_case_insensitive_match("HIGH"@, "high"@));
     let before = LinkProcessingOptionsView {
-        source_set: Some(SourceSetView { id: 8 }),
+        source_set: Some(fixture_source_set(8)),
         on_document_ready: Some(DocsAlgoView { id: 12 }),
         ..initial()
     };
@@ -522,7 +540,7 @@ proof fn preload_branches_and_commit_timing() {
 
 proof fn image_source_selection_and_preload_key() {
     let image = DestinationView::from_native(NativeDestination::Image);
-    let options = LinkProcessingOptionsView { destination: image, source_set: Some(SourceSetView { id: 8 }), ..initial() };
+    let options = LinkProcessingOptionsView { destination: image, source_set: Some(fixture_source_set(8)), ..initial() };
     assert(options.type_ =~= ""@);
     assert(image.as_str() == "image"@);
     link_types::match_preload_type::runner_finishes(fixture(), options.type_, "image"@);
@@ -692,10 +710,10 @@ proof fn source_set_uses_both_attributes_and_null_image() {
     let header = link("target"@, attrs);
     let apply = apply_call(header, state);
     let source_set = CreateSourceSetCall {
-        default_source: "target"@, srcset: Seq::empty(), sizes: Seq::empty(), img: None, result: SourceSetView { id: 7 }
+        default_source: "target"@, srcset: Seq::empty(), sizes: Seq::empty(), img: None, result: fixture_source_set(7)
     };
     let process = ProcessLinkHeaderCall {
-        relation: "preload"@, options: LinkProcessingOptionsView { source_set: Some(SourceSetView { id: 7 }), ..apply.after }
+        relation: "preload"@, options: LinkProcessingOptionsView { source_set: Some(fixture_source_set(7)), ..apply.after }
     };
     let step = LinkHeaderStep { header_index: 0, media: None, action: LinkHeaderAction::Dispatch { apply, source_set: Some(source_set), process } };
     let trace = ProcessLinkHeadersTrace { steps: seq![step], states: seq![state, context(1)] };

@@ -84,7 +84,11 @@ distinct opaque/list paths, nullable query/fragment, and a contextual blob entry
 port, and nullable domain. The native adapter reads `ImmutableOrigin` variants;
 opaque identity and host correspondence remain labelled assumptions.
 
-`SourceSetView`, `EnvironmentView`,
+`SourceSetView` contains an identity-ordered set of image sources and a source
+size with CSS syntax and a contextual used value. `view_in_document` uses the
+document-context adapter for lazy native size-list evaluation and URL resolution.
+
+`EnvironmentView`,
 `PolicyContainerView`, `DocumentView`, and `DocsAlgoView` are distinct typed
 abstract identities. Their contents and operations remain external-model
 boundaries. Requests, document snapshots, source-set call records, callbacks,

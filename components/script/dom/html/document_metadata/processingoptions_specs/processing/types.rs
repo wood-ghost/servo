@@ -307,10 +307,78 @@ pub(crate) open spec fn fetch_priority_attribute_definition()
 // =========================
 
 // https://html.spec.whatwg.org/multipage/images.html#source-set
-// A source set is an ordered set of zero or more image sources and a source size. read through the whole whatwg html standard and then create a set. Then create a interface to connect to NativeSourceSet in pub(crate) source_set: Option<SourceSet> like other view struct
-// TODO: currently it is not a set
+// Snapshot/inspection 2026-10-30.
+// A source set is an ordered set of zero or more image sources and a source size.
 pub(crate) struct SourceSetView {
-    pub id: int,
+    pub image_sources: OrderedImageSourcesView,
+    pub source_size: SourceSizeView,
+}
+
+impl SourceSetView {
+    pub(crate) open spec fn well_formed(self) -> bool {
+        &&& self.image_sources.well_formed()
+        &&& (forall|i: int| 0 <= i < self.image_sources.entries.len() ==>
+            (#[trigger] self.image_sources.entries[i]).well_formed())
+    }
+}
+
+// https://infra.spec.whatwg.org/#ordered-set
+// An ordered set is a list that does not contain the same item twice.
+// Source identities implement Infra object identity: equal URLs/densities do
+// not collapse independently created source objects. Selection separately
+// removes duplicate pixel densities.
+pub(crate) struct OrderedImageSourcesView {
+    pub(crate) entries: Seq<ImageSourceView>,
+}
+
+impl OrderedImageSourcesView {
+    #[verifier::type_invariant]
+    pub(crate) open spec fn well_formed(&self) -> bool {
+        forall|i: int, j: int| 0 <= i < j < self.entries.len() ==>
+            (#[trigger] self.entries[i]).identity != (#[trigger] self.entries[j]).identity
+    }
+}
+
+// https://html.spec.whatwg.org/multipage/images.html#image-source
+// An image source is a URL, and optionally either a pixel density descriptor, or a width descriptor.
+pub(crate) struct ImageSourceView {
+    // Infra object identity, not the URL string or pixel density.
+    pub identity: int,
+    pub url: ServoUrlView,
+    pub descriptor: Option<ImageSourceDescriptorView>,
+}
+
+impl ImageSourceView {
+    pub(crate) open spec fn well_formed(self) -> bool {
+        match self.descriptor {
+            None => true,
+            Some(ImageSourceDescriptorView::Width { width }) => width > 0,
+            Some(ImageSourceDescriptorView::PixelDensity { density }) => match density {
+                PixelDensityView::Finite { value } => value >= 0real,
+                PixelDensityView::PositiveInfinity => true,
+            },
+        }
+    }
+}
+
+// https://html.spec.whatwg.org/multipage/images.html#width-descriptor
+// https://html.spec.whatwg.org/multipage/images.html#pixel-density-descriptor
+pub(crate) enum ImageSourceDescriptorView {
+    Width { width: nat },
+    PixelDensity { density: PixelDensityView },
+}
+
+// Normalizing width by a zero source size can produce positive infinity.
+// Native f64 conversion/rounding is an explicit correspondence boundary.
+pub(crate) enum PixelDensityView { Finite { value: real }, PositiveInfinity }
+
+// https://html.spec.whatwg.org/multipage/images.html#source-size-2
+// A source size is a <source-size-value>. When a source size has a unit relative to the viewport, it must be interpreted relative to the img element's node document's viewport. Other units must be interpreted the same as in Media Queries.
+// CSS syntax is retained separately from its contextual used value. Neither is
+// equated to Servo's unevaluated SourceSizeList by an unconditional assumption.
+pub(crate) struct SourceSizeView {
+    pub css_value: Seq<char>,
+    pub used_css_pixels: real,
 }
 
 // =========================

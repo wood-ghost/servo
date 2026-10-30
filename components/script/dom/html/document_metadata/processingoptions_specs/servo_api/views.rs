@@ -59,6 +59,25 @@ pub(crate) uninterp spec fn policy_container_view(container: &Arc<PolicyContaine
 pub(crate) uninterp spec fn environment_view(client: &RequestClient) -> EnvironmentView;
 // TRUSTED(scope): not verified yet; remove when SourceSet's contextual view correspondence is verified
 pub(crate) uninterp spec fn source_set_view(source_set: &SourceSet) -> SourceSetView;
+
+// Native SourceSet.image_sources holds unresolved URL strings and descriptors.
+// URL resolution needs the same document context as source-size evaluation.
+// TRUSTED(scope): not verified yet; remove when SourceSet.image_sources correspondence is verified
+pub(crate) uninterp spec fn source_set_images_in_context(source_set: &SourceSet, document: DocumentView)
+    -> OrderedImageSourcesView;
+
+// SourceSet.source_size is a lazy SourceSizeList; evaluate_source_size_list uses
+// Document/layout state and returns Au. The model records CSS pixels, not Au.
+// TRUSTED(scope): not verified yet; remove when SourceSet::evaluate_source_size_list correspondence is verified
+pub(crate) uninterp spec fn source_size_in_context(source_set: &SourceSet, document: DocumentView)
+    -> SourceSizeView;
+
+pub(crate) open spec fn source_set_view_in_context(source_set: &SourceSet, document: DocumentView) -> SourceSetView {
+    SourceSetView {
+        image_sources: source_set_images_in_context(source_set, document),
+        source_size: source_size_in_context(source_set, document),
+    }
+}
 // TRUSTED(scope): not verified yet; remove when RequestBuilder's view correspondence is verified
 pub(crate) uninterp spec fn request_view(request: &RequestBuilder) -> RequestView;
 
@@ -154,7 +173,14 @@ pub(crate) open spec fn view_in_document(
     options: &LinkProcessingOptions,
     document: DocumentView,
 ) -> LinkProcessingOptionsView {
-    LinkProcessingOptionsView { document: Some(document), ..view(options) }
+    LinkProcessingOptionsView {
+        document: Some(document),
+        source_set: match options.source_set {
+            None => None,
+            Some(source_set) => Some(source_set_view_in_context(&source_set, document)),
+        },
+        ..view(options)
+    }
 }
 
 /// Standard-facing primitive interface. Parsing, support decisions, URL/Fetch

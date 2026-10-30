@@ -347,3 +347,33 @@ pure context"**. Reproduced with the installed `verus` in
 `/tmp/opencode/spec_return_probe.rs`; no verifier code changed. This affects
 literal nested returns in same-origin-domain; its control-flow representation
 must preserve the parent step and both substeps rather than merging conditions.
+
+## Task: source-set view and contextual native adapter (2026-10-30)
+
+Definitions: <https://html.spec.whatwg.org/multipage/images.html#source-set>,
+`#image-source`, `#source-size-2`; HTML snapshot/inspection 2026-10-30.
+Record map: ordered image sources→`image_sources`, source size→`source_size`.
+Image source URL→`url`, optional width/pixel-density descriptor→`descriptor`.
+Definition sentences are directly above the corresponding records/fields.
+`OrderedImageSourcesView` uses a sequence with a local invariant forbidding
+duplicate **object identities**. It retains ordering and does not collapse two
+separately created sources with the same URL. A regression proves that distinction.
+
+Source-size CSS syntax and its contextual used CSS-pixel value are distinct.
+Servo stores a lazy `SourceSizeList` and evaluates it against a Document to Au;
+the model does not equate the list with a resolved size. Native source URL
+strings also require contextual resolution. `source_set_view_in_context` takes
+that document explicitly and `view_in_document` now uses it. The two primitive
+observations are labelled scope boundaries. Context-free `source_set_view`
+remains a labelled unresolved projection for callers that supply no document.
+Finite density and positive infinity are separate; f64 rounding/invalid-value
+correspondence and parser validity are not silently assumed proved.
+
+Full focused command: **55 verified, 0 errors**. Labels added: scope for
+contextual image-source and source-size observations; none removed. No new
+executable requirements or runtime edits. Self-check 1, 3, 6, 8–11 yes for this
+view task; 2, 4, 5, 7 have no numbered algorithm. Quantified uniqueness checks
+are definition invariants, not translations of image-selection steps. Findings:
+native lazy-size and unresolved-string representation gaps, not standard defects.
+Not done: CSS/URL parsing, concrete contextual observation and image selection/
+density-normalization proofs; other requested views and native chain obligations.
