@@ -552,3 +552,27 @@ yes for this algorithm. Native MutableOrigin/OriginSnapshot domain observations
 remain outside this proof. The previously recorded pure-spec-return limitation
 is avoided by an explicit state machine, not a runtime rewrite. Remaining
 serialization/site operations and legacy link algorithms are not completed here.
+
+## Task: URL equality through serialization (2026-10-30)
+
+Algorithm: <https://url.spec.whatwg.org/#concept-url-equals>, snapshot 2026-10-19,
+inspected 2026-10-30. Row 1: serializedA/serializedB are carried to the result.
+`algorithms/url.rs::url_equality_machine` maps 1→step1 (serialize A),
+2→step2 (serialize B), 3→step3 (compare), with complete verbatim step comments.
+The optional exclude-fragments argument defaults to false in `url_equal`.
+
+The linked URL serializer is an explicitly labelled primitive over only the
+serialized components; blob-entry identity is excluded from its inputs, and
+excluded fragments are omitted. This specifies the equality algorithm relative
+to that primitive without claiming a proof of URL/host/path serialization.
+The generated relations yield a proved terminating three-transition run.
+Two further proofs establish blob-entry independence and excluded-fragment
+independence. Native `ServoUrl::as_str` and `is_equal_excluding_fragments` receive
+labelled correspondence contracts through closed projections.
+
+Full focused command: **62 verified, 0 errors**. Labels added: scope for the
+linked URL serializer and two native method contracts; none removed. No new
+implicit preconditions or executable changes. Self-check 1–11: yes for this
+three-step algorithm. Findings/limitations: none new. Not done: serializer
+implementation correspondence, broader URL parsing/origin operations and
+remaining link algorithm migrations/native effects.

@@ -89,4 +89,20 @@ pub assume_specification<'a>[ServoUrl::query](url: &'a ServoUrl) -> (result: Opt
 pub assume_specification<'a>[ServoUrl::fragment](url: &'a ServoUrl) -> (result: Option<&'a str>)
     ensures optional_string(result) == fragment(url);
 
+pub closed spec fn serialization(url: &ServoUrl) -> Seq<char> {
+    super::super::processing::algorithms::url::serialize_url(url_view(url), false)
+}
+
+pub closed spec fn equal_excluding_fragments(a: &ServoUrl, b: &ServoUrl) -> bool {
+    super::super::processing::algorithms::url::url_equals(url_view(a), url_view(b), true)
+}
+
+// TRUSTED(scope): not verified yet; remove when ServoUrl::as_str correspondence is verified
+pub assume_specification<'a>[ServoUrl::as_str](url: &'a ServoUrl) -> (result: &'a str)
+    ensures result@ == serialization(url);
+
+// TRUSTED(scope): not verified yet; remove when ServoUrl::is_equal_excluding_fragments is verified
+pub assume_specification[ServoUrl::is_equal_excluding_fragments](a: &ServoUrl, b: &ServoUrl) -> (result: bool)
+    ensures result == equal_excluding_fragments(a, b);
+
 } // verus!
