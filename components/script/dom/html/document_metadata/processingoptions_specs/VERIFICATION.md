@@ -1254,3 +1254,35 @@ Full focused command: **86 verified, 0 errors**. Labels/requirements unchanged.
 Self-check 1/9–11 yes for this adapter correction; normative step checks are not
 applicable. No native code or allocation-success guarantee was added. Independent
 BytesMut implementation verification remains outside this task.
+
+## Task: final view vocabulary and definition layout (2026-10-30)
+
+Aligned the linked record vocabulary: RequestView now uses `integrity_metadata`
+and `cryptographic_nonce_metadata`, and PreloadEntryView uses
+`integrity_metadata`. LinkProcessingOptionsView retains the standard's distinct
+`integrity` name and the user-requested `type_`. All dependent setters,
+computation laws and fixtures were updated without semantic changes.
+
+The complete HTML option-item text is directly above each field, including its
+default and value type. Request metadata/policy-container definition sentences,
+preload entry/key field text and definition URLs are present. Request policy
+container None explicitly denotes Fetch's **"client" sentinel**, not null.
+The preload-key constructor carries its full unnumbered standard sentence and
+row-3 justification; no step number is invented. Sources: HTML snapshot 2026-10-30,
+Fetch snapshot 2026-10-19, inspected 2026-10-30, at the anchors in model.rs and
+link_types/preload.rs.
+
+FINDING: the preload-key definition calls its destination a **preload destination**,
+but its constructor copies request.destination, which is already translated
+(including the empty string for fetch). The model preserves the literal
+constructor action and explicitly records the inconsistent declared domain.
+It does not silently change the quoted field definition or normalize away the
+conflict to match Servo.
+
+Full focused command: **86 verified, 0 errors**. Trust-label lint still reports
+**0 missing labels** (80 files / 278 boundary items / 3 rewrites). No runtime
+code, trust labels or preconditions changed. Self-check 1/3/6/8–11 yes for the
+record/constructor layout, with the key-domain finding stated above; existing
+numbered algorithm mappings are unchanged. Remaining work is the consolidated
+status/review report; the explicitly trusted implementation/model boundaries
+remain unproved rather than being labelled complete.

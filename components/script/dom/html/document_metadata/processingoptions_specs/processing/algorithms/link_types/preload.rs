@@ -55,9 +55,11 @@ pub(crate) open spec fn type_matches_destination<M: LinkProcessingModel>(
 }
 
 // https://html.spec.whatwg.org/multipage/links.html#create-a-preload-key
+// Snapshot/inspection 2026-10-30.
+// Form: row 3, a single final return with no carried temporary. The source is
+// an unnumbered sentence, so no step number is invented.
+// To create a preload key for a request request, return a new preload key whose URL is request's URL, destination is request's destination, mode is request's mode, and credentials mode is request's credentials mode.
 pub(crate) open spec fn create_preload_key(request: RequestView) -> PreloadKeyView {
-    // Return a new preload key with the request's URL, destination, mode,
-    // and credentials mode. Key equality is itemwise equality.
     PreloadKeyView {
         url: request.url,
         destination: request.destination,
@@ -90,7 +92,7 @@ pub(crate) open spec fn preload_computation<M: LinkProcessingModel>(
             Some(request) => {
                 let unsafe_end_time = 0int;
                 let entry = PreloadEntryView {
-                    integrity: options.integrity,
+                    integrity_metadata: options.integrity,
                     response: None,
                     on_response_available: None,
                 };

@@ -39,7 +39,7 @@ pub(crate) enum LinkHeadersPhase {
     Media,
 }
 
-/// Abstract identities of specification objects, not Rust addresses. `effects`
+/// Document/context snapshots with a typed document identity, not Rust addresses. `effects`
 /// identifies the remaining observable state, e.g. registered preloads. Context
 /// values can change between dispatched links; the document identity stays fixed.
 pub(crate) struct LinkHeaderDocumentState {
@@ -54,27 +54,59 @@ pub(crate) struct LinkHeaderDocumentState {
 /// Specification view of the standard's full options record, following MimeView's
 /// naming convention. This includes fields that Servo's current
 /// LinkProcessingOptions does not yet represent: initiator, document,
-/// on-document-ready, and fetch priority. Nullable algorithms/source sets use
-/// abstract identities, with None representing the standard's null value.
+/// on-document-ready, and fetch priority. Nullable algorithms use typed identities;
+/// source sets carry detailed records. None represents the standard's null value.
 /// https://html.spec.whatwg.org/multipage/semantics.html#link-processing-options
 // A link processing options is a struct. It has the following items:
 pub(crate) struct LinkProcessingOptionsView {
-    pub href: Seq<char>, // href (default the empty string)
-    pub initiator: Seq<char>, // initiator (default "link")
-    pub integrity: Seq<char>, // integrity (default the empty string)
-    pub type_: Seq<char>, // type (default the empty string)
-    pub cryptographic_nonce_metadata: Seq<char>, // cryptographic nonce metadata (default the empty string) A string
-    pub destination: DestinationView, // destination (default the empty string) A destination type.
-    pub crossorigin: Option<CorsSettingsView>, // crossorigin (default No CORS) A CORS settings attribute state
-    pub referrer_policy: ReferrerPolicyView, // referrer policy (default the empty string) A referrer policy
-    pub source_set: Option<SourceSetView>, // source set (default null) Null or a source set
-    pub base_url: ServoUrlView, // base URL A URL
-    pub origin: OriginView, // origin An origin
-    pub environment: EnvironmentView, // environment An environment
-    pub policy_container: Arc<PolicyContainerView>, // policy container A policy container
-    pub document: Option<DocumentView>, // document (default null) Null or a Document
-    pub on_document_ready: Option<DocsAlgoView>, // Null or an algorithm accepting a Document
-    pub fetch_priority: LinkFetchPriorityView, // fetch priority (default Auto) A fetch priority attribute state
+    // href (default the empty string)
+    // A string
+    pub href: Seq<char>,
+    // initiator (default "link")
+    // A string
+    pub initiator: Seq<char>,
+    // integrity (default the empty string)
+    // A string
+    pub integrity: Seq<char>,
+    // type (default the empty string)
+    // A string
+    pub type_: Seq<char>,
+    // cryptographic nonce metadata (default the empty string)
+    // A string
+    pub cryptographic_nonce_metadata: Seq<char>,
+    // destination (default the empty string)
+    // A destination type.
+    pub destination: DestinationView,
+    // crossorigin (default No CORS)
+    // A CORS settings attribute state
+    pub crossorigin: Option<CorsSettingsView>,
+    // referrer policy (default the empty string)
+    // A referrer policy
+    pub referrer_policy: ReferrerPolicyView,
+    // source set (default null)
+    // Null or a source set
+    pub source_set: Option<SourceSetView>,
+    // base URL
+    // A URL
+    pub base_url: ServoUrlView,
+    // origin
+    // An origin
+    pub origin: OriginView,
+    // environment
+    // An environment
+    pub environment: EnvironmentView,
+    // policy container
+    // A policy container
+    pub policy_container: Arc<PolicyContainerView>,
+    // document (default null)
+    // Null or a Document
+    pub document: Option<DocumentView>,
+    // on document ready (default null)
+    // Null or an algorithm accepting a Document
+    pub on_document_ready: Option<DocsAlgoView>,
+    // fetch priority (default Auto)
+    // A fetch priority attribute state
+    pub fetch_priority: LinkFetchPriorityView,
 }
 
 // https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute
@@ -83,7 +115,8 @@ pub(crate) struct LinkProcessingOptionsView {
 // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#enumerated-attribute
 // Enumerated Attributes
 // Some attributes, called enumerated attributes, take on a finite set of states. The state for such an attribute is derived by combining the attribute's value, a set of keyword/state mappings, and three possible special states that can also be given in the specification of the attribute. These special states are the invalid value default, the missing value default, and the empty value default.
-// TODO: check how is servo dealing with this attribute. Is it a trait?
+// The generic standard definition is types::EnumerateAttribute. Servo's
+// make_enumerated_getter! in dom/macros.rs is an executable macro, not this trait/model.
 
 pub(crate) struct MediaQueryCall {
     pub document: DocumentView,
@@ -148,15 +181,21 @@ pub(crate) enum CredentialsMode { Include, SameOrigin, Omit }
 
 /// The fields used by the algorithms below. `other` carries the remaining Fetch
 /// request fields. Their defaults belong to the external Fetch model interface.
+/// https://fetch.spec.whatwg.org/#concept-request
+/// Fetch snapshot 2026-10-19, inspected 2026-10-30.
 pub(crate) struct RequestView {
     pub url: ServoUrlView,
     pub destination: DestinationView,
     pub mode: RequestMode,
     pub credentials_mode: CredentialsMode,
     pub use_url_credentials: bool,
+    // None represents Fetch's "client" sentinel, not a null policy container.
+    // A request has an associated policy container, which is "client" or a policy container. Unless stated otherwise it is "client".
     pub policy_container: Option<Arc<PolicyContainerView>>,
-    pub integrity: Seq<char>,
-    pub nonce: Seq<char>,
+    // A request has associated integrity metadata (a string). Unless stated otherwise, it is the empty string.
+    pub integrity_metadata: Seq<char>,
+    // A request has associated cryptographic nonce metadata (a string). Unless stated otherwise, it is the empty string.
+    pub cryptographic_nonce_metadata: Seq<char>,
     pub referrer_policy: ReferrerPolicyView,
     pub client: Option<EnvironmentView>,
     pub priority: LinkFetchPriorityView,
@@ -164,10 +203,24 @@ pub(crate) struct RequestView {
     pub other: int,
 }
 
+// https://html.spec.whatwg.org/multipage/links.html#preload-key
+// Snapshot/inspection 2026-10-30.
+// A preload key is a struct. It has the following items:
+// FINDING: the destination item says preload destination, but the constructor
+// copies request.destination (already translated, including the empty string).
+// This view preserves that constructor's value, exposing the domain mismatch.
 pub(crate) struct PreloadKeyView {
+    // URL
+    // A URL
     pub url: ServoUrlView,
+    // destination
+    // A preload destination
     pub destination: DestinationView,
+    // mode
+    // A request mode, either "same-origin", "cors", or "no-cors"
     pub mode: RequestMode,
+    // credentials mode
+    // A credentials mode
     pub credentials_mode: CredentialsMode,
 }
 
@@ -177,9 +230,18 @@ pub(crate) struct ResponseView {
     pub other: int,
 }
 
+// https://html.spec.whatwg.org/multipage/links.html#preload-entry
+// Snapshot/inspection 2026-10-30.
+// A preload entry is a struct. It has the following items:
 pub(crate) struct PreloadEntryView {
-    pub integrity: Seq<char>,
+    // integrity metadata
+    // A string
+    pub integrity_metadata: Seq<char>,
+    // response
+    // Null or a response
     pub response: Option<ResponseView>,
+    // on response available
+    // Null, or an algorithm accepting a response or null
     pub on_response_available: Option<int>,
 }
 

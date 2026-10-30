@@ -35,7 +35,7 @@ pub closed spec fn create_request<M: LinkProcessingModel>(model: M, options: Lin
     request::create_link_request(model, options)
 }
 pub closed spec fn new_entry(options: LinkProcessingOptionsView) -> PreloadEntryView {
-    PreloadEntryView { integrity: options.integrity, response: None, on_response_available: None }
+    PreloadEntryView { integrity_metadata: options.integrity, response: None, on_response_available: None }
 }
 pub closed spec fn preload_key(request: RequestView) -> PreloadKeyView { create_preload_key(request) }
 pub closed spec fn document_is_null(options: LinkProcessingOptionsView) -> bool { options.document is None }

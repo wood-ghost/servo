@@ -39,10 +39,10 @@ pub closed spec fn set_policy_container(request: RequestView, options: LinkProce
     RequestView { policy_container: Some(options.policy_container), ..request }
 }
 pub closed spec fn set_integrity_metadata(request: RequestView, options: LinkProcessingOptionsView) -> RequestView {
-    RequestView { integrity: options.integrity, ..request }
+    RequestView { integrity_metadata: options.integrity, ..request }
 }
 pub closed spec fn set_cryptographic_nonce_metadata(request: RequestView, options: LinkProcessingOptionsView) -> RequestView {
-    RequestView { nonce: options.cryptographic_nonce_metadata, ..request }
+    RequestView { cryptographic_nonce_metadata: options.cryptographic_nonce_metadata, ..request }
 }
 pub closed spec fn set_referrer_policy(request: RequestView, options: LinkProcessingOptionsView) -> RequestView {
     RequestView { referrer_policy: options.referrer_policy, ..request }
@@ -226,8 +226,8 @@ pub(crate) broadcast proof fn request_result<M: LinkProcessingModel>(model: M, o
         request_run(model, options).result == match model.encoding_parse_url(options.href, options.base_url) {
             None => None,
             Some(url) => Some(RequestView {
-                policy_container: Some(options.policy_container), integrity: options.integrity,
-                nonce: options.cryptographic_nonce_metadata, referrer_policy: options.referrer_policy,
+                policy_container: Some(options.policy_container), integrity_metadata: options.integrity,
+                cryptographic_nonce_metadata: options.cryptographic_nonce_metadata, referrer_policy: options.referrer_policy,
                 client: Some(options.environment), priority: options.fetch_priority,
                 ..create_a_potential_cors_request(model, url, options.destination, options.crossorigin, false)
             }),

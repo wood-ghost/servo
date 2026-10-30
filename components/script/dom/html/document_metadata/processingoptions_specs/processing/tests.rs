@@ -67,7 +67,7 @@ impl LinkProcessingModel for Fixture {
         RequestView {
             url: fixture_url(0), destination: DestinationView::from_native(NativeDestination::None), mode: RequestMode::NoCors,
             credentials_mode: CredentialsMode::Omit, use_url_credentials: false,
-            policy_container: None, integrity: Seq::empty(), nonce: Seq::empty(),
+            policy_container: None, integrity_metadata: Seq::empty(), cryptographic_nonce_metadata: Seq::empty(),
             referrer_policy: ReferrerPolicyView::from_native(NativeReferrerPolicy::EmptyString),
             client: None, priority: LinkFetchPriorityView::Auto,
             initiator_type: None, other: 17,
@@ -532,7 +532,7 @@ proof fn link_request_failure_and_fields(policy_container: Arc<PolicyContainerVi
     let request = result->Some_0;
     assert(request.url == fixture_url(7) && request.destination == options.destination);
     assert(request.priority == LinkFetchPriorityView::High);
-    assert(request.integrity == "i"@ && request.policy_container == Some(policy_container));
+    assert(request.integrity_metadata == "i"@ && request.policy_container == Some(policy_container));
     assert(request.client == Some(fixture_environment()));
     assert(request::create_link_request_ensures(fixture(), options, result));
     let empty = LinkProcessingOptionsView { href: Seq::empty(), ..options };
@@ -598,7 +598,7 @@ proof fn per_relation_dispatch_and_preconnect_permission() {
 pub(crate) open spec fn callback_state() -> PreloadCallbackState {
     let request = fixture().new_request();
     PreloadCallbackState {
-        entry: PreloadEntryView { integrity: "i"@, response: None, on_response_available: None },
+        entry: PreloadEntryView { integrity_metadata: "i"@, response: None, on_response_available: None },
         key: link_types::preload::create_preload_key(request),
         controller: Some(9int), unsafe_end_time: 0, document: Some(DocumentView { id: 1 }), process_response: Some(12int),
     }

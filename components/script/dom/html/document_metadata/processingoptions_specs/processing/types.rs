@@ -22,6 +22,7 @@ verus! {
 // =========================
 
 /// Local invariant-bearing wrapper around Servo's existing Fetch destination.
+/// https://fetch.spec.whatwg.org/#destination-type
 /// NativeDestination::None denotes the empty destination; "fetch" is a potential
 /// destination translated by the preload algorithm, not a value of the enum.
 /// This struct is used for capturing the servo Destination enum
@@ -185,6 +186,7 @@ pub(crate) enum EnumeratedAttributeState<State> {
 
 /// The two CORS settings carried by Servo. An Option<CorsSettingsView> uses
 /// None for the HTML No CORS state.
+/// https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute
 pub(crate) struct CorsSettingsView {
     pub(crate) value: NativeCorsSettings,
 }
