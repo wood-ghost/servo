@@ -201,6 +201,7 @@ pub(crate) enum PreloadCallback {
 pub(crate) struct PreloadFetch {
     pub request: RequestView,
     pub process_response_consume_body: PreloadCallback,
+    pub controller: int,
 }
 
 /// A plan records operations selected by the standard, not evidence of an
@@ -219,6 +220,7 @@ pub(crate) enum PreloadPlan {
         report_timing: PreloadCallback,
         fetch: PreloadFetch,
         commit_callback: PreloadCallback,
+        commit_algorithm: DocsAlgoView,
         commit: PreloadCommit,
     },
 }

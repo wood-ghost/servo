@@ -26,6 +26,7 @@ broadcast use {
     super::algorithms::request::request_result,
     super::algorithms::potential_cors::potential_cors_result,
     super::algorithms::apply_attributes::attribute_result,
+    super::algorithms::link_types::preload_machine::preload_result,
 };
 
 pub(crate) struct Fixture {
@@ -78,6 +79,8 @@ impl LinkProcessingModel for Fixture {
     }
     open spec fn unsafe_shared_current_time(&self) -> int { 1000 }
     open spec fn document_relevant_global(&self, document: DocumentView) -> int { document.id + 300 }
+    open spec fn fetch_request(&self, request: RequestView, process_response_consume_body: PreloadCallback) -> int { 901 }
+    open spec fn commit_algorithm(&self, initial_state: PreloadCallbackState) -> DocsAlgoView { DocsAlgoView { id: 902 } }
 }
 
 pub(crate) open spec fn fixture() -> Fixture {
@@ -552,6 +555,8 @@ proof fn preload_branches_and_commit_timing() {
     assert(early is Fetch);
     assert(early->Fetch_request.initiator_type == Some("early hint"@));
     assert(early->Fetch_commit is OnDocumentReady);
+    assert(early->Fetch_options.on_document_ready == Some(early->Fetch_commit_algorithm));
+    assert(early->Fetch_fetch.controller == 901);
 }
 
 proof fn image_source_selection_and_preload_key() {

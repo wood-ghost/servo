@@ -36,6 +36,11 @@ pub(crate) trait LinkProcessingModel {
     spec fn network_error(&self) -> ResponseView;
     spec fn unsafe_shared_current_time(&self) -> int;
     spec fn document_relevant_global(&self, document: DocumentView) -> int;
+    // https://fetch.spec.whatwg.org/#concept-fetch
+    spec fn fetch_request(&self, request: RequestView, process_response_consume_body: PreloadCallback) -> int;
+    // Identity of the algorithm defined by preload Step 12. Callback invocation
+    // takes the then-current shared state; this seed does not freeze its values.
+    spec fn commit_algorithm(&self, initial_state: PreloadCallbackState) -> DocsAlgoView;
 }
 
 } // verus!

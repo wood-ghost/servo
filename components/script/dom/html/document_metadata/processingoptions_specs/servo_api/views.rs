@@ -228,6 +228,10 @@ impl LinkProcessingModel for StandardModel {
     uninterp spec fn network_error(&self) -> ResponseView;
     uninterp spec fn unsafe_shared_current_time(&self) -> int;
     uninterp spec fn document_relevant_global(&self, document: DocumentView) -> int;
+    // TRUSTED(scope): not verified yet; remove when Fetch controller observation is verified
+    uninterp spec fn fetch_request(&self, request: RequestView, process_response_consume_body: PreloadCallback) -> int;
+    // TRUSTED(scope): not verified yet; remove when preload commit-algorithm identity correspondence is verified
+    uninterp spec fn commit_algorithm(&self, initial_state: PreloadCallbackState) -> DocsAlgoView;
 }
 
 } // verus!

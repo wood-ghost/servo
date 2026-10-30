@@ -13,6 +13,7 @@ use super::super::super::types::DestinationView;
 use super::super::super::model_trait::LinkProcessingModel;
 use super::super::super::super::predicates::is_preload_destination;
 use super::super::request::create_link_request;
+pub(crate) use super::preload_machine::{preload, preload_requires};
 
 verus! {
 
@@ -63,17 +64,16 @@ pub(crate) open spec fn create_preload_key(request: RequestView) -> PreloadKeyVi
     }
 }
 
-// https://html.spec.whatwg.org/multipage/links.html#preload
-pub(crate) open spec fn preload<M: LinkProcessingModel>(
+// Computation helper. The canonical thirteen-step definition and the theorem
+// relating this helper to its generated relations live in preload_machine.rs.
+pub(crate) open spec fn preload_computation<M: LinkProcessingModel>(
     model: M,
     options: LinkProcessingOptionsView,
     process_response: Option<int>,
 ) -> PreloadPlan {
-    // 1. If options's type doesn't match options's destination, then return.
     if !type_matches_destination(model, options.type_, options.destination) {
         PreloadPlan::TypeMismatch
     } else {
-        // 2. If destination is image and source set is non-null, select the href.
         let options = if options.destination.as_native() == NativeDestination::Image {
             match options.source_set {
                 Some(source_set) => LinkProcessingOptionsView {
@@ -82,46 +82,41 @@ pub(crate) open spec fn preload<M: LinkProcessingModel>(
                 None => options,
             }
         } else { options };
-        // 3. Let request be the result of creating a link request given options.
         let request = create_link_request(model, options);
         match request {
-            // 4. If request is null, then return.
             None => PreloadPlan::RequestFailure,
             Some(request) => {
-                // 5. Let unsafeEndTime be 0.
                 let unsafe_end_time = 0int;
-                // 6. Let entry be a new preload entry with the integrity metadata.
                 let entry = PreloadEntryView {
                     integrity: options.integrity,
                     response: None,
                     on_response_available: None,
                 };
-                // 7. Let key be the result of creating a preload key for request.
                 let key = create_preload_key(request);
-                // 8. If document is null, set request's initiator type to "early hint".
                 let request = if options.document is None {
                     RequestView { initiator_type: Some("early hint"@), ..request }
                 } else { request };
-                // 9. Let controller be null.
                 let controller = None;
-                // 10. Let reportTiming be the following algorithm: callbacks::report_timing.
                 let report_timing = PreloadCallback::ReportTiming;
-                // 11. Fetch request and assign the returned controller. The body of
-                // processResponseConsumeBody is callbacks::preload_response (11.1–11.6).
                 // This plan describes the fetch and its callback; execution is a
                 // separate effect/trace obligation, not a spec-mode network operation.
                 let fetch = PreloadFetch {
                     request,
                     process_response_consume_body: PreloadCallback::ProcessResponseConsumeBody,
+                    controller: model.fetch_request(request, PreloadCallback::ProcessResponseConsumeBody),
                 };
-                // 12. Let commit be the following algorithm: callbacks::commit_preload.
                 let commit_callback = PreloadCallback::Commit;
-                // 13. If document is null, install commit as on-document-ready;
-                // otherwise, call commit with document.
+                let commit_algorithm = model.commit_algorithm(PreloadCallbackState {
+                    entry, key, controller: Some(fetch.controller), unsafe_end_time,
+                    document: options.document, process_response,
+                });
                 let commit = match options.document {
                     None => PreloadCommit::OnDocumentReady,
                     Some(document) => PreloadCommit::Document { document },
                 };
+                let options = if options.document is None {
+                    LinkProcessingOptionsView { on_document_ready: Some(commit_algorithm), ..options }
+                } else { options };
                 PreloadPlan::Fetch {
                     options,
                     request,
@@ -133,6 +128,7 @@ pub(crate) open spec fn preload<M: LinkProcessingModel>(
                     report_timing,
                     fetch,
                     commit_callback,
+                    commit_algorithm,
                     commit,
                 }
             },
@@ -145,16 +141,10 @@ pub(crate) open spec fn preload_ensures<M: LinkProcessingModel>(
     options: LinkProcessingOptionsView,
     process_response: Option<int>,
     result: PreloadPlan,
-) -> bool {
-    // Preserve the create-link-request assertion on paths that reach it.
-    let selected_href = if options.destination.as_native() == NativeDestination::Image {
-        match options.source_set {
-            Some(source_set) => model.select_image_source(source_set),
-            None => options.href,
-        }
-    } else { options.href };
-    &&& (type_matches_destination(model, options.type_, options.destination) ==> selected_href.len() > 0)
-    &&& result == preload(model, options, process_response)
+) -> bool
+    recommends preload_requires(model, options),
+{
+    result == preload(model, options, process_response)
 }
 
 } // verus!

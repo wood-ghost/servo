@@ -26,7 +26,7 @@ processing/algorithms/headers.rs
            -> enumerated_attributes.rs: ASCII case-insensitive keyword matching
     -> create-a-source-set                            external CSS/image algorithm
     -> link_types/dispatch.rs: process_link_header
-       -> link_types/preload.rs: preload               steps 1–13
+        -> link_types/preload_machine.rs: preload       steps 1–13
           -> type_matches_destination                 steps 1–7
           -> select-image-source                      external image algorithm
           -> request.rs: create_link_request           steps 1–11

@@ -7,6 +7,7 @@
 pub(crate) mod dispatch;
 pub(crate) mod match_preload_type;
 pub(crate) mod preload;
+pub(crate) mod preload_machine;
 pub(crate) mod preconnect;
 
 pub(crate) use self::dispatch::*;

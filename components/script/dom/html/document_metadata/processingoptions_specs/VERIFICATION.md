@@ -695,3 +695,48 @@ standard says keyword but the record field is a state; use its explicit table
 mapping without changing the quoted sentence. No new Verus limitation. Native
 attribute updates remain trusted and may differ on invalid attributes/fetch
 priority. Native effects and remaining preload/header/callback migrations remain.
+
+## Task: thirteen-step preload machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#preload>, snapshot/
+inspection 2026-10-30. Row 1: mutable options/request/controller and temporaries.
+`link_types/preload_machine.rs` is canonical; the old expression is a derived
+computation helper. Nested callback bodies remain separate specs to migrate next.
+
+| Step | `preload_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: linked type match and early return |
+| 2 | step2 / Step2 | Yes: image/source-set guard and href update |
+| 3 | step3 / Step3 | Yes: linked request construction; inherited assertion guard |
+| 4 | step4 / Step4 | Yes: request-failure return |
+| 5 | step5 / Step5 | Yes: unsafeEndTime initialization |
+| 6 | step6 / Step6 | Yes: new preload entry |
+| 7 | step7 / Step7 | Yes: linked preload-key constructor |
+| 8 | step8 / Step8 | Yes: early-hint initiator update |
+| 9 | step9 / Step9 | Yes: controller initialized to null |
+| 10 | step10 / Step10 | Yes: reportTiming definition marker |
+| 11 | step11 / Step11 | Yes: controller assigned from Fetch; separate response callback |
+| 12 | step12 / Step12 | Yes: commit algorithm identity with shared-state seed |
+| 13 | step13 / Step13 | Yes: set on-document-ready or record commit invocation |
+
+All thirteen complete sentences are immediately above their transitions. The
+result/termination theorem follows generated successors and both early-return
+paths. The request's nonempty-href assertion is an explicit inherited guard
+**after source selection**, not a conjunct of the preload result. The plan now
+records the returned Fetch controller and commit-algorithm identity, and the
+early-hint path actually updates options.on_document_ready. These repair omissions
+in the old reference plan, not executable behavior. Existing tests additionally
+check that the installed callback is the defined commit and the controller is
+the Fetch result. Callback invocation still takes then-current shared state;
+the identity seed does not assert by-value capture of mutable state.
+
+Full focused command: **67 verified, 0 errors**. Added scope labels for Fetch
+controller and commit-identity correspondence primitives in StandardModel.
+No runtime edits. Self-check 1–11: yes for the outer thirteen steps, with nested
+callback and linked-key/selection tasks explicitly remaining. FINDING: source
+selection returns a source and density whereas this step assigns its result to
+string href; the linked primitive exposes the href component, with URL/string
+correspondence still explicit. Native preload remains trusted: a valid operation
+plan does not establish that native fetching, callback installation or commit ran.
+Not done: native effects, nested callback migrations, headers and remaining
+linked algorithms/requirement propagation. No new Verus limitation.
