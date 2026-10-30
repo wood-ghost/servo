@@ -151,7 +151,8 @@ pub assume_specification<'a> [Mime::params](mt: &'a Mime) -> (result: Params<'a>
         parameter_entries_well_formed(mt),
         result.obeys_prophetic_iter_laws(),
         result.remaining() == parameter_entries(mt),
-        result.will_return_none(),
+        // Every entry in mime's finite parameter iterator is produced.
+        result.produces() == Seq::new(parameter_entries(mt).len(), |i: int| true),
         result.decrease() == Some(parameter_entries(mt).len()),
 ;
 

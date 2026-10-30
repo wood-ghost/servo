@@ -33,6 +33,8 @@ use super::processingoptions_specs as SpecRequires;
 use net_traits::mime_classifier_specs::{
     classifier as SpecClassifier, mime_api as SpecMime, requires as MimeRequires,
 };
+#[cfg(verus_only)]
+use nom_rfc8288::complete::LinkParamOwned;
 
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
@@ -53,22 +55,40 @@ verus! {
 
 // Setup-only boundaries: external items are excluded from verification. External bodies
 // retain an opaque type or callable signature without checking their fields or code.
+// Abstraction-only testing assumes external-body contracts at call sites.
 // The TODOs below identify the call-chain proofs to enable after modeling dependencies.
 
 trait ValueForKeyInLinkHeader {
-    fn has_key_in_link_header(&self, key: &str) -> bool;
-    fn value_for_key_in_link_header(&self, key: &str) -> Option<&str>;
+    /// Ordered parameters, including duplicates and parameters without values.
+    spec fn link_header_params(&self) -> Seq<LinkParamOwned>;
+
+    fn has_key_in_link_header(&self, key: &str) -> (result: bool)
+        ensures
+            result == Spec::has_key_in_link_header_result(self.link_header_params(), key@),
+    ;
+
+    fn value_for_key_in_link_header(&self, key: &str) -> (result: Option<&str>)
+        ensures
+            Spec::option_str_view(result)
+                == Spec::value_for_key_in_link_header_result(self.link_header_params(), key@),
+    ;
 }
 
 impl ValueForKeyInLinkHeader for LinkHeader {
+    spec fn link_header_params(&self) -> Seq<LinkParamOwned> {
+        self.params@
+    }
+
     // TODO: Specify key membership and verify this temporarily trusted body.
+    // TRUSTED(scope): not verified yet; remove when ValueForKeyInLinkHeader::has_key_in_link_header is verified
     #[verifier::external_body]
-    fn has_key_in_link_header(&self, key: &str) -> bool {
+    fn has_key_in_link_header(&self, key: &str) -> (result: bool) {
         self.params.iter().any(|p| p.key == key)
     }
     // TODO: Specify first-match lookup and verify this temporarily trusted body.
+    // TRUSTED(scope): not verified yet; remove when ValueForKeyInLinkHeader::value_for_key_in_link_header is verified
     #[verifier::external_body]
-    fn value_for_key_in_link_header(&self, key: &str) -> Option<&str> {
+    fn value_for_key_in_link_header(&self, key: &str) -> (result: Option<&str>) {
         let param = self.params.iter().find(|p| p.key == key)?;
         param.val.as_deref()
     }
@@ -81,7 +101,7 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
-// Field types needed by the contracts are declared in processingoptions_specs::servo_support.
+// Field types needed by the contracts are declared in processingoptions_specs::servo_api.
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -119,13 +139,22 @@ pub(crate) struct LinkProcessingOptions {
 
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
-    // TODO: Specify the field updates and verify this temporarily trusted body.
+    // The standard field-update contract is a proof obligation for this body.
+    // In particular, invalid attributes and fetch priority require conformance checks.
+    // Abstraction-only: remove external_body to resume the native field-update proof.
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::apply_link_options_from_parsed_header is verified
     #[verifier::external_body]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
         rel: &str,
-    ) -> bool {
+    ) -> (result: bool)
+        ensures
+            // result == Spec::apply_link_options_from_parsed_header_result(link_object, rel@),
+            Spec::apply_link_options_from_parsed_header_ensures(
+                old(self), final(self), link_object, rel@, result,
+            ),
+    {
         // Step 1. If rel is "preload":
         if rel == "preload" {
             // Step 1.1. If attribs["as"] does not exist, then return false.
@@ -172,9 +201,15 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
+    // Abstraction-only: remove external_body to resume the native dispatch/effect proof.
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::process_link_header is verified
+    #[verifier::external_body]
     fn process_link_header(self, rel: &str, document: &Document)
         requires
+            // INHERITED from type_matches_destination; parser/classifier input obligations.
             SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
+        ensures
+            Spec::process_link_header_ok(&self, rel@, document),
     {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -189,10 +224,15 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#translate-a-preload-destination>
     // Verus does not yet support string patterns in this match.
-    #[verifier::external]
+    // TODO: Define the result predicate and verify this temporarily trusted body.
+    // TRUSTED(verus-gap): string patterns in match; not reported
+    #[verifier::external_body]
     pub(crate) fn translate_a_preload_destination(
         potential_destination: &str,
-    ) -> Option<Destination> {
+    ) -> (result: Option<Destination>)
+        ensures
+            result == Spec::translate_a_preload_destination_result(potential_destination@),
+    {
         // Step 2. Return the result of translating destination.
         Some(match potential_destination {
             "fetch" => Destination::None,
@@ -208,12 +248,21 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-link-request>
-    #[verifier::external]
+    // TODO: Specify the request fields and verify this temporarily trusted body.
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::create_link_request is verified
+    #[verifier::external_body]
     pub(crate) fn create_link_request(
         self,
         webview_id: WebViewId,
         global: &GlobalScope,
-    ) -> Option<RequestBuilder> {
+    ) -> (result: Option<RequestBuilder>)
+        requires
+            // IMPLICIT: Servo asserts nonempty href; witness: href = "".
+            SpecRequires::create_link_request_requires(&self),
+        ensures
+            // TODO: Establish create_link_request_ensures through the request/URL views.
+            Spec::create_link_request_execution_ensures(&self, webview_id, global, &result),
+    {
         // Step 1. Assert: options's href is not the empty string.
         assert!(!self.href.is_empty());
 
@@ -253,11 +302,15 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
+    // Abstraction-only: remove external_body to resume the native MIME-agreement proof.
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::type_matches_destination is verified
+    #[verifier::external_body]
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
+            // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
-        // ensures
-        //     result == Spec::type_matches_destination_result(self),
+        ensures
+            result == Spec::type_matches_destination_result(self),
     {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
@@ -309,7 +362,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
-    // trusted via external_body because its let-chain lacks Verus support.
+    // Let-chain expanded into nested conditionals for Verus feature checking.
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::preload is verified
     #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
@@ -318,8 +372,13 @@ impl LinkProcessingOptions {
         document: &Document,
     )
         requires
+            // INHERITED from type_matches_destination.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+            // IMPLICIT: Servo asserts a match instead of returning on mismatch; witness: type = "invalid", destination = Style.
             Spec::type_matches_destination_result(&self),
+        ensures
+            // TODO: Capture the operation plan required by the standard preload_ensures.
+            Spec::preload_execution_ensures(&self, webview_id, &link, document),
     {
         // Step 1. If options's type doesn't match options's destination, then return.
         //
@@ -327,15 +386,26 @@ impl LinkProcessingOptions {
         assert!(self.type_matches_destination());
         // Step 2. If options's destination is "image" and options's source set is not null,
         // then set options's href to the result of selecting an image source from options's source set.
-        if self.destination == Destination::Image &&
-            let Some(srcset) = &mut self.source_set
-        {
-            self.href = String::from(
-                srcset
-                    .select_image_source_from_source_set(document)
-                    .unwrap_or_default()
-                    .0,
-            );
+        // REWRITE(verus-gap): let chains; original code below; restore when let-chain support is merged (PR not reported)
+        // if self.destination == Destination::Image &&
+        //     let Some(srcset) = &mut self.source_set
+        // {
+        //     self.href = String::from(
+        //         srcset
+        //             .select_image_source_from_source_set(document)
+        //             .unwrap_or_default()
+        //             .0,
+        //     );
+        // }
+        if self.destination == Destination::Image {
+            if let Some(srcset) = &mut self.source_set {
+                self.href = String::from(
+                    srcset
+                        .select_image_source_from_source_set(document)
+                        .unwrap_or_default()
+                        .0,
+                );
+            }
         }
         // Step 3. Let request be the result of creating a link request given options.
         let Some(request) = self.create_link_request(webview_id, &document.owner_global()) else {
@@ -371,8 +441,13 @@ impl LinkProcessingOptions {
 }
 
 // match_ignore_ascii_case! expands to a const block that Verus does not yet support.
-#[verifier::external]
-pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSettings> {
+// TODO: Define the result predicate and verify this temporarily trusted body.
+// TRUSTED(verus-gap): match_ignore_ascii_case! expands to an unsupported const block; not reported
+#[verifier::external_body]
+pub(crate) fn determine_cors_settings_for_token(token: &str) -> (result: Option<CorsSettings>)
+    ensures
+        result == Spec::determine_cors_settings_for_token_result(token@),
+{
     match_ignore_ascii_case! { token,
         "anonymous" => Some(CorsSettings::Anonymous),
         "use-credentials" => Some(CorsSettings::UseCredentials),
@@ -381,6 +456,7 @@ pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSetti
 }
 
 /// <https://html.spec.whatwg.org/multipage/#extract-links-from-headers>
+// TRUSTED(scope): not verified yet; remove when extract_links_from_headers is verified
 #[verifier::external]
 pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> Vec<LinkHeader> {
     // Step 1. Let links be a new list.
@@ -413,11 +489,18 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // Verus does not yet support the let-chains in this body.
+// Abstraction-only: remove external_body to resume the trace and MIME-caller proofs.
+// TRUSTED(scope): not verified yet; remove when process_link_headers is verified
+#[verifier::external_body]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
     phase: LinkProcessingPhase,
-) {
+)
+    ensures
+        // TODO: Capture a ghost trace and connect it to process_link_headers_ensures.
+        Spec::process_link_headers_execution_ensures(link_headers, document, phase),
+{
     let global = document.owner_global();
     // Step 1. Let links be the result of extracting links from response's header list.
     //
@@ -446,7 +529,7 @@ pub(crate) fn process_link_headers(
             continue;
         }
         // Step 2.5. If attribs["media"] exists and attribs["media"] does not match the environment, then continue.
-        // TODO: adaption applied due to lacking support of let-chain in Verus
+        // REWRITE(verus-gap): let chains; original code below; restore when let-chain support is merged (PR not reported)
         // if let Some(media) = link_object.value_for_key_in_link_header("media") &&
         //     !MediaList::matches_environment(document, media)
         // {
@@ -481,7 +564,7 @@ pub(crate) fn process_link_headers(
         // Step 2.8. If attribs["imagesrcset"] exists and attribs["imagesizes"] exists,
         // then set options's source set to the result of creating a source set given
         // linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
-        // TODO: adaption applied due to lacking support of let-chain in Verus
+        // REWRITE(verus-gap): let chains; original code below; restore when let-chain support is merged (PR not reported)
         // if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") &&
         //     let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes")
         // {
@@ -507,6 +590,7 @@ pub(crate) fn process_link_headers(
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContextType is verified
 #[verifier::external]
 #[derive(Clone, IntoStaticStr)]
 #[strum(serialize_all = "lowercase")]
@@ -515,6 +599,7 @@ pub(crate) enum LinkFetchContextType {
     Preload,
 }
 
+// TRUSTED(scope): not verified yet; remove when InitiatorType::from is verified
 #[verifier::external]
 impl From<LinkFetchContextType> for InitiatorType {
     fn from(other: LinkFetchContextType) -> Self {
@@ -523,6 +608,7 @@ impl From<LinkFetchContextType> for InitiatorType {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext is verified
 #[verifier::external]
 pub(crate) struct LinkFetchContext {
     /// The `<link>` element (if any) that caused this fetch
@@ -537,6 +623,7 @@ pub(crate) struct LinkFetchContext {
     pub(crate) response_body: BytesMut,
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext's FetchResponseListener implementation is verified
 #[verifier::external]
 impl FetchResponseListener for LinkFetchContext {
     fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
@@ -604,6 +691,7 @@ impl FetchResponseListener for LinkFetchContext {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext::resource_timing_information is verified
 #[verifier::external]
 impl ResourceTimingListener for LinkFetchContext {
     fn resource_timing_information(&self) -> (InitiatorType, ServoUrl) {

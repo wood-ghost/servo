@@ -3,7 +3,14 @@ use net_traits::mime_classifier_specs::{mime_api::FromStrSpec, requires as MimeR
 use net_traits::request::Destination;
 use vstd::prelude::*;
 
+use super::super::processingoptions::LinkProcessingOptions;
+
 verus! {
+
+/// Step 1 of create_link_request asserts that href is nonempty.
+pub(crate) open spec fn create_link_request_requires(options: &LinkProcessingOptions) -> bool {
+    options.href@.len() > 0
+}
 
 /// Inherit requirements only along the calls made by type_matches_destination.
 /// Empty types and fetch destinations skip parsing. A parse failure imposes no
