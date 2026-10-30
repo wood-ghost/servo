@@ -531,7 +531,7 @@ pub(crate) fn process_link_headers(
         // INHERITED from attribute application and preload; stops here as an assumption about HTTP headers and the linked models.
         SpecRequires::process_link_headers_requires(link_headers, document, phase),
     ensures
-        // TODO: Capture a ghost trace and connect it to process_link_headers_ensures.
+        // Standard trace relation; native per-invocation trace capture remains trusted.
         Spec::process_link_headers_execution_ensures(link_headers, document, phase),
 {
     let global = document.owner_global();

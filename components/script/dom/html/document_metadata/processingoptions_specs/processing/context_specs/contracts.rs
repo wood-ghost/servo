@@ -324,14 +324,23 @@ pub(crate) open spec fn process_link_headers_ensures(
     )
 }
 
-/// Existing executable-facing obligation until ghost trace capture is connected.
-/// TODO: Replace this hook with process_link_headers_ensures over the recorded trace.
-/// Keeping it uninterpreted preserves the outstanding proof obligation.
-pub(crate) uninterp spec fn process_link_headers_execution_ensures(
+// TRUSTED(scope): not verified yet; remove when native process_link_headers trace capture is verified
+pub(crate) uninterp spec fn observed_process_link_headers_trace(
     link_headers: &[LinkHeader],
     document: &Document,
     phase: LinkProcessingPhase,
-) -> bool;
+) -> SpecModel::ProcessLinkHeadersTrace;
+
+/// Standard trace relation over an explicit native observation boundary. The
+/// complete reference-trace theorem does not implement this observation producer.
+pub(crate) open spec fn process_link_headers_execution_ensures(
+    link_headers: &[LinkHeader],
+    document: &Document,
+    phase: LinkProcessingPhase,
+) -> bool {
+    process_link_headers_ensures(link_headers, document, phase,
+        observed_process_link_headers_trace(link_headers, document, phase))
+}
 
 // ----------------------------------------
 // External Servo API predicates

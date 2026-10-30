@@ -1167,3 +1167,18 @@ no runtime edits or new requirements. The prior thirteen-step/child-callback
 URL/snapshot/form/step audit remains unchanged. Self-check 1/7/9–11 yes for the
 contract connection. Native source/request/effect correspondence and the final
 header-loop effect hook remain outstanding trusted boundaries.
+
+## Task: connect native header postcondition to standard trace (2026-10-30)
+
+`process_link_headers_execution_ensures` now checks the standard trace relation
+against an explicitly labelled `observed_process_link_headers_trace`, replacing
+the final uninterpreted Boolean effect hook. The observation producer and native
+loop are still trusted; the reference theorem only proves that accepted supplied
+observations expand to a complete numbered-machine run.
+
+Full focused command: **86 verified, 0 errors**. Added the trace-observation scope
+label; no runtime edits or new preconditions. The prior header URL/snapshot/form/
+step audit is unchanged; contract self-check 1/7/9–11 yes. Native per-invocation
+capture, RFC representation and document/effect correspondence remain unproved.
+All three original result hooks now name standard results/relations explicitly;
+their unverified native bridges remain visible rather than becoming silent axioms.
