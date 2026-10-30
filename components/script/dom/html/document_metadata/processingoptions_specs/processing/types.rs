@@ -93,7 +93,7 @@ pub open spec fn destination_types() -> Set<Seq<char>> {
 // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#enumerated-attribute
 // Inspected 2026-10-30, Living Standard last updated 2026-10-30.
 // Some attributes, called enumerated attributes, take on a finite set of states.
-pub(crate) struct EnumeratedAttributeView<State> {
+pub(crate) struct EnumerateAttribute<State> {
     pub states: Set<State>,
     // The state for such an attribute is derived by combining the attribute's
     // value, a set of keyword/state mappings, and three possible special states
@@ -108,7 +108,7 @@ pub(crate) struct EnumeratedAttributeView<State> {
     pub empty_value_default: Option<State>,
 }
 
-impl<State> EnumeratedAttributeView<State> {
+impl<State> EnumerateAttribute<State> {
     /// The mapped/default states are members of the attribute's state set.
     /// Multiple keywords can map to the same state: the map need not be injective.
     pub(crate) open spec fn well_formed(self) -> bool {
@@ -172,12 +172,12 @@ impl CorsSettingsView {
 // Inspected 2026-10-30, Living Standard last updated 2026-10-30.
 // A CORS settings attribute is an enumerated attribute with the following keywords and states:
 pub(crate) open spec fn cors_settings_attribute_definition()
-    -> EnumeratedAttributeView<Option<CorsSettingsView>>
+    -> EnumerateAttribute<Option<CorsSettingsView>>
 {
     let no_cors = None;
     let anonymous = Some(CorsSettingsView::from_native(NativeCorsSettings::Anonymous));
     let use_credentials = Some(CorsSettingsView::from_native(NativeCorsSettings::UseCredentials));
-    EnumeratedAttributeView {
+    EnumerateAttribute {
         states: set![no_cors, anonymous, use_credentials],
         // Keyword              State
         keyword_states: map![
@@ -282,9 +282,9 @@ pub(crate) enum LinkFetchPriorityView {
 
 // Inspected 2026-10-30, Living Standard last updated 2026-10-30.
 pub(crate) open spec fn fetch_priority_attribute_definition()
-    -> EnumeratedAttributeView<LinkFetchPriorityView>
+    -> EnumerateAttribute<LinkFetchPriorityView>
 {
-    EnumeratedAttributeView {
+    EnumerateAttribute {
         states: set![LinkFetchPriorityView::High, LinkFetchPriorityView::Low, LinkFetchPriorityView::Auto],
         // Keyword       State
         keyword_states: map![

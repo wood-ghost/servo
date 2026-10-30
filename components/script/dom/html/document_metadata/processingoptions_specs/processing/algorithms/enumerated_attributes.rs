@@ -7,7 +7,7 @@
 //! Inspected 2026-10-30, Living Standard last updated 2026-10-30.
 
 use vstd::prelude::*;
-use super::super::types::{EnumeratedAttributeState, EnumeratedAttributeView};
+use super::super::types::{EnumeratedAttributeState, EnumerateAttribute};
 use super::super::super::predicates::ascii_case_insensitive_match;
 
 verus! {
@@ -16,7 +16,7 @@ verus! {
 /// This selects a keyword, not a default state. Several matching keywords may
 /// represent the same state; a well-formed definition makes their states agree.
 pub(crate) open spec fn matching_keyword<State>(
-    attribute: EnumeratedAttributeView<State>,
+    attribute: EnumerateAttribute<State>,
     value: Seq<char>,
 ) -> Option<Seq<char>> {
     if exists|keyword: Seq<char>|
@@ -34,7 +34,7 @@ pub(crate) open spec fn matching_keyword<State>(
 /// To determine the state of an attribute, use the following steps:
 /// None means the attribute is not specified; Some("") means a present empty value.
 pub(crate) open spec fn determine_the_state_of_an_attribute<State>(
-    attribute: EnumeratedAttributeView<State>,
+    attribute: EnumerateAttribute<State>,
     value: Option<Seq<char>>,
 ) -> EnumeratedAttributeState<State>
     recommends attribute.well_formed(),

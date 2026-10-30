@@ -231,3 +231,22 @@ algorithms remain as tabulated in the setup audit.
 Not done: native parser/UA/category correspondence, remaining algorithms and
 views, and native caller proofs. Setup checkpoint `5adfff23466` was pulled
 fast-forward (already current) and pushed to `origin/mime_classifier`.
+
+## Task: conditional enumerated-attribute rename (2026-10-30)
+
+The pre-edit repository search found no `EnumerateAttribute` definition in
+Rust/TOML/WebIDL. Renamed the definition, impl, tables, resolver arguments,
+fixtures and README to exactly `EnumerateAttribute`; the separate
+`EnumeratedAttributeState` result type is unchanged. This is a name-only
+abstraction task, not a new standard algorithm or a claim to have repaired the
+legacy resolver's step layout. Definition URL and snapshot remain
+<https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#enumerated-attribute>,
+inspected 2026-10-30. Existing step map: 1/1.1/1.2/2/3/4/5 in
+`determine_the_state_of_an_attribute`; comments/layout still await their own task.
+
+Full focused command above: **52 verified, 0 errors**. Labels added/removed:
+none. Findings: none new. Implicit preconditions and trust inventory unchanged.
+Self-check 1 and 9–11: yes for the rename; 2–8: no new algorithm translation,
+and the legacy gaps remain reported rather than being certified by this rename.
+Not done: detailed views, remaining algorithm migrations, native correspondence.
+State-machine task `d3c7945a968` was pulled fast-forward (already current) and pushed.

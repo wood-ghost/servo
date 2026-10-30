@@ -178,8 +178,8 @@ proof fn domain_type_invariants_apply_to_tracked_values(
     assert(cors_settings_attribute_definition().states.contains(Some(anonymous)));
 }
 
-pub(crate) open spec fn enumerated_attribute_fixture() -> EnumeratedAttributeView<int> {
-    EnumeratedAttributeView {
+pub(crate) open spec fn enumerated_attribute_fixture() -> EnumerateAttribute<int> {
+    EnumerateAttribute {
         states: set![1int, 2int, 3int, 4int],
         keyword_states: map!["on"@ => 1int, "yes"@ => 1int],
         invalid_value_default: Some(4int),
@@ -196,17 +196,17 @@ proof fn enumerated_attribute_definition_constraints() {
     assert(attribute.well_formed());
     // Two distinct keywords may represent the same state.
     assert(attribute.keyword_states["on"@] == attribute.keyword_states["yes"@]);
-    let missing_state = EnumeratedAttributeView { states: set![2int, 3int, 4int], ..attribute };
+    let missing_state = EnumerateAttribute { states: set![2int, 3int, 4int], ..attribute };
     assert(missing_state.keyword_states.dom().contains("on"@));
     assert(!missing_state.states.contains(missing_state.keyword_states["on"@]));
     assert(!missing_state.well_formed());
-    let invalid_default = EnumeratedAttributeView { invalid_value_default: Some(9int), ..attribute };
+    let invalid_default = EnumerateAttribute { invalid_value_default: Some(9int), ..attribute };
     assert(!invalid_default.well_formed());
-    let same_state = EnumeratedAttributeView {
+    let same_state = EnumerateAttribute {
         keyword_states: map!["on"@ => 1int, "ON"@ => 1int], ..attribute
     };
     assert(same_state.well_formed());
-    let conflicting_states = EnumeratedAttributeView {
+    let conflicting_states = EnumerateAttribute {
         keyword_states: map!["on"@ => 1int, "ON"@ => 2int], ..attribute
     };
     assert(ascii_case_insensitive_match("on"@, "ON"@));
@@ -236,7 +236,7 @@ proof fn enumerated_empty_keyword_precedes_empty_default() {
     assert(ascii_lowercase("yes"@) =~= "yes"@);
     assert(ascii_lowercase(""@) =~= ""@);
     let original = enumerated_attribute_fixture();
-    let attribute = EnumeratedAttributeView {
+    let attribute = EnumerateAttribute {
         keyword_states: original.keyword_states.insert(""@, 1int), ..original
     };
     assert(ascii_case_insensitive_match(""@, ""@));
@@ -250,7 +250,7 @@ proof fn enumerated_no_state_and_default_fallthrough() {
     assert(ascii_lowercase("ON"@) =~= "on"@);
     assert(ascii_lowercase(""@) =~= ""@);
     assert(ascii_lowercase("bad"@) =~= "bad"@);
-    let attribute = EnumeratedAttributeView {
+    let attribute = EnumerateAttribute {
         missing_value_default: None, empty_value_default: None, invalid_value_default: None,
         ..enumerated_attribute_fixture()
     };
@@ -259,14 +259,14 @@ proof fn enumerated_no_state_and_default_fallthrough() {
     assert(determine_the_state_of_an_attribute(attribute, Some(""@)) is NoState);
     assert(determine_the_state_of_an_attribute(attribute, Some("bad"@)) is NoState);
     assert(determine_the_state_of_an_attribute(attribute, Some("ON"@)) == EnumeratedAttributeState::State { value: 1int });
-    let invalid_default = EnumeratedAttributeView { invalid_value_default: Some(4int), ..attribute };
+    let invalid_default = EnumerateAttribute { invalid_value_default: Some(4int), ..attribute };
     assert(determine_the_state_of_an_attribute(invalid_default, Some(""@)) == EnumeratedAttributeState::State { value: 4int });
     // Missing input returns at step 1; it does not fall through to the invalid default.
     assert(determine_the_state_of_an_attribute(invalid_default, None) is NoState);
 }
 
 proof fn enumerated_defaults_always_provide_a_state<State>(
-    attribute: EnumeratedAttributeView<State>,
+    attribute: EnumerateAttribute<State>,
     value: Option<Seq<char>>,
 )
     requires

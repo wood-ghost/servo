@@ -89,7 +89,7 @@ uninterpreted and does not assert allocation or reference-counting behavior.
 
 ## Enumerated attributes: standard-facing structure
 
-`processing/types.rs` captures the definition as `EnumeratedAttributeView<State>`:
+`processing/types.rs` captures the definition as `EnumerateAttribute<State>`:
 the finite state set, keyword/state mapping, and optional invalid-, missing-, and
 empty-value defaults. Multiple keywords may map to one state. Its well-formedness
 predicate checks membership of mapped/default states and coherence of
