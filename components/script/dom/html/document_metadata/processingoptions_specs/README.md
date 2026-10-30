@@ -181,19 +181,21 @@ algorithm is defined over the header/parser model interface.
   Request construction and preload keep explicitly named native execution hooks
   until their result/effect observations are connected to the reference contracts.
 
-The abstraction-only setup temporarily marks four native bodies
+The current setup temporarily marks three of the originally excluded native bodies
 `#[verifier::external_body]`:
 
 - `apply_link_options_from_parsed_header`
 - `process_link_header`
-- `type_matches_destination`
 - `process_link_headers`
 
-Their pre/postconditions are retained as trusted call contracts. Skipping the last
-body also suspends its internal MIME caller-precondition check. Remove these four
+Native `type_matches_destination` is now checked under the explicit implicit
+requirements in `requires.rs`; see the dated task report for its conditional scope.
+The other pre/postconditions are retained as trusted call contracts. Skipping the last
+body also suspends its internal MIME caller-precondition check. Remove these three
 attributes to resume the native proofs. Reference algorithms, model regression
 proofs, and requirement lemmas remain enabled. The separate `external_body`
-attribute on native `preload` is currently commented out for the feature check below.
+attribute on native `preload` is active in the current saved setup; the earlier
+feature-check results below describe a historical active-body run.
 
 Current agreement work includes invalid-keyword preservation, missing fetch priority,
 MIME-parser/UA-support correspondence, and CSS **essence** comparison rather than

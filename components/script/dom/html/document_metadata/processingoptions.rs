@@ -53,6 +53,8 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 verus! {
 
+broadcast use super::processingoptions_specs::processing::algorithms::link_types::match_preload_type::runner_finishes;
+
 // Setup-only boundaries: external items are excluded from verification. External bodies
 // retain an opaque type or callable signature without checking their fields or code.
 // Abstraction-only testing assumes external-body contracts at call sites.
@@ -302,9 +304,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
-    // Abstraction-only: remove external_body to resume the native MIME-agreement proof.
-    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::type_matches_destination is verified
-    #[verifier::external_body]
+    // Checked against the seven-step machine under the explicit correspondence
+    // requirements below; the executable body is unchanged.
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
             // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
@@ -316,6 +317,9 @@ impl LinkProcessingOptions {
     {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
+            proof {
+                assert(self.link_type@ =~= ""@);
+            }
             return true;
         }
         // Step 2. If destination is "fetch", then return true.

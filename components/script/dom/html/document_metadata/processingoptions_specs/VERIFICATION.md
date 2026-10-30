@@ -484,3 +484,27 @@ Self-check 1–11: yes for this requirement-only task, using the existing seven-
 spec; no new numbered algorithm. Findings: implementation/model distinctions in
 the table, not new standard ambiguity. Not done: enable/discharge native body,
 inherit/discharge these premises at callers, and remaining algorithm migrations.
+
+## Task: native type checker verified conditionally (2026-10-30)
+
+Removed `external_body` and its scope label from native
+`LinkProcessingOptions::type_matches_destination`. Its standard-result `ensures`
+is unchanged and points to the seven-step state machine (HTML
+<https://html.spec.whatwg.org/multipage/links.html#match-preload-type>, snapshot
+2026-10-30, row 1 for the MIME temporary). Steps 1–7 retain the previously
+reported machine mapping and pass the eleven-point self-check.
+
+Full focused command: **56 verified, 0 errors**. The preceding trial was
+55 verified, 1 failed native check at the empty-string early return; an erased
+ghost assertion establishes extensional equality of the empty string sequence.
+All executable expressions/control flow are preserved. The proved machine
+result theorem is broadcast for the executable contract proof.
+
+Labels removed: `TRUSTED(scope)` for native type matching; its external-body
+annotation is removed. Labels added: none. The implicit requirements from the
+previous task remain: native parser, decoder-support and category agreement,
+preload destination domain, and CSS essence/full-record agreement. This is a
+conditional implementation theorem, not proof that all browser inputs meet those
+premises. Existing MIME external-library contracts remain trusted dependencies.
+No new findings/Verus limitations. Not done: caller requirement propagation,
+native preload/effects, other algorithms and remaining origin/URL operations.
