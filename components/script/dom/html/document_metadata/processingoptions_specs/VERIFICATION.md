@@ -576,3 +576,42 @@ implicit preconditions or executable changes. Self-check 1–11: yes for this
 three-step algorithm. Findings/limitations: none new. Not done: serializer
 implementation correspondence, broader URL parsing/origin operations and
 remaining link algorithm migrations/native effects.
+
+## Task: create-link-request state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/semantics.html#create-a-link-request>,
+snapshot/inspection 2026-10-30. Row 1: URL/request temporaries and field updates.
+`algorithms/request.rs` now defines the standard through generated transition
+relations, not functional shadowing. Closed field setters each update one field
+and keep crate-private views compatible with generated public relations.
+
+| Step | `create_link_request_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: href assertion is a guard |
+| 2 | step2 / Step2 | Yes: separately linked URL parser |
+| 3 | step3 / Step3 | Yes: null return on parsing failure |
+| 4 | step4 / Step4 | Yes: separately linked potential-CORS request |
+| 5 | step5 / Step5 | Yes: policy container update |
+| 6 | step6 / Step6 | Yes: integrity metadata update |
+| 7 | step7 / Step7 | Yes: cryptographic nonce metadata update |
+| 8 | step8 / Step8 | Yes: referrer policy update |
+| 9 | step9 / Step9 | Yes: client update |
+| 10 | step10 / Step10 | Yes: priority update |
+| 11 | step11 / Step11 | Yes: return request |
+
+Each transition has the complete verbatim sentence immediately above it. The
+runner selects generated successors and stops on the early return. `request_result`
+proves termination and derives the result/field-preservation law under the href
+assertion. The assertion moved out of the result conjunction into the machine
+guard and the explicit specification domain predicate; the executable already
+requires the same nonempty href and retains its runtime assert. The standard
+result is unchanged on its defined domain. The regression now checks the
+empty-input domain obligation rather than treating an assertion as a false result.
+
+Full focused command: **63 verified, 0 errors**. Labels added/removed: none.
+Self-check 1–11: yes for this algorithm. No executable changes/new input
+restrictions. Existing URL/CORS native correspondence remains a separate
+boundary. Resolved integration diagnostic: Verus permits one module-level
+`broadcast use` declaration; combine the proved laws in one declaration.
+Findings: none new. Not done: native request-body conformance, potential-CORS
+machine migration, preload effects and the remaining link algorithms.

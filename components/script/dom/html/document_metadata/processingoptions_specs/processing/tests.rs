@@ -21,7 +21,10 @@ use super::super::servo_api::views as SpecViews;
 
 verus! {
 
-broadcast use super::algorithms::link_types::match_preload_type::runner_finishes;
+broadcast use {
+    super::algorithms::link_types::match_preload_type::runner_finishes,
+    super::algorithms::request::request_result,
+};
 
 pub(crate) struct Fixture {
     pub mime: Option<int>,
@@ -522,7 +525,8 @@ proof fn link_request_failure_and_fields(policy_container: Arc<PolicyContainerVi
     assert(request.client == Some(fixture_environment()));
     assert(request::create_link_request_ensures(fixture(), options, result));
     let empty = LinkProcessingOptionsView { href: Seq::empty(), ..options };
-    assert(!request::create_link_request_ensures(fixture(), empty, result));
+    // Assert is a domain obligation, not an additional conjunct of the result.
+    assert(!request::create_link_request_requires(empty));
 }
 
 proof fn preload_branches_and_commit_timing() {
