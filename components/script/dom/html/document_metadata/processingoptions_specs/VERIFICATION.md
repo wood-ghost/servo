@@ -763,3 +763,24 @@ edits, new preconditions, findings or limitations. Self-check 1–11: yes for
 these six substeps. Native callback execution and shared-state observation remain
 outside this operation-plan proof. Remaining work includes commit callback,
 header algorithms, linked cleanup and native/boundary accounting.
+
+## Task: preload commit callback and map update (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#preload>, callback
+12.1–12.2, snapshot/inspection 2026-10-30. Row 1: document-map mutation and
+ordered effects. `callbacks.rs::commit_preload_machine` maps 12.1→step12_1
+(conditional timing), 12.2→step12_2 (map insertion), verbatim and in order.
+The map update is explicit, alongside its observation-log entry.
+
+Map keys encode itemwise preload-key equality using URL serialization, destination,
+mode and credentials mode, so blob-entry identity does not accidentally affect URL
+equality. The theorem proves the final map is exactly the arbitrary input map
+with the one key updated, and proves the effect list independently of that input
+map. The legacy effect-only adapter uses that independence; it does not assume
+that a real document starts with an empty map.
+
+Full focused command: **69 verified, 0 errors**. Labels added/removed: none;
+the existing URL-serializer and native effect-observation boundaries remain.
+Self-check 1–11: yes for both substeps. No runtime edits, new preconditions,
+findings or limitations. Not done: native document-map/async callback
+correspondence, header algorithms and remaining linked/boundary tasks.
