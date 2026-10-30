@@ -524,3 +524,31 @@ discharge. Self-check 1, 9–11 yes; no new numbered algorithm, other items refe
 to the unchanged standard specs and their reported legacy gaps. Findings and
 Verus limitations: none new. Not done: header-loop and DOM-input propagation,
 caller/effect proofs and remaining algorithm migrations.
+
+## Task: same-origin-domain state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain>,
+snapshot/inspection 2026-10-30. Row 1: returns inside the nested Step 2 block
+exit the enclosing algorithm. Preserve that parent step and both substeps rather
+than merge their conditions or duplicate the final return.
+
+| Step | `same_origin_domain_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes, opaque identity |
+| 2 | step2 / Step2 | Yes, enter tuple-origin block or proceed to 3 |
+| 2.1 | step2_1 / Step2_1 | Yes, same scheme and equal non-null domains |
+| 2.2 | step2_2 / Step2_2 | Yes, separately call same-origin with null domains |
+| 3 | step3 / Step3 | Yes, false return |
+
+All comments are verbatim. Public closed condition projections preserve the
+crate-private origin view without introducing trust. Generated transition
+relations define the runner. Proofs supply successor witnesses and establish
+termination, input preservation and the result; the HTML table's different-port/
+equal-domain example verifies the distinction from same-origin equality.
+
+Full focused command: **59 verified, 0 errors**. Labels added/removed: none.
+No executable edits, extra preconditions, or new findings. Self-check 1–11:
+yes for this algorithm. Native MutableOrigin/OriginSnapshot domain observations
+remain outside this proof. The previously recorded pure-spec-return limitation
+is avoided by an explicit state machine, not a runtime rewrite. Remaining
+serialization/site operations and legacy link algorithms are not completed here.
