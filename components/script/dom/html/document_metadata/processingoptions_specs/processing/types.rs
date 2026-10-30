@@ -300,8 +300,7 @@ pub(crate) open spec fn fetch_priority_attribute_definition()
     }
 }
 
-// Typed abstract identities, not Rust addresses or completed object models.
-// The primitive interface specifies operations on these views separately.
+// Standard-facing records and the remaining explicitly abstract object identities.
 
 // =========================
 //      SourceSet
@@ -319,11 +318,101 @@ pub(crate) struct SourceSetView {
 // =========================
 
 // https://url.spec.whatwg.org/#concept-url
+// Snapshot 2026-10-19, inspected 2026-10-30.
 // A URL is a struct that represents a universal identifier. To disambiguate from a valid URL string it can also be referred to as a URL record.
-// TODO: create the struct the same as whatwg standard, and create link with ServoUrl type
 pub(crate) struct ServoUrlView {
-    pub id: int,
+    // A URL’s scheme is an ASCII string that identifies the type of URL and can be used to dispatch a URL for further processing after parsing. It is initially the empty string.
+    pub scheme: Seq<char>,
+    // A URL’s username is an ASCII string identifying a username. It is initially the empty string.
+    pub username: Seq<char>,
+    // A URL’s password is an ASCII string identifying a password. It is initially the empty string.
+    pub password: Seq<char>,
+    // A URL’s host is null or a host. It is initially null.
+    pub host: Option<HostView>,
+    // A URL’s port is either null or a 16-bit unsigned integer that identifies a networking port. It is initially null.
+    pub port: Option<u16>,
+    // A URL’s path is a URL path, usually identifying a location. It is initially « ».
+    pub path: UrlPathView,
+    // A URL’s query is either null or an ASCII string. It is initially null.
+    pub query: Option<Seq<char>>,
+    // A URL’s fragment is either null or an ASCII string that can be used for further processing on the resource the URL’s other components identify. It is initially null.
+    pub fragment: Option<Seq<char>>,
+    // A URL also has an associated blob URL entry that is either null or a blob URL entry. It is initially null.
+    pub blob_url_entry: Option<BlobUrlEntryView>,
 }
+
+impl ServoUrlView {
+    /// Definition defaults, not a claim that parsing the empty string succeeds.
+    pub(crate) open spec fn initial() -> Self {
+        Self {
+            scheme: Seq::empty(), username: Seq::empty(), password: Seq::empty(),
+            host: None, port: None, path: UrlPathView::List { segments: Seq::empty() },
+            query: None, fragment: None, blob_url_entry: None,
+        }
+    }
+
+    pub(crate) open spec fn component_domains(self) -> bool {
+        &&& ascii_string(self.scheme)
+        &&& ascii_string(self.username)
+        &&& ascii_string(self.password)
+        &&& (self.query is Some ==> ascii_string(self.query->Some_0))
+        &&& (self.fragment is Some ==> ascii_string(self.fragment->Some_0))
+        &&& self.path.component_domains()
+    }
+}
+
+// https://infra.spec.whatwg.org/#ascii-string
+// An ASCII string is a string whose code points are all ASCII code points.
+// Form: row 2, forall; independent code-point membership checks.
+pub(crate) open spec fn ascii_string(value: Seq<char>) -> bool {
+    forall|i: int| 0 <= i < value.len() ==> (#[trigger] value[i]) as u32 <= 0x7f
+}
+
+// https://url.spec.whatwg.org/#concept-host
+// A host is a domain, an IP address, an opaque host, or an empty host.
+// Host parsing and domain/opaque-host syntax are separate linked algorithms.
+pub(crate) enum HostView {
+    Domain { value: Seq<char> },
+    Ipv4 { address: u32 },
+    Ipv6 { pieces: [u16; 8] },
+    Opaque { value: Seq<char> },
+    Empty,
+}
+
+// https://url.spec.whatwg.org/#concept-host-equals
+// To determine whether a host A equals host B, return true if A is B, and false otherwise.
+pub(crate) open spec fn host_equals(a: HostView, b: HostView) -> bool { a == b }
+
+// https://url.spec.whatwg.org/#url-path
+// A URL path is either a URL path segment or a list of zero or more URL path segments.
+pub(crate) enum UrlPathView {
+    Opaque { segment: Seq<char> },
+    List { segments: Seq<Seq<char>> },
+}
+
+impl UrlPathView {
+    pub(crate) open spec fn component_domains(self) -> bool {
+        match self {
+            Self::Opaque { segment } => ascii_string(segment),
+            Self::List { segments } => forall|i: int| 0 <= i < segments.len() ==>
+                ascii_string(#[trigger] segments[i]) && !segments[i].contains('/'),
+        }
+    }
+}
+
+// https://w3c.github.io/FileAPI/#blob-url-entry
+// A blob URL entry consists of an object (of type Blob or MediaSource), and an environment.
+// The environment handle avoids recursively embedding snapshots of URL records.
+pub(crate) struct BlobUrlEntryView {
+    pub object: BlobUrlObjectView,
+    pub environment: EnvironmentIdentityView,
+}
+
+pub(crate) enum BlobUrlObjectView { Blob { identity: int }, MediaSource { identity: int } }
+
+// https://html.spec.whatwg.org/multipage/webappapis.html#environment
+// Identity of the environment object, not a substitute for EnvironmentView's contents.
+pub(crate) struct EnvironmentIdentityView { pub identity: int }
 
 // =========================
 //      Origin

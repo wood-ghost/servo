@@ -23,7 +23,17 @@ use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as Spec
 verus! {
 
 // TRUSTED(scope): not verified yet; remove when ServoUrl's view correspondence is verified
-pub(crate) uninterp spec fn url_view(url: &ServoUrl) -> ServoUrlView;
+pub(crate) uninterp spec fn native_url_record(url: &ServoUrl) -> ServoUrlView;
+
+/// Context-free ServoUrl projection. Blob-store observations must be supplied
+/// explicitly through url_view_with_blob_entry; ServoUrl itself stores no entry.
+pub(crate) open spec fn url_view(url: &ServoUrl) -> ServoUrlView {
+    url_view_with_blob_entry(url, None)
+}
+
+pub(crate) open spec fn url_view_with_blob_entry(url: &ServoUrl, entry: Option<BlobUrlEntryView>) -> ServoUrlView {
+    ServoUrlView { blob_url_entry: entry, ..native_url_record(url) }
+}
 // TRUSTED(scope): not verified yet; remove when ImmutableOrigin's view correspondence is verified
 pub(crate) uninterp spec fn origin_view(origin: &ImmutableOrigin) -> OriginView;
 // TRUSTED(scope): not verified yet; remove when PolicyContainer's view correspondence is verified
@@ -151,7 +161,9 @@ impl LinkProcessingModel for StandardModel {
     uninterp spec fn encoding_parse_url(&self, href: Seq<char>, base_url: ServoUrlView) -> Option<ServoUrlView>;
     uninterp spec fn new_request(&self) -> RequestView;
     uninterp spec fn select_image_source(&self, source_set: SourceSetView) -> Seq<char>;
-    uninterp spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool;
+    open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool {
+        url.scheme == "http"@ || url.scheme == "https"@
+    }
     uninterp spec fn url_origin(&self, url: ServoUrlView) -> OriginView;
     uninterp spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool;
     uninterp spec fn network_partition_key(&self, environment: EnvironmentView) -> int;

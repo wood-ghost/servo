@@ -250,3 +250,41 @@ Self-check 1 and 9–11: yes for the rename; 2–8: no new algorithm translation
 and the legacy gaps remain reported rather than being certified by this rename.
 Not done: detailed views, remaining algorithm migrations, native correspondence.
 State-machine task `d3c7945a968` was pulled fast-forward (already current) and pushed.
+
+## Task: URL record and native observations (2026-10-30)
+
+Definition: <https://url.spec.whatwg.org/#concept-url>, snapshot 2026-10-19
+(`845bafca22fb0c5a42c4bf384a9bdea525a2f10d`), inspected 2026-10-30.
+`ServoUrlView` now contains scheme, username, password, host, port, path, query,
+fragment, and blob URL entry, with the complete field-definition sentences above
+the fields. Supporting host/path variants preserve empty host versus null and
+opaque string versus path list. Defaults and ASCII component-domain predicates
+are explicit. Native parsing validity is not assumed merely by constructing a view.
+
+This task adds a record definition, not a numbered parsing/serialization algorithm.
+Definition-to-item audit: scheme→scheme, username→username, password→password,
+host→host, port→port, path→path, query→query, fragment→fragment,
+blob URL entry→blob_url_entry: **yes**, names/types/defaults preserved.
+ASCII membership uses row 2 (`forall` over independent code points).
+
+`servo_api/url.rs` supplies nine labelled native getter contracts. `None` native
+password maps to the empty string; `port()` does not substitute a default port.
+Host and path serialization remain separately labelled linked boundaries.
+`native_url_record` is a labelled correspondence assumption. Blob-entry context
+is supplied by `url_view_with_blob_entry`: the context-free projection uses None
+because ServoUrl itself has no blob-store field. Connecting the actual blob claim
+and environment to that contextual argument remains an execution obligation.
+
+Full focused command above: **52 verified, 0 errors**. Labels added: scope for
+nine getters and two serializers; the existing URL-projection label now names
+`native_url_record`. Labels removed: none. No executable or implicit-precondition
+changes. Existing fixtures now carry URL records rather than integer URL IDs.
+Verus requires external contract visibility to match public Rust methods;
+public **closed** projections expose their contracts without widening the local
+standard-record types. No verifier changes or trusted workaround introduced.
+
+Self-check: 1, 3, 6, 8–11 yes for this view task; 2, 4, 5, 7 have no numbered
+algorithm steps to audit. Existing algorithm gaps remain reported. FINDING: none
+new; the absence of blob cache storage in ServoUrl is a representation gap.
+Not done: URL serializer/equality algorithm, native parsing correspondence,
+blob-store observation, and the other requested views.

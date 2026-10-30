@@ -76,7 +76,11 @@ arbitrary spec-mode values directly, including the types whose standalone lemmas
 the user has commented out. Conversions in `servo_api/views.rs` wrap the existing
 Servo enums, preserving optional CORS states.
 
-`SourceSetView`, `ServoUrlView`, `OriginView`, `EnvironmentView`,
+`ServoUrlView` now contains the URL Standard's record components, including
+distinct opaque/list paths, nullable query/fragment, and a contextual blob entry.
+`servo_api/url.rs` labels the native getter correspondence assumptions.
+
+`SourceSetView`, `OriginView`, `EnvironmentView`,
 `PolicyContainerView`, `DocumentView`, and `DocsAlgoView` are distinct typed
 abstract identities. Their contents and operations remain external-model
 boundaries. Requests, document snapshots, source-set call records, callbacks,

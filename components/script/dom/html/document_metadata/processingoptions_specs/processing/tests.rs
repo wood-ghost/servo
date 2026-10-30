@@ -53,7 +53,7 @@ impl LinkProcessingModel for Fixture {
     open spec fn encoding_parse_url(&self, href: Seq<char>, base_url: ServoUrlView) -> Option<ServoUrlView> { self.url }
     open spec fn new_request(&self) -> RequestView {
         RequestView {
-            url: ServoUrlView { id: 0 }, destination: DestinationView::from_native(NativeDestination::None), mode: RequestMode::NoCors,
+            url: fixture_url(0), destination: DestinationView::from_native(NativeDestination::None), mode: RequestMode::NoCors,
             credentials_mode: CredentialsMode::Omit, use_url_credentials: false,
             policy_container: None, integrity: Seq::empty(), nonce: Seq::empty(),
             referrer_policy: ReferrerPolicyView::from_native(NativeReferrerPolicy::EmptyString),
@@ -62,8 +62,8 @@ impl LinkProcessingModel for Fixture {
         }
     }
     open spec fn select_image_source(&self, source_set: SourceSetView) -> Seq<char> { "selected.png"@ }
-    open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool { url.id == 7 }
-    open spec fn url_origin(&self, url: ServoUrlView) -> OriginView { OriginView { id: url.id + 100 } }
+    open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool { url.scheme == "https"@ || url.scheme == "http"@ }
+    open spec fn url_origin(&self, url: ServoUrlView) -> OriginView { OriginView { id: 100 + url.port.unwrap_or(0) as int } }
     open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool { left == right }
     open spec fn network_partition_key(&self, environment: EnvironmentView) -> int { environment.id + 200 }
     open spec fn network_error(&self) -> ResponseView {
@@ -74,7 +74,14 @@ impl LinkProcessingModel for Fixture {
 }
 
 pub(crate) open spec fn fixture() -> Fixture {
-    Fixture { mime: Some(0int), supported: true, url: Some(ServoUrlView { id: 7 }) }
+    Fixture { mime: Some(0int), supported: true, url: Some(fixture_url(7)) }
+}
+
+pub(crate) open spec fn fixture_url(port: u16) -> ServoUrlView {
+    ServoUrlView {
+        scheme: "https"@, host: Some(HostView::Domain { value: "example.test"@ }),
+        port: Some(port), ..ServoUrlView::initial()
+    }
 }
 
 /// An arbitrary shared policy view; tests require preservation, not a particular
@@ -84,7 +91,7 @@ pub(crate) uninterp spec fn fixture_policy_container() -> Arc<PolicyContainerVie
 pub(crate) open spec fn context(effects: int) -> LinkHeaderDocumentState {
     LinkHeaderDocumentState {
         document: DocumentView { id: 1 },
-        base_url: ServoUrlView { id: 2 },
+        base_url: fixture_url(2),
         origin: OriginView { id: 3 },
         environment: EnvironmentView { id: 4 },
         policy_container: fixture_policy_container(), effects,
@@ -460,7 +467,7 @@ proof fn matching_type_order_and_essence() {
 
 proof fn potential_cors_request_modes() {
     let image = DestinationView::from_native(NativeDestination::Image);
-    let url = ServoUrlView { id: 7 };
+    let url = fixture_url(7);
     let anonymous_settings = CorsSettingsView::from_native(NativeCorsSettings::Anonymous);
     let no_cors = cors::create_a_potential_cors_request(fixture(), url, image, None, false);
     assert(no_cors.mode == RequestMode::NoCors && no_cors.credentials_mode == CredentialsMode::Include);
@@ -479,7 +486,7 @@ proof fn link_request_failure_and_fields(policy_container: Arc<PolicyContainerVi
     let result = request::create_link_request(fixture(), options);
     assert(result is Some);
     let request = result->Some_0;
-    assert(request.url == ServoUrlView { id: 7 } && request.destination == options.destination);
+    assert(request.url == fixture_url(7) && request.destination == options.destination);
     assert(request.priority == LinkFetchPriorityView::High);
     assert(request.integrity == "i"@ && request.policy_container == Some(policy_container));
     assert(request.client == Some(EnvironmentView { id: 4 }));
@@ -655,10 +662,10 @@ proof fn trace_checks_application_result_not_only_call_shape() {
 
 proof fn native_buffering_and_notification_adapter() {
     assert(seq![1u8] + seq![2u8] =~= seq![1u8, 2u8]);
-    let before = LinkFetchContextView { kind: LinkFetchContextTypeView::Preload, url: ServoUrlView { id: 7 }, link: Some(8int), response_body: seq![1u8], capacity: 4 };
+    let before = LinkFetchContextView { kind: LinkFetchContextTypeView::Preload, url: fixture_url(7), link: Some(8int), response_body: seq![1u8], capacity: 4 };
     let after = LinkFetchContextView { response_body: seq![1u8, 2u8], ..before };
     assert(fetch_context::process_response_chunk_ensures(before, seq![2u8], after));
-    assert(fetch_context::resource_timing_information(before) == ("preload"@, ServoUrlView { id: 7 }));
+    assert(fetch_context::resource_timing_information(before) == ("preload"@, fixture_url(7)));
     let eof = fetch_context::process_response_eof_effects(before, 3, 4, true);
     assert(eof.len() == 2 && eof[0] is SubmitTiming);
     assert(eof[1] == CallbackEffect::FireEvent { element: 8, name: "error"@ });
