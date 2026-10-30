@@ -866,3 +866,38 @@ pinned state-machine macro. A named type alias declared in `verus!` preserves
 the mathematical function type and parses correctly; no trust/verifier change.
 Findings: none new. Remaining work: remaining linked/secondary caller specs,
 trust-label and requirement/boundary audit, feature probes/native build and report.
+
+## Task: linked Fetch destination translation (2026-10-30)
+
+Algorithm: <https://fetch.spec.whatwg.org/#concept-potential-destination-translate>,
+snapshot 2026-10-19, inspected 2026-10-30. Row 3: sequential returns without
+carried variables. `destination.rs` covers the general Fetch domain, not just
+the six HTML preload names. Step 1→fetch branch; step 2→conditional domain
+obligation; step 3→fall-through return. The domain theorem proves the translated
+value belongs to the Fetch destination set for every potential destination.
+
+Full focused command: **77 verified, 0 errors**. Labels added/removed: none.
+Self-check 1–5, 7–11: yes. Check 6 textual-order qualification: as permitted by
+the assertion-to-contract rule, step 2's verbatim Assert is attached to the entry
+`recommends` clause (guarded for the early-return path), rather than appearing as
+a branch or result conjunct. The executable return branches retain order 1, 3.
+This obligation relocation is explicit; it is not a silently dropped step.
+No runtime edits, new implementation preconditions or findings. Next task links
+HTML translation to this general algorithm instead of inlining its behavior.
+
+### Fresh feature probes, same installed verifier (2026-10-30)
+
+Ran `verus --edition=2024 /tmp/opencode/<probe>.rs` (matching Servo's edition),
+with the native functions enclosed in `verus!` and an ordinary empty main:
+
+| Probe / minimal function body | Exact diagnostic / result |
+| --- | --- |
+| `link_string_pattern_probe`: `match value { "fetch" => true, _ => false }`, value: &str | `Verus does not currently support equality-testing this type in a pattern: &'{erased} str` |
+| `link_let_chain_probe`: `if flag && let Some(x) = value { x } else { 0 }`, value: Option<u8> | `Verus does not currently support let expressions in conditions` |
+| `link_const_block_probe`: `const { true }` | `Verus does not currently support const block expressions` |
+| `link_feature_positive_control`: equivalent nested if/if-let, Option enum match, plain true | **3 verified, 0 errors** |
+
+The three negative probes fail during frontend translation, not theorem checking.
+Issues/PRs remain "not reported". Existing labelled let-chain rewrites and string/
+macro-const trust boundaries therefore remain justified on this binary. No
+verifier changes or unnecessary runtime rewrites were made.
