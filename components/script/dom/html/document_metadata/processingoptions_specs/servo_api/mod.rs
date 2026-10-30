@@ -12,5 +12,6 @@ pub(crate) mod link_header;
 pub(crate) mod preload;
 pub(crate) mod views;
 pub(crate) mod url;
+pub(crate) mod environment;
 
 pub(crate) use self::external_specs::*;

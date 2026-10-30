@@ -377,3 +377,39 @@ are definition invariants, not translations of image-selection steps. Findings:
 native lazy-size and unresolved-string representation gaps, not standard defects.
 Not done: CSS/URL parsing, concrete contextual observation and image selection/
 density-normalization proofs; other requested views and native chain obligations.
+
+## Task: full environment record and native context (2026-10-30)
+
+Definitions: <https://html.spec.whatwg.org/multipage/webappapis.html#environment>
+and `#environment-settings-object`, snapshot/inspection 2026-10-30. The base
+record's complete field map is id→id, creation URL→creation_url, top-level
+creation URL→top_level_creation_url, top-level origin→top_level_origin, target
+browsing context→target_browsing_context, active service worker→active_service_worker,
+execution ready flag→execution_ready_flag. Top-level origin explicitly permits
+null, an origin, or an implementation-defined value. The id is an opaque string.
+
+Settings-object observations are a **separate extension**, preserving the base
+environment distinction: realm execution context, module map, API base URL,
+origin, has-cross-site-ancestor, policy container, cross-origin isolated
+capability, and time origin. Module-map URL keys use canonical serialization
+keys rather than structural URL-record equality including blob cache state.
+
+`servo_api/environment.rs` supplies defined context adapters and three labelled
+GlobalScope getter contracts. RequestClient supplies only origin/policy
+observations here; it is not asserted to store the full environment. Remaining
+base/settings data are explicit `EnvironmentSupplement`/`SettingsSupplement`
+inputs. Inspected owners: GlobalScope creation/top-level/API URLs;
+WorkerGlobalScope.execution_ready (`is_execution_ready`); Performance.time_origin.
+Realm/module-map/navigation/service-worker observations still need their owning
+modules' correspondence. `view_in_environment` allows explicit context at the
+options boundary. The old context-free RequestClient projection remains labelled
+unresolved, rather than claiming missing fields are derivable from RequestClient.
+
+Full focused command: **55 verified, 0 errors**. Labels added: scope for three
+GlobalScope observations/getters and two RequestClient field observations; none
+removed. No executable changes or extra input requirements. Field-map self-check:
+yes for all seven plus eight extension fields. Overall self-check 1, 3, 6, 8–11:
+yes for this view task; 2, 4, 5, 7 have no numbered algorithm. FINDING/Verus
+limitations: none new. Not done: context production, global ID uniqueness,
+navigation/worker/realm/module-map proofs, policy contents, remaining algorithms
+and native chain obligations. These context inputs are not browser-state proofs.

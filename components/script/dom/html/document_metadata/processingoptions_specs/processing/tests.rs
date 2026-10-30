@@ -67,7 +67,7 @@ impl LinkProcessingModel for Fixture {
     open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool {
         super::algorithms::origin::same_origin(left, right)
     }
-    open spec fn network_partition_key(&self, environment: EnvironmentView) -> int { environment.id + 200 }
+    open spec fn network_partition_key(&self, environment: EnvironmentView) -> int { 204 }
     open spec fn network_error(&self) -> ResponseView {
         ResponseView { network_error: true, body: None, other: 0 }
     }
@@ -95,6 +95,16 @@ pub(crate) open spec fn fixture_source_set(identity: int) -> SourceSetView {
     }
 }
 
+pub(crate) open spec fn fixture_environment() -> EnvironmentView {
+    EnvironmentView {
+        id: "fixture-environment"@, creation_url: fixture_url(2),
+        top_level_creation_url: Some(fixture_url(2)),
+        top_level_origin: TopLevelOriginView::Origin { origin: OriginView::Opaque { identity: 3 } },
+        target_browsing_context: None, active_service_worker: None,
+        execution_ready_flag: true,
+    }
+}
+
 proof fn source_set_ordered_identity_distinguishes_equal_urls() {
     let first = ImageSourceView { identity: 1, url: fixture_url(7), descriptor: None };
     let second = ImageSourceView { identity: 2, ..first };
@@ -113,7 +123,7 @@ pub(crate) open spec fn context(effects: int) -> LinkHeaderDocumentState {
         document: DocumentView { id: 1 },
         base_url: fixture_url(2),
         origin: OriginView::Opaque { identity: 3 },
-        environment: EnvironmentView { id: 4 },
+        environment: fixture_environment(),
         policy_container: fixture_policy_container(), effects,
     }
 }
@@ -509,7 +519,7 @@ proof fn link_request_failure_and_fields(policy_container: Arc<PolicyContainerVi
     assert(request.url == fixture_url(7) && request.destination == options.destination);
     assert(request.priority == LinkFetchPriorityView::High);
     assert(request.integrity == "i"@ && request.policy_container == Some(policy_container));
-    assert(request.client == Some(EnvironmentView { id: 4 }));
+    assert(request.client == Some(fixture_environment()));
     assert(request::create_link_request_ensures(fixture(), options, result));
     let empty = LinkProcessingOptionsView { href: Seq::empty(), ..options };
     assert(!request::create_link_request_ensures(fixture(), empty, result));

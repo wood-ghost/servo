@@ -11,6 +11,7 @@
 use net_traits::ReferrerPolicy as NativeReferrerPolicy;
 use net_traits::request::{CorsSettings as NativeCorsSettings, Destination as NativeDestination};
 use vstd::prelude::*;
+use std::sync::Arc;
 use super::super::predicates::{ascii_case_insensitive_match, is_referrer_policy};
 use super::super::servo_api::views::destination_name as native_destination_name;
 
@@ -480,7 +481,7 @@ pub(crate) enum BlobUrlObjectView { Blob { identity: int }, MediaSource { identi
 
 // https://html.spec.whatwg.org/multipage/webappapis.html#environment
 // Identity of the environment object, not a substitute for EnvironmentView's contents.
-pub(crate) struct EnvironmentIdentityView { pub identity: int }
+pub(crate) struct EnvironmentIdentityView { pub id: Seq<char> }
 
 // =========================
 //      Origin
@@ -523,11 +524,91 @@ impl OriginView {
 // =========================
 
 // https://html.spec.whatwg.org/multipage/webappapis.html#environment
-// TODO: and environment view should have all the components described in whatwg standard.
-// TODO: the environment may be related to some other field in servo impl in LinkProcessingOptions. If so then add connection to them, if not then add related items to connection to them.
+// Snapshot/inspection 2026-10-30.
+// An environment is an object that identifies the settings of a current or potential execution environment (i.e., a navigation params's reserved environment or a request's reserved client). An environment has the following fields:
 pub(crate) struct EnvironmentView {
-    pub id: int,
+    // An id
+    // An opaque string that uniquely identifies this environment.
+    pub id: Seq<char>,
+    // A creation URL
+    // A URL that represents the location of the resource with which this environment is associated.
+    pub creation_url: ServoUrlView,
+    // A top-level creation URL
+    // Null or a URL that represents the creation URL of the "top-level" environment. It is null for workers and worklets.
+    pub top_level_creation_url: Option<ServoUrlView>,
+    // A top-level origin
+    // A for now implementation-defined value, null, or an origin. For a "top-level" potential execution environment it is null (i.e., when there is no response yet); otherwise it is the "top-level" environment's origin. For a dedicated worker or worklet it is the top-level origin of its creator. For a shared or service worker it is an implementation-defined value.
+    pub top_level_origin: TopLevelOriginView,
+    // A target browsing context
+    // Null or a target browsing context for a navigation request.
+    pub target_browsing_context: Option<BrowsingContextView>,
+    // An active service worker
+    // Null or a service worker that controls the environment.
+    pub active_service_worker: Option<ServiceWorkerView>,
+    // An execution ready flag
+    // A flag that indicates whether the environment setup is done. It is initially unset.
+    pub execution_ready_flag: bool,
 }
+
+impl EnvironmentView {
+    pub(crate) open spec fn identity(self) -> EnvironmentIdentityView {
+        EnvironmentIdentityView { id: self.id }
+    }
+}
+
+pub(crate) enum TopLevelOriginView { Null, Origin { origin: OriginView }, ImplementationDefined { value: int } }
+// https://html.spec.whatwg.org/multipage/document-sequences.html#browsing-context
+// Identity of the navigation target; navigation state is outside this unit.
+pub(crate) struct BrowsingContextView { pub identity: int }
+// https://w3c.github.io/ServiceWorker/#dfn-service-worker
+// Identity of the controlling worker; worker lifecycle is outside this unit.
+pub(crate) struct ServiceWorkerView { pub identity: int }
+
+// https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object
+// Snapshot/inspection 2026-10-30.
+// An environment settings object is an environment that additionally specifies algorithms for:
+// These fields are observations of the listed algorithms at a snapshot, not a
+// claim that RequestClient stores the entire settings object.
+pub(crate) struct EnvironmentSettingsView {
+    pub environment: EnvironmentView,
+    // A realm execution context
+    // A JavaScript execution context shared by all scripts that use this settings object, i.e., all scripts in a given realm. When we run a classic script or run a module script, this execution context becomes the top of the JavaScript execution context stack, on top of which another execution context specific to the script in question is pushed. (This setup ensures Source Text Module Record's Evaluate knows which realm to use.)
+    pub realm_execution_context: int,
+    // A module map
+    // A module map that is used when importing JavaScript modules.
+    pub module_map: ModuleMapView,
+    // An API base URL
+    // A URL used by APIs called by scripts that use this environment settings object to parse URLs.
+    pub api_base_url: ServoUrlView,
+    // An origin
+    // An origin used in security checks.
+    pub origin: OriginView,
+    // A has cross-site ancestor
+    // A boolean used in security checks.
+    pub has_cross_site_ancestor: bool,
+    // A policy container
+    // A policy container containing policies used for security checks.
+    pub policy_container: Arc<PolicyContainerView>,
+    // A cross-origin isolated capability
+    // A boolean representing whether scripts that use this environment settings object are allowed to use APIs that require cross-origin isolation.
+    pub cross_origin_isolated_capability: bool,
+    // A time origin
+    // A number used as the baseline for performance-related timestamps.
+    pub time_origin: real,
+}
+
+// https://html.spec.whatwg.org/multipage/webappapis.html#module-map
+// Keys pair a URL and module type; entries represent fetching, failure or a module script.
+// The URL key is its canonical serialization so blob-entry identity is not part
+// of key equality. Producing this key requires the linked URL serializer.
+pub(crate) struct ModuleMapView {
+    pub entries: Map<(SerializedUrlKeyView, Seq<char>), ModuleMapEntryView>,
+}
+
+pub(crate) enum ModuleMapEntryView { Fetching, Failed, ModuleScript { identity: int } }
+
+// https://url.spec.whatwg.org/#concept-url-equals
+pub(crate) struct SerializedUrlKeyView { pub serialization: Seq<char> }
 
 // =========================
 //      PolicyContainer

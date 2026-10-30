@@ -88,7 +88,11 @@ opaque identity and host correspondence remain labelled assumptions.
 size with CSS syntax and a contextual used value. `view_in_document` uses the
 document-context adapter for lazy native size-list evaluation and URL resolution.
 
-`EnvironmentView`,
+`EnvironmentView` has all seven HTML environment fields. The separate
+`EnvironmentSettingsView` records the eight additional settings-object
+observations. `servo_api/environment.rs` combines GlobalScope URL observations,
+partial RequestClient data, and explicit supplemental context.
+
 `PolicyContainerView`, `DocumentView`, and `DocsAlgoView` are distinct typed
 abstract identities. Their contents and operations remain external-model
 boundaries. Requests, document snapshots, source-set call records, callbacks,

@@ -183,6 +183,19 @@ pub(crate) open spec fn view_in_document(
     }
 }
 
+/// Explicit environment context for callers holding a GlobalScope. The native
+/// options' RequestClient alone cannot supply an entire HTML environment.
+pub(crate) open spec fn view_in_environment(
+    options: &LinkProcessingOptions,
+    global: &crate::dom::globalscope::GlobalScope,
+    context: super::environment::EnvironmentSupplement,
+) -> LinkProcessingOptionsView {
+    LinkProcessingOptionsView {
+        environment: super::environment::environment_with_context(global, context),
+        ..view(options)
+    }
+}
+
 /// Standard-facing primitive interface. Parsing, support decisions, URL/Fetch
 /// operations, and clocks need independent correspondence proofs. In particular,
 /// classifier recognition is not assumed to imply UA format support.
