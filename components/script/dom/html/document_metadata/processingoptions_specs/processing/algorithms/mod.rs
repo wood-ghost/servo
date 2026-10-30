@@ -7,6 +7,7 @@
 
 pub(crate) mod headers;
 pub(crate) mod extract_headers;
+pub(crate) mod process_headers;
 pub(crate) mod options;
 pub(crate) mod apply_attributes;
 pub(crate) mod origin;

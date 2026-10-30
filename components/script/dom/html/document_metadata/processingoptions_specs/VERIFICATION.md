@@ -821,3 +821,48 @@ singular parser correspondence primitive; none removed. Self-check 1–11: yes f
 the literal algorithm. No runtime edits or extra external-input requirements.
 No new Verus limitation. Remaining work: processing-loop machine, remaining
 linked algorithms, trust/boundary audit and native effect correspondence.
+
+## Task: process-link-headers loop machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers>,
+snapshot/inspection 2026-10-30. Row 1: loop, temporaries, option updates, continue
+and early return. `process_headers.rs` is the numbered specification. The existing
+coarse observation validator is now named `processing_trace_computation`; the
+general `processing_trace` theorem constructs a complete fine-grained run for
+every accepted supplied trace.
+
+| Step | `process_headers_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: separate supplied extraction operation |
+| 2 | step2 / Step2 | Yes: loop head, variable binding and completion |
+| 2.1 | step2_1 / Step2_1 | Yes: relation temporary |
+| 2.2 | step2_2 / Step2_2 | Yes: attributes temporary |
+| 2.3 | step2_3 / Step2_3 | Yes: expected phase |
+| 2.4 | step2_4 / Step2_4 | Yes: phase skip to loop head |
+| 2.5 | step2_5 / Step2_5 | Yes: media call/skip to loop head |
+| 2.6 | step2_6 / Step2_6 | Yes: full field list and option defaults |
+| 2.7 | step2_7 / Step2_7 | Yes: linked attribute update and early return |
+| 2.8 | step2_8 / Step2_8 | Yes: both image attributes and null image argument |
+| 2.9 | step2_9 / Step2_9 | Yes: linked dispatch invocation and next iteration |
+
+All complete step text is directly above its transition. Inputs/links are never
+shortened. The proof's loop invariant ties the consumed prefix to index and the
+current document snapshot, including earlier iterations' effects. Both skip
+paths preserve the document snapshot; only dispatch consumes its observed next
+state. Early application failure ends at the final visited link. The pre-extracted
+adapter supplies the earlier extraction result; the response adapter calls the
+separate extraction specification. This is not native execution instrumentation.
+
+Full focused command: **76 verified, 0 errors**. Added scope labels for observed
+media results, source-set results and dispatch document effects. These are the
+same supplied-call boundaries as before; guards check call arguments/trace format,
+not the correctness of unverified media/CSS/dispatch implementations. No native
+code or external-input requirements changed. Self-check 1–11: yes for the parent
+algorithm relative to its labelled linked boundaries.
+
+Resolved macro limitation: an initializer parameter written directly as
+`f: spec_fn() -> T` produced `expected ','` / `cannot find type spec_fn` with the
+pinned state-machine macro. A named type alias declared in `verus!` preserves
+the mathematical function type and parses correctly; no trust/verifier change.
+Findings: none new. Remaining work: remaining linked/secondary caller specs,
+trust-label and requirement/boundary audit, feature probes/native build and report.

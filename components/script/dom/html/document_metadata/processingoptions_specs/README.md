@@ -43,8 +43,9 @@ Migrated algorithms use one state-machine transition per numbered step, with
 verbatim text and derived result proofs. The task log identifies remaining legacy
 algorithms that still use functional shadowing, recursion, or coarse trace checks.
 Extraction now has a loop-head/body state machine and a proved complete trace.
-The native multi-object parser retains a separate recursive adapter; ordered
-trace positions still represent the legacy processing loop. Trace
+The native multi-object parser retains a separate recursive adapter. The header
+processing observation predicate now has a proved expansion to a complete
+fine-grained loop-machine trace. Trace
 format checks live in `processing/trace.rs`, rather than determining the visible
 structure of the standard algorithms.
 
