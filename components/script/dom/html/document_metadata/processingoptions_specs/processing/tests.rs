@@ -21,6 +21,8 @@ use super::super::servo_api::views as SpecViews;
 
 verus! {
 
+broadcast use super::algorithms::link_types::match_preload_type::runner_finishes;
+
 pub(crate) struct Fixture {
     pub mime: Option<int>,
     pub supported: bool,
@@ -512,6 +514,10 @@ proof fn preload_branches_and_commit_timing() {
 proof fn image_source_selection_and_preload_key() {
     let image = DestinationView::from_native(NativeDestination::Image);
     let options = LinkProcessingOptionsView { destination: image, source_set: Some(SourceSetView { id: 8 }), ..initial() };
+    assert(options.type_ =~= ""@);
+    assert(image.as_str() == "image"@);
+    link_types::match_preload_type::runner_finishes(fixture(), options.type_, "image"@);
+    assert(link_types::preload::type_matches_destination(fixture(), options.type_, image));
     let plan = link_types::preload::preload(fixture(), options, None);
     assert(plan is Fetch);
     assert(plan->Fetch_options.href == "selected.png"@);

@@ -171,3 +171,63 @@ state-machine migrations, the conditional type rename, fresh limitation probes,
 and caller verification remain tasks. This checkpoint is **trusted-only for the
 native chain**, with already-existing reference proofs enabled. The 49 count
 must not be described as 49 verified native chain functions.
+
+## Task: seven-step type matching state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#match-preload-type>.
+Snapshot: HTML last updated and inspected 2026-10-30. Form: row 1, because
+`mimeTypeRecord` is carried between steps 3–6, using the approved clarification.
+Source: `processing/algorithms/link_types/match_preload_type.rs`.
+
+| Step | Spec item | Self-check |
+| --- | --- | --- |
+| 1 | `match_preload_type::step1`, Step1 | Yes: empty type returns true |
+| 2 | `match_preload_type::step2`, Step2 | Yes: literal `fetch` returns true |
+| 3 | `match_preload_type::step3`, Step3 | Yes: named MIME parser sets the temporary |
+| 4 | `match_preload_type::step4`, Step4 | Yes: parsing failure returns false |
+| 5 | `match_preload_type::step5`, Step5 | Yes: named UA-support predicate |
+| 6 | `match_preload_type::step6`, Step6 | Yes: all five verbatim bullets and named MIME predicates |
+| 7 | `match_preload_type::step7`, Step7 | Yes: return false |
+
+The generated transition relations define the runner's successors. The
+`advance_correct` proof supplies generated witnesses, `runner_finishes` proves
+termination and a derived Boolean result theorem, and `transition_properties`
+proves input preservation, absence of terminal outgoing edges, and the
+successful-parse condition needed before reading the MIME temporary. The
+seven-advance bound is proved sufficient; it is not assumed fuel. Terminal
+stuttering is a scheduling convention, not a machine transition or standard step.
+Existing branch/essence/preload regressions now use this machine's result.
+
+Checks: full focused command above **52 verified, 0 errors**; native
+`cargo +1.97.1 check -p servo-script --lib --offline` passed with the same
+`BINDGEN_EXTRA_CLANG_ARGS`. The native check resolved the new script dependency
+on the same `verus_state_machines_macros` version already used by net-traits;
+the subsequent Verus run used `--locked`. Both disabled checks remain disabled.
+
+Labels added/removed: none. No executable changes or new implicit preconditions.
+The six linked MIME operations use mathematical function parameters, with URLs;
+their correspondence remains the existing `LinkProcessingModel` boundary.
+The native type-checking body is still labelled trusted, not newly proved.
+
+Verus integration details: generated public relations cannot call crate-private
+trait methods (`in pub open spec function, cannot refer to private function`).
+Use a public mathematical operation bundle inside the crate-private module,
+without widening the existing data views. `take_step` functions are proof-mode
+witness constructors, so the spec runner selects through the generated relations.
+Generic `case_on_next!` requires `::<M>`; recursion-polarity annotations use the
+item-level form. These are resolved API/visibility requirements, not new trusted
+workarounds or verifier modifications.
+
+FINDING retained: preload versus Fetch destination domains. The literal machine
+takes the standard's string; the native adapter maps empty destination to
+`fetch` outside all numbered steps. No other standard finding introduced.
+
+Self-check 1–11: **yes for this algorithm**. There are no `Assert:` steps,
+loops, position updates, or extra executable requirements in this task.
+Initialization and scheduling/proof helpers are labelled as infrastructure;
+they are not additional numbered algorithm steps. Legacy gaps in other
+algorithms remain as tabulated in the setup audit.
+
+Not done: native parser/UA/category correspondence, remaining algorithms and
+views, and native caller proofs. Setup checkpoint `5adfff23466` was pulled
+fast-forward (already current) and pushed to `origin/mime_classifier`.

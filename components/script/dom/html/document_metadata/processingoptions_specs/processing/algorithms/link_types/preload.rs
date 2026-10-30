@@ -36,52 +36,19 @@ pub(crate) open spec fn translate_a_preload_destination(destination: Seq<char>) 
 }
 
 // https://html.spec.whatwg.org/multipage/links.html#match-preload-type
-// For a preload destination, return whether the type matches that destination.
+// Native destination adapter to the literal seven-step state machine.
+// FINDING: HTML's algorithm says "fetch" but link options carry the translated
+// Fetch destination (the empty string). Keep that representation choice here,
+// outside the standard's step 2.
 pub(crate) open spec fn type_matches_destination<M: LinkProcessingModel>(
     model: M,
     type_: Seq<char>,
     destination: DestinationView,
 ) -> bool {
-    // Inspect the existing Servo enum carried by the local wrapper.
-    let destination = destination.as_native();
-    // 1. If type is an empty string, then return true.
-    if type_.len() == 0 {
-        true
-    // 2. If destination is "fetch", then return true.
-    // The translated Fetch destination represents this as NativeDestination::None.
-    } else if destination == NativeDestination::None {
-        true
-    } else {
-        // 3. Let mimeTypeRecord be the result of parsing type.
-        let mime_type_record = model.parse_mime_type(type_);
-        match mime_type_record {
-            // 4. If mimeTypeRecord is failure, then return false.
-            None => false,
-            Some(mime_type_record) => {
-                // 5. If mimeTypeRecord is not supported by the user agent, return false.
-                if !model.mime_supported(mime_type_record) {
-                    false
-                } else {
-                    // 6. If any of the following are true, then return true:
-                    let matches =
-                        // destination is "script" and the MIME type is JavaScript;
-                        (destination == NativeDestination::Script && model.is_javascript_mime(mime_type_record))
-                        // destination is "image" and the MIME type is an image;
-                        || (destination == NativeDestination::Image && model.is_image_mime(mime_type_record))
-                        // destination is "font" and the MIME type is a font;
-                        || (destination == NativeDestination::Font && model.is_font_mime(mime_type_record))
-                        // destination is "style" and the MIME essence is text/css;
-                        || (destination == NativeDestination::Style && model.mime_essence(mime_type_record) == "text/css"@)
-                        // destination is "track" and the MIME essence is text/vtt.
-                        || (destination == NativeDestination::Track && model.mime_essence(mime_type_record) == "text/vtt"@);
-                    if matches { true } else {
-                        // 7. Return false.
-                        false
-                    }
-                }
-            },
-        }
-    }
+    let destination = if destination.as_native() == NativeDestination::None {
+        "fetch"@
+    } else { destination.as_str() };
+    super::match_preload_type::run(model, type_, destination).result
 }
 
 // https://html.spec.whatwg.org/multipage/links.html#create-a-preload-key

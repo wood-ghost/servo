@@ -5,6 +5,7 @@
 //! Per-relation HTTP Link processing algorithms.
 
 pub(crate) mod dispatch;
+pub(crate) mod match_preload_type;
 pub(crate) mod preload;
 pub(crate) mod preconnect;
 
