@@ -42,6 +42,9 @@ impl LinkProcessingModel for Fixture {
     open spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>> {
         headers.map_values(|header: (Seq<char>, Seq<char>)| header.1)
     }
+    open spec fn parse_standard_link_header(&self, value: Seq<char>) -> Option<ParsedLinkHeader> {
+        if value == "missing target"@ { None } else { Some(link(value, attributes())) }
+    }
     open spec fn parse_link_header(&self, value: Seq<char>) -> Seq<Option<ParsedLinkHeader>> {
         if value == "missing target"@ { seq![None] }
         else if value == "two relations"@ {
@@ -641,17 +644,17 @@ proof fn commit_reports_only_available_response() {
 
 proof fn extraction_preserves_order_and_skips_missing_target() {
     let headers = seq![("Link"@, "a"@), ("Link"@, "missing target"@), ("Link"@, "b"@)];
-    reveal_with_fuel(headers::extract_links_from_values, 4);
+    reveal_with_fuel(super::algorithms::extract_headers::literal_extract_values, 4);
     reveal_with_fuel(headers::append_parsed_link_objects, 2);
     let links = headers::extract_links_from_headers(fixture(), headers);
     assert(links.len() == 2);
     assert(links[0].target_uri == "a"@ && links[1].target_uri == "b"@);
 }
 
-proof fn extraction_retains_multiple_relations() {
+proof fn native_parser_adapter_retains_multiple_relations() {
     reveal_with_fuel(headers::extract_links_from_values, 2);
     reveal_with_fuel(headers::append_parsed_link_objects, 3);
-    let result = headers::extract_links_from_headers(fixture(), seq![("Link"@, "two relations"@)]);
+    let result = headers::extract_links_from_values(fixture(), seq!["two relations"@], 0, Seq::empty());
     assert(result.len() == 2);
     assert(result[0].target_uri == result[1].target_uri);
     assert(result[0].relation_type == "preload"@ && result[1].relation_type == "preconnect"@);

@@ -205,6 +205,8 @@ impl LinkProcessingModel for StandardModel {
     type Mime = Mime;
 
     uninterp spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>>;
+    // TRUSTED(scope): not verified yet; remove when singular HTML link-object parsing correspondence is verified
+    uninterp spec fn parse_standard_link_header(&self, value: Seq<char>) -> Option<ParsedLinkHeader>;
     uninterp spec fn parse_link_header(&self, value: Seq<char>) -> Seq<Option<ParsedLinkHeader>>;
     uninterp spec fn parse_mime_type(&self, value: Seq<char>) -> Option<Mime>;
     uninterp spec fn mime_supported(&self, mime: Mime) -> bool;

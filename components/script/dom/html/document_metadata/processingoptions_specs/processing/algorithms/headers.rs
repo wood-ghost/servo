@@ -12,24 +12,13 @@ use super::super::model_trait::LinkProcessingModel;
 use super::super::trace::*;
 use super::options::{initial_options, apply_link_options_from_parsed_header};
 use super::link_types::process_link_header_call_matches;
+pub(crate) use super::extract_headers::extract_links_from_headers;
 
 verus! {
 
-// https://html.spec.whatwg.org/multipage/semantics.html#extract-links-from-headers
-pub(crate) open spec fn extract_links_from_headers<M: LinkProcessingModel>(
-    model: M,
-    headers: HeaderListView,
-) -> Seq<ParsedLinkHeader> {
-    // 1. Let links be a new list.
-    let links = Seq::empty();
-    // 2. Let rawLinkHeaders be the result of getting, decoding, and splitting "Link".
-    let raw_link_headers = model.get_decode_and_split_link_headers(headers);
-    // 3. For each linkHeader of rawLinkHeaders (recursion encodes the iteration):
-    let links = extract_links_from_values(model, raw_link_headers, 0, links);
-    // 4. Return links.
-    links
-}
-
+// Native multi-object parser adapter, not the literal HTML extraction algorithm.
+// FINDING: RFC 8288 B.2 returns a list, while HTML Step 3.1 names one linkObject.
+// Keep this expansion behavior separate; extract_headers.rs models HTML literally.
 pub(crate) open spec fn extract_links_from_values<M: LinkProcessingModel>(
     model: M,
     raw_link_headers: Seq<Seq<char>>,
@@ -42,8 +31,6 @@ pub(crate) open spec fn extract_links_from_values<M: LinkProcessingModel>(
         links
     } else {
         let link_header = raw_link_headers[index as int];
-        // 3.1. Let linkObject be the result of parsing linkHeader. [WEBLINK]
-        // RFC 8288 B.2 returns a list; apply 3.2–3.3 to each resulting object.
         let link_objects = model.parse_link_header(link_header);
         let links = append_parsed_link_objects(link_objects, 0, links);
         extract_links_from_values(model, raw_link_headers, index + 1, links)
@@ -61,9 +48,7 @@ pub(crate) open spec fn append_parsed_link_objects(
         links
     } else {
         let links = match link_objects[index as int] {
-            // 3.2. If linkObject["target_uri"] does not exist, then continue.
             None => links,
-            // 3.3. Append linkObject to links.
             Some(link_object) => links.push(link_object),
         };
         append_parsed_link_objects(link_objects, index + 1, links)

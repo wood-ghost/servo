@@ -16,6 +16,10 @@ pub(crate) trait LinkProcessingModel {
     type Mime;
 
     spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>>;
+    // Literal HTML extraction Step 3.1: one linkObject, possibly without target_uri.
+    // FINDING: RFC field-value parsing below returns multiple objects; its
+    // correspondence to this singular interface is not silently assumed.
+    spec fn parse_standard_link_header(&self, value: Seq<char>) -> Option<ParsedLinkHeader>;
     // RFC 8288 parsing can return multiple links (including relation expansion).
     // None represents a parsed object without target_uri. The concrete parser
     // adapter must establish the relationship to HTML's singular linkObject wording.

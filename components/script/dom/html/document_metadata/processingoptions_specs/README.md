@@ -42,8 +42,9 @@ processing/algorithms/headers.rs
 Migrated algorithms use one state-machine transition per numbered step, with
 verbatim text and derived result proofs. The task log identifies remaining legacy
 algorithms that still use functional shadowing, recursion, or coarse trace checks.
-In that legacy layer, recursion represents the extraction loop and ordered trace
-positions represent the processing loop. Trace
+Extraction now has a loop-head/body state machine and a proved complete trace.
+The native multi-object parser retains a separate recursive adapter; ordered
+trace positions still represent the legacy processing loop. Trace
 format checks live in `processing/trace.rs`, rather than determining the visible
 structure of the standard algorithms.
 
@@ -173,7 +174,9 @@ algorithm is defined over the header/parser model interface.
 - `servo_api/link_header.rs` specifies the native first-match, case-sensitive lookup,
   including a first match with no value. Its valued-attribute map is not asserted
   to implement RFC parameter normalization. RFC parsing can expand one field into
-  multiple relation-specific objects; the extraction model retains those objects.
+  multiple relation-specific objects; the native adapter retains those objects.
+  The literal HTML extraction machine uses a separate singular parser interface,
+  with the RFC/HTML cardinality ambiguity recorded as a FINDING.
 - The common caller trace records all visited links, skipped links, options, calls,
   and state snapshots. The called algorithms have separate contracts. Real trace
   capture and correspondence remain explicit follow-ups.

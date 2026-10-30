@@ -784,3 +784,40 @@ the existing URL-serializer and native effect-observation boundaries remain.
 Self-check 1–11: yes for both substeps. No runtime edits, new preconditions,
 findings or limitations. Not done: native document-map/async callback
 correspondence, header algorithms and remaining linked/boundary tasks.
+
+## Task: literal header-extraction loop machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/semantics.html#extract-links-from-headers>,
+snapshot/inspection 2026-10-30. Row 1: accumulation, loop cursor and continue.
+`extract_headers.rs` preserves the raw input sequence and advances an explicit
+index; no input shortening or merged body steps.
+
+| Step | `extract_headers_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: empty links list |
+| 2 | step2 / Step2 | Yes: separately linked header get/decode/split |
+| 3 | step3 / Step3 | Yes: loop head, loop variable and exit |
+| 3.1 | step3_1 / Step3_1 | Yes: separately linked singular parser |
+| 3.2 | step3_2 / Step3_2 | Yes: missing target continues at loop head |
+| 3.3 | step3_3 / Step3_3 | Yes: append and finish iteration |
+| 4 | step4 / Step4 | Yes: return links |
+
+The recursive computation is now justified by a **constructed complete machine
+trace**, with termination measure remaining raw headers and loop-head invariant
+index≤length. Trace-splicing and recursive proofs establish every generated next
+edge, including missing-target paths and order-preserving accumulation. They
+are reference traces, not observations of native execution.
+
+FINDING resolution policy: take HTML's singular linkObject literally. Added
+`parse_standard_link_header` for that interface. The pre-existing RFC/native
+multi-object parser and its order/relation-expansion computation remain separate
+in `headers.rs`; the multiple-relations regression explicitly checks that native
+adapter. No native parser or executable loop was changed, and no assertion of
+equivalence between the singular and plural interfaces is made. That ambiguity
+must be resolved before claiming complete native extraction conformance.
+
+Full focused command: **73 verified, 0 errors**. Added scope label to StandardModel's
+singular parser correspondence primitive; none removed. Self-check 1–11: yes for
+the literal algorithm. No runtime edits or extra external-input requirements.
+No new Verus limitation. Remaining work: processing-loop machine, remaining
+linked algorithms, trust/boundary audit and native effect correspondence.
