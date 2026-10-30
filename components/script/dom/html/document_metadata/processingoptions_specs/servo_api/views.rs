@@ -34,8 +34,25 @@ pub(crate) open spec fn url_view(url: &ServoUrl) -> ServoUrlView {
 pub(crate) open spec fn url_view_with_blob_entry(url: &ServoUrl, entry: Option<BlobUrlEntryView>) -> ServoUrlView {
     ServoUrlView { blob_url_entry: entry, ..native_url_record(url) }
 }
-// TRUSTED(scope): not verified yet; remove when ImmutableOrigin's view correspondence is verified
-pub(crate) uninterp spec fn origin_view(origin: &ImmutableOrigin) -> OriginView;
+// TRUSTED(scope): not verified yet; remove when OpaqueOrigin's identity correspondence is verified
+pub(crate) uninterp spec fn opaque_origin_identity(origin: &servo_url::OpaqueOrigin) -> int;
+
+// TRUSTED(external-lib): url 2.5.8; validated by not yet
+pub(crate) uninterp spec fn native_host_view(host: &servo_url::Host) -> HostView;
+
+/// Native representation adapter. ImmutableOrigin stores an effective u16 port;
+/// the standard tuple uses null for a scheme's default port. document.domain
+/// state is supplied separately through OriginView::with_domain.
+pub(crate) open spec fn origin_view(origin: &ImmutableOrigin) -> OriginView {
+    match origin {
+        ImmutableOrigin::Opaque(value) => OriginView::Opaque { identity: opaque_origin_identity(value) },
+        ImmutableOrigin::Tuple(scheme, host, port) => OriginView::Tuple {
+            scheme: scheme@, host: native_host_view(host),
+            port: if Some(*port) == super::url::default_port(scheme@) { None } else { Some(*port) },
+            domain: None,
+        },
+    }
+}
 // TRUSTED(scope): not verified yet; remove when PolicyContainer's view correspondence is verified
 pub(crate) uninterp spec fn policy_container_view(container: &Arc<PolicyContainer>) -> Arc<PolicyContainerView>;
 // TRUSTED(scope): not verified yet; remove when RequestClient's environment correspondence is verified

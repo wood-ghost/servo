@@ -288,3 +288,27 @@ algorithm steps to audit. Existing algorithm gaps remain reported. FINDING: none
 new; the absence of blob cache storage in ServoUrl is a representation gap.
 Not done: URL serializer/equality algorithm, native parsing correspondence,
 blob-store observation, and the other requested views.
+
+## Task: origin record and native projection (2026-10-30)
+
+Definition: <https://html.spec.whatwg.org/multipage/browsers.html#concept-origin>,
+HTML snapshot/inspection 2026-10-30. `OriginView` has opaque identity and tuple
+variants. Tuple field map: scheme→scheme, host→host, port→port, domain→domain;
+all four definition sentences are directly above the corresponding fields.
+Opaque identity supports equality only; no serializable reconstruction is claimed.
+
+`ImmutableOrigin` is now a transparent external enum. Its actual Tuple fields
+are projected directly, with the stored effective port normalized using the URL
+default-port table. `OpaqueOrigin` and url 2.5.8 `Host` remain labelled opaque
+types; their identity/host projections remain labelled assumptions. Native
+ImmutableOrigin has no document.domain state: the view sets domain to None,
+and `with_domain` takes explicit supplemental MutableOrigin/OriginSnapshot data.
+
+Full focused command: **52 verified, 0 errors**. Labels added: scope for
+OpaqueOrigin/opaque identity; external-lib for Host/host projection. The former
+whole-origin uninterpreted projection is replaced by a defined variant adapter;
+the external-type scope label remains. No runtime edits or implicit preconditions.
+Self-check: 1, 3, 6, 8–11 yes for this record/adapter; 2, 4, 5, 7 have no numbered
+algorithm in this task. Findings: none new. No new Verus limitation encountered.
+Not done: same-origin/effective-domain/same-origin-domain algorithms (next tasks),
+mutable-domain native observation, origin serialization and broader site rules.

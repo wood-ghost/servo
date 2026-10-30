@@ -80,7 +80,11 @@ Servo enums, preserving optional CORS states.
 distinct opaque/list paths, nullable query/fragment, and a contextual blob entry.
 `servo_api/url.rs` labels the native getter correspondence assumptions.
 
-`SourceSetView`, `OriginView`, `EnvironmentView`,
+`OriginView` distinguishes opaque identities from tuples of scheme, host, nullable
+port, and nullable domain. The native adapter reads `ImmutableOrigin` variants;
+opaque identity and host correspondence remain labelled assumptions.
+
+`SourceSetView`, `EnvironmentView`,
 `PolicyContainerView`, `DocumentView`, and `DocsAlgoView` are distinct typed
 abstract identities. Their contents and operations remain external-model
 boundaries. Requests, document snapshots, source-set call records, callbacks,

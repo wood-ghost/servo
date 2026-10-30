@@ -63,7 +63,7 @@ impl LinkProcessingModel for Fixture {
     }
     open spec fn select_image_source(&self, source_set: SourceSetView) -> Seq<char> { "selected.png"@ }
     open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool { url.scheme == "https"@ || url.scheme == "http"@ }
-    open spec fn url_origin(&self, url: ServoUrlView) -> OriginView { OriginView { id: 100 + url.port.unwrap_or(0) as int } }
+    open spec fn url_origin(&self, url: ServoUrlView) -> OriginView { OriginView::Opaque { identity: 100 + url.port.unwrap_or(0) as int } }
     open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool { left == right }
     open spec fn network_partition_key(&self, environment: EnvironmentView) -> int { environment.id + 200 }
     open spec fn network_error(&self) -> ResponseView {
@@ -92,7 +92,7 @@ pub(crate) open spec fn context(effects: int) -> LinkHeaderDocumentState {
     LinkHeaderDocumentState {
         document: DocumentView { id: 1 },
         base_url: fixture_url(2),
-        origin: OriginView { id: 3 },
+        origin: OriginView::Opaque { identity: 3 },
         environment: EnvironmentView { id: 4 },
         policy_container: fixture_policy_container(), effects,
     }
@@ -542,8 +542,8 @@ proof fn per_relation_dispatch_and_preconnect_permission() {
         crossorigin: Some(CorsSettingsView::from_native(NativeCorsSettings::Anonymous)), ..initial()
     };
     let plan = link_types::preconnect::preconnect(fixture(), options);
-    assert(plan == PreconnectPlan::MayConnect { partition_key: 204, origin: OriginView { id: 107 }, use_credentials: false });
-    let same = LinkProcessingOptionsView { origin: OriginView { id: 107 }, ..options };
+    assert(plan == PreconnectPlan::MayConnect { partition_key: 204, origin: OriginView::Opaque { identity: 107 }, use_credentials: false });
+    let same = LinkProcessingOptionsView { origin: OriginView::Opaque { identity: 107 }, ..options };
     let same_plan = link_types::preconnect::preconnect(fixture(), same);
     assert(same_plan is MayConnect && same_plan->MayConnect_use_credentials);
 }

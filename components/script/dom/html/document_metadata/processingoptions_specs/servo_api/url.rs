@@ -17,6 +17,17 @@ use super::super::processing::types::{HostView, UrlPathView};
 
 verus! {
 
+// https://url.spec.whatwg.org/#special-scheme
+// Snapshot 2026-10-19, inspected 2026-10-30. Default-port column of the table:
+// "ftp" 21; "file" null; "http" 80; "https" 443; "ws" 80; "wss" 443.
+// Table lookup for the native origin adapter, not a numbered standard algorithm.
+pub(crate) open spec fn default_port(scheme: Seq<char>) -> Option<u16> {
+    if scheme == "ftp"@ { Some(21u16) }
+    else if scheme == "http"@ || scheme == "ws"@ { Some(80u16) }
+    else if scheme == "https"@ || scheme == "wss"@ { Some(443u16) }
+    else { None }
+}
+
 // https://url.spec.whatwg.org/#concept-host-serializer
 // TRUSTED(scope): not verified yet; remove when the URL host serializer is verified
 pub(crate) uninterp spec fn host_serialization(host: HostView) -> Seq<char>;

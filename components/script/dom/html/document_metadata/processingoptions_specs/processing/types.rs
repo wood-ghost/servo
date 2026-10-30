@@ -419,9 +419,35 @@ pub(crate) struct EnvironmentIdentityView { pub identity: int }
 // =========================
 
 // https://html.spec.whatwg.org/multipage/browsers.html#concept-origin
-// TODO: follow exactly what whatwg is stating (including the equality and ...) then create link with ImmutableOrigin type
-pub(crate) struct OriginView {
-    pub id: int,
+// Snapshot and inspection 2026-10-30.
+// An origin is one of the following:
+pub(crate) enum OriginView {
+    // An opaque origin
+    // An internal value, with no serialization it can be recreated from (it is serialized as "null" per serialization of an origin), for which the only meaningful operation is testing for equality.
+    Opaque { identity: int },
+    // A tuple origin
+    // A tuple consisting of:
+    Tuple {
+        // A scheme (an ASCII string).
+        scheme: Seq<char>,
+        // A host (a host).
+        host: HostView,
+        // A port (null or a 16-bit unsigned integer).
+        port: Option<u16>,
+        // A domain (null or a host). Null unless stated otherwise.
+        domain: Option<HostView>,
+    },
+}
+
+impl OriginView {
+    /// Representation adapter for domain state owned by MutableOrigin/OriginSnapshot,
+    /// not by ImmutableOrigin. Opaque origins have no mutable domain component.
+    pub(crate) open spec fn with_domain(self, domain: Option<HostView>) -> Self {
+        match self {
+            Self::Opaque { .. } => self,
+            Self::Tuple { scheme, host, port, .. } => Self::Tuple { scheme, host, port, domain },
+        }
+    }
 }
 
 // =========================

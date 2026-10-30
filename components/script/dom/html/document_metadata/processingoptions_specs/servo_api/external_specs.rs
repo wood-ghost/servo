@@ -208,8 +208,18 @@ pub struct ExUrlParseError(url::ParseError);
 
 // TRUSTED(scope): not verified yet; remove when servo_url::ImmutableOrigin is verified
 #[verifier::external_type_specification]
-#[verifier::external_body]
 pub struct ExImmutableOrigin(ImmutableOrigin);
+
+// TRUSTED(scope): not verified yet; remove when servo_url::OpaqueOrigin is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExOpaqueOrigin(servo_url::OpaqueOrigin);
+
+// TRUSTED(external-lib): url 2.5.8; validated by not yet
+#[verifier::external_type_specification]
+#[verifier::external_body]
+#[verifier::reject_recursive_types(S)]
+pub struct ExHost<S>(servo_url::Host<S>);
 
 // ----------------------------------------
 // ToOwned for Clone types
