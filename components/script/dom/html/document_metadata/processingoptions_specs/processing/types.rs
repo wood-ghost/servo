@@ -44,6 +44,37 @@ impl DestinationView {
         native_destination_name(self.as_native())
     }
 
+    /// Representation lookup, not a second definition of Fetch translation.
+    /// Every standard destination name maps to the existing native enum variant.
+    pub(crate) open spec fn from_name(value: Seq<char>) -> Option<Self> {
+        let native = if value.len() == 0 { Some(NativeDestination::None) }
+            else if value == "audio"@ { Some(NativeDestination::Audio) }
+            else if value == "audioworklet"@ { Some(NativeDestination::AudioWorklet) }
+            else if value == "document"@ { Some(NativeDestination::Document) }
+            else if value == "embed"@ { Some(NativeDestination::Embed) }
+            else if value == "font"@ { Some(NativeDestination::Font) }
+            else if value == "frame"@ { Some(NativeDestination::Frame) }
+            else if value == "iframe"@ { Some(NativeDestination::IFrame) }
+            else if value == "image"@ { Some(NativeDestination::Image) }
+            else if value == "json"@ { Some(NativeDestination::Json) }
+            else if value == "manifest"@ { Some(NativeDestination::Manifest) }
+            else if value == "object"@ { Some(NativeDestination::Object) }
+            else if value == "paintworklet"@ { Some(NativeDestination::PaintWorklet) }
+            else if value == "report"@ { Some(NativeDestination::Report) }
+            else if value == "script"@ { Some(NativeDestination::Script) }
+            else if value == "serviceworker"@ { Some(NativeDestination::ServiceWorker) }
+            else if value == "sharedworker"@ { Some(NativeDestination::SharedWorker) }
+            else if value == "style"@ { Some(NativeDestination::Style) }
+            else if value == "text"@ { Some(NativeDestination::Text) }
+            else if value == "track"@ { Some(NativeDestination::Track) }
+            else if value == "video"@ { Some(NativeDestination::Video) }
+            else if value == "webidentity"@ { Some(NativeDestination::WebIdentity) }
+            else if value == "worker"@ { Some(NativeDestination::Worker) }
+            else if value == "xslt"@ { Some(NativeDestination::Xslt) }
+            else { None };
+        match native { Some(value) => Some(Self::from_native(value)), None => None }
+    }
+
     #[verifier::type_invariant]
     pub(crate) open spec fn well_formed(&self) -> bool {
         destination_types().contains(self.as_str())
@@ -86,6 +117,10 @@ pub open spec fn destination_types() -> Set<Seq<char>> {
 //     ensures
 //         destination.well_formed(),
 // {}
+
+pub(crate) proof fn destination_from_name_roundtrip(destination: DestinationView)
+    ensures DestinationView::from_name(destination.as_str()) == Some(destination),
+{}
 
 // =========================
 //      EnumeratedAttribute

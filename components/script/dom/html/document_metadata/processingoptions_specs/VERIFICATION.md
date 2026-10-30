@@ -901,3 +901,24 @@ The three negative probes fail during frontend translation, not theorem checking
 Issues/PRs remain "not reported". Existing labelled let-chain rewrites and string/
 macro-const trust boundaries therefore remain justified on this binary. No
 verifier changes or unnecessary runtime rewrites were made.
+
+## Task: HTML preload translation calls Fetch (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination>,
+snapshot/inspection 2026-10-30. Row 3: conditional return then final return.
+Step 1→invalid-preload-name branch; step 2→the separate general Fetch translation.
+The canonical returned string is converted to DestinationView by a representation
+lookup, rather than inlining six cases of the linked standard algorithm.
+
+`DestinationView::from_name` covers the existing 24 native enum values; a
+round-trip theorem checks the inverse mapping. A second theorem proves every
+preload name meets the linked potential-destination domain and returns a view.
+Existing destination/attribute/header regressions pass.
+
+Full focused command: **79 verified, 0 errors**. Labels added/removed: none.
+Self-check 1–11: yes for HTML's two steps, with Fetch's exported assertion
+placement explicitly documented in the preceding task. No runtime changes,
+extra implementation requirements or new findings. Native string-pattern
+translation remains labelled trusted for the freshly reproduced Verus gap.
+Remaining work: preconnect/secondary caller and small linked definitions,
+trust/input-boundary audit, native build and final report.

@@ -18,23 +18,25 @@ pub(crate) use super::preload_machine::{preload, preload_requires};
 verus! {
 
 // https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination
+// Snapshot/inspection 2026-10-30.
+// Form: row 3, direct spec fn; ordered conditional/final returns, no temporary.
+// The returned destination string is represented by the native-enum view lookup.
 pub(crate) open spec fn translate_a_preload_destination(destination: Seq<char>) -> Option<DestinationView> {
     // 1. If destination is not a preload destination, then return null.
     if !is_preload_destination(destination) {
         None
     } else {
         // 2. Return the result of translating destination.
-        // Fetch's potential destination "fetch" translates to the empty destination.
-        Some(DestinationView::from_native(
-            if destination == "fetch"@ { NativeDestination::None }
-            else if destination == "font"@ { NativeDestination::Font }
-            else if destination == "image"@ { NativeDestination::Image }
-            else if destination == "script"@ { NativeDestination::Script }
-            else if destination == "style"@ { NativeDestination::Style }
-            else { NativeDestination::Track }
-        ))
+        DestinationView::from_name(super::super::destination::translate_a_potential_destination(destination))
     }
 }
+
+pub(crate) proof fn preload_translation_meets_linked_domain(destination: Seq<char>)
+    requires is_preload_destination(destination),
+    ensures
+        super::super::destination::is_potential_destination(destination),
+        translate_a_preload_destination(destination) is Some,
+{}
 
 // https://html.spec.whatwg.org/multipage/links.html#match-preload-type
 // Native destination adapter to the literal seven-step state machine.
