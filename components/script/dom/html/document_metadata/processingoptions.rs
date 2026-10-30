@@ -282,7 +282,7 @@ impl LinkProcessingOptions {
             // IMPLICIT: Servo asserts nonempty href; witness: href = "".
             SpecRequires::create_link_request_requires(&self),
         ensures
-            // TODO: Establish create_link_request_ensures through the request/URL views.
+            // Standard result through the request/URL views; native correspondence remains trusted.
             Spec::create_link_request_execution_ensures(&self, webview_id, global, &result),
     {
         // Step 1. Assert: options's href is not the empty string.

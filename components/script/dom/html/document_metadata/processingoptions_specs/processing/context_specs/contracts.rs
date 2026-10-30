@@ -172,13 +172,17 @@ pub(crate) open spec fn create_link_request_ensures(
     )
 }
 
-/// Callable native boundary while the URL/RequestBuilder representation proof is pending.
-pub(crate) uninterp spec fn create_link_request_execution_ensures(
+/// Exact standard result through the current views. The native external-body
+/// annotation trusts this correspondence until URL/Fetch/context views are proved;
+/// the postcondition itself is no longer an uninterpreted Boolean hook.
+pub(crate) open spec fn create_link_request_execution_ensures(
     options: &LinkProcessingOptions,
     webview_id: WebViewId,
     global: &GlobalScope,
     result: &Option<RequestBuilder>,
-) -> bool;
+) -> bool {
+    create_link_request_ensures(options, webview_id, global, result)
+}
 
 /// <https://html.spec.whatwg.org/multipage/#preload>
 /// Standard preload postcondition over an explicit observed operation plan.

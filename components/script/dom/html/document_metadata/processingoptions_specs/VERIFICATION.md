@@ -1138,3 +1138,17 @@ HTTP ingress callers in ServoParser remain outside verification. RFC normalizati
 and singular/plural parser correspondence remain separate labelled model gaps.
 Remaining work: exact standard-result hook connections, trust inventory and final
 native build/report.
+
+## Task: connect native request postcondition to standard result (2026-10-30)
+
+`create_link_request_execution_ensures` now delegates to the exact standard
+result through the current options/request views, instead of being an
+uninterpreted Boolean. The native function retains its labelled external body:
+URL parsing, Fetch defaults, request fields and supplemental-context production
+remain assumed correspondence, not newly verified code.
+
+Full focused command: **86 verified, 0 errors**. No new labels/input restrictions
+or executable changes. The prior eleven-step URL/snapshot/form/map and self-check
+remain authoritative. Self-check 1/7/9–11 yes for this contract connection; the
+nonempty-href assertion remains a precondition. Not done: proving this native
+request body or the opaque/context-free view bridges, and remaining effect hooks.
