@@ -142,6 +142,7 @@ pub(crate) open spec fn process_link_header_ok(
     )
 }
 
+// TRUSTED(scope): not verified yet; remove when native per-link dispatch-plan observation is verified
 pub(crate) uninterp spec fn observed_process_link_header(
     options: &LinkProcessingOptions,
     rel: Seq<char>,
@@ -201,6 +202,7 @@ pub(crate) open spec fn preload_ensures(
     )
 }
 
+// TRUSTED(scope): not verified yet; remove when link-element response-callback identity correspondence is verified
 pub(crate) uninterp spec fn element_response_callback(link: &Trusted<HTMLLinkElement>) -> int;
 
 pub(crate) open spec fn link_response_callback(link: &Option<Trusted<HTMLLinkElement>>) -> Option<int> {
@@ -294,11 +296,13 @@ pub open spec fn native_referrer_policy_result(token: Seq<char>) -> ReferrerPoli
 /// TODO: Establish the representation bridge to the standard's extracted links,
 /// including relation splitting, parameter normalization, and attribute lookup.
 /// No correspondence with nom-rfc8288 is assumed by this declaration.
+// TRUSTED(scope): not verified yet; remove when native/standard parsed-header representation correspondence is verified
 pub(crate) uninterp spec fn parsed_link_headers_view(
     link_headers: Seq<LinkHeader>,
 ) -> Seq<SpecModel::ParsedLinkHeader>;
 
 /// TODO: Connect a document-state snapshot to the abstract context/object identities.
+// TRUSTED(scope): not verified yet; remove when document-state snapshot correspondence is verified
 pub(crate) uninterp spec fn link_headers_document_state(
     document: &Document,
 ) -> SpecModel::LinkHeaderDocumentState;
@@ -352,48 +356,56 @@ pub(crate) open spec fn process_link_headers_execution_ensures(
 
 /// TODO: Relate the returned global to the node's current owner document/window.
 /// A result relation avoids asserting equality of separately allocated root wrappers.
+// TRUSTED(scope): not verified yet; remove when NodeTraits::owner_global result correspondence is verified
 pub(crate) uninterp spec fn node_owner_global_ensures<T: DerivedFrom<Node> + DomObject>(
     node: &T,
     result: &DomRoot<GlobalScope>,
 ) -> bool;
 
 /// TODO: Relate the returned window to the document.
+// TRUSTED(scope): not verified yet; remove when Document::window result correspondence is verified
 pub(crate) uninterp spec fn document_window_ensures<'a>(
     document: &'a Document,
     result: &'a Window,
 ) -> bool;
 
 /// TODO: Relate the returned identifier to the window's webview.
+// TRUSTED(scope): not verified yet; remove when Window::webview_id result correspondence is verified
 pub(crate) uninterp spec fn window_webview_id_ensures(
     window: &Window,
     result: WebViewId,
 ) -> bool;
 
 /// TODO: Model the document's origin and the Ref borrow guard.
+// TRUSTED(scope): not verified yet; remove when Document::origin result correspondence is verified
 pub(crate) uninterp spec fn document_origin_ensures<'a>(
     document: &'a Document,
     result: &Ref<'a, MutableOrigin>,
 ) -> bool;
 
 /// TODO: Relate the mutable-origin wrapper to its immutable component.
+// TRUSTED(scope): not verified yet; remove when MutableOrigin::immutable result correspondence is verified
 pub uninterp spec fn mutable_origin_immutable_ensures<'a>(
     origin: &'a MutableOrigin,
     result: &'a ImmutableOrigin,
 ) -> bool;
 
 /// TODO: Model the document's policy container and the Ref borrow guard.
+// TRUSTED(scope): not verified yet; remove when Document::policy_container result correspondence is verified
 pub(crate) uninterp spec fn document_policy_container_ensures<'a>(
     document: &'a Document,
     result: &Ref<'a, Arc<PolicyContainer>>,
 ) -> bool;
 
 /// TODO: Define the document base-URL selection algorithm.
+// TRUSTED(scope): not verified yet; remove when Document::base_url result correspondence is verified
 pub(crate) uninterp spec fn document_base_url_ensures(
     document: &Document,
     result: &ServoUrl,
 ) -> bool;
 
 /// TODO: Model the request-client fields for the relevant global environment.
+// TRUSTED(scope): not verified yet; remove when GlobalScope::request_client result correspondence is verified
 pub(crate) uninterp spec fn global_scope_request_client_ensures(
     global: &GlobalScope,
     no_gc: Option<&NoGC>,
@@ -401,12 +413,14 @@ pub(crate) uninterp spec fn global_scope_request_client_ensures(
 ) -> bool;
 
 /// TODO: Model the referrer selected from the global environment.
+// TRUSTED(scope): not verified yet; remove when GlobalScope::get_referrer result correspondence is verified
 pub(crate) uninterp spec fn global_scope_get_referrer_ensures(
     global: &GlobalScope,
     result: &Referrer,
 ) -> bool;
 
 /// TODO: Relate the Boolean result to parsing and evaluating the media query.
+// TRUSTED(scope): not verified yet; remove when MediaList::matches_environment result correspondence is verified
 pub(crate) uninterp spec fn media_list_matches_environment_ensures(
     document: &Document,
     media_query: Seq<char>,
@@ -414,6 +428,7 @@ pub(crate) uninterp spec fn media_list_matches_environment_ensures(
 ) -> bool;
 
 /// TODO: Model source-set parsing, normalization, and the document environment.
+// TRUSTED(scope): not verified yet; remove when SourceSet::create_source_set result correspondence is verified
 pub uninterp spec fn source_set_create_source_set_ensures(
     default_source: Seq<char>,
     srcset: Seq<char>,

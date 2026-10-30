@@ -69,6 +69,7 @@ pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
     essence_str(mt) == "application/ogg"@
 }
 
+// TRUSTED(scope): not verified yet; remove when has_html_suffix is specified and verified
 pub uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
 
 pub open spec fn is_text_plain(mt: &Mime) -> bool {

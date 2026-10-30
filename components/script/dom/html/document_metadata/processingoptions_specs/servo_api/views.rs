@@ -204,31 +204,44 @@ pub(crate) struct StandardModel;
 impl LinkProcessingModel for StandardModel {
     type Mime = Mime;
 
+    // TRUSTED(scope): not verified yet; remove when Fetch header decoding/splitting correspondence is verified
     uninterp spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>>;
     // TRUSTED(scope): not verified yet; remove when singular HTML link-object parsing correspondence is verified
     uninterp spec fn parse_standard_link_header(&self, value: Seq<char>) -> Option<ParsedLinkHeader>;
+    // TRUSTED(external-lib): nom-rfc8288 0.4.0; validated by not yet
     uninterp spec fn parse_link_header(&self, value: Seq<char>) -> Seq<Option<ParsedLinkHeader>>;
+    // TRUSTED(scope): not verified yet; remove when WHATWG/native MIME parser correspondence is verified
     uninterp spec fn parse_mime_type(&self, value: Seq<char>) -> Option<Mime>;
+    // TRUSTED(scope): not verified yet; remove when user-agent decoder support correspondence is verified
     uninterp spec fn mime_supported(&self, mime: Mime) -> bool;
     open spec fn is_javascript_mime(&self, mime: Mime) -> bool { SpecMimePredicates::is_javascript(&mime) }
     open spec fn is_image_mime(&self, mime: Mime) -> bool { SpecMimePredicates::is_image(&mime) }
     // Keep the standard's font-category contract separate from current classifier
     // compatibility extensions until their agreement is established.
+    // TRUSTED(scope): not verified yet; remove when the standard font-category correspondence is verified
     uninterp spec fn is_font_mime(&self, mime: Mime) -> bool;
     open spec fn mime_essence(&self, mime: Mime) -> Seq<char> { SpecMime::essence_str(&mime) }
+    // TRUSTED(scope): not verified yet; remove when encoding-parse-a-URL correspondence is verified
     uninterp spec fn encoding_parse_url(&self, href: Seq<char>, base_url: ServoUrlView) -> Option<ServoUrlView>;
+    // TRUSTED(scope): not verified yet; remove when Fetch request-default correspondence is verified
     uninterp spec fn new_request(&self) -> RequestView;
+    // TRUSTED(scope): not verified yet; remove when source-set selection correspondence is verified
     uninterp spec fn select_image_source(&self, source_set: SourceSetView) -> Seq<char>;
     open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool {
         url.scheme == "http"@ || url.scheme == "https"@
     }
+    // TRUSTED(scope): not verified yet; remove when the URL-origin algorithm correspondence is verified
     uninterp spec fn url_origin(&self, url: ServoUrlView) -> OriginView;
     open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool {
         super::super::processing::algorithms::origin::same_origin(left, right)
     }
+    // TRUSTED(scope): not verified yet; remove when Fetch network-partition-key correspondence is verified
     uninterp spec fn network_partition_key(&self, environment: EnvironmentView) -> int;
+    // TRUSTED(scope): not verified yet; remove when Fetch network-error correspondence is verified
     uninterp spec fn network_error(&self) -> ResponseView;
+    // TRUSTED(scope): not verified yet; remove when the shared-clock observation is verified
     uninterp spec fn unsafe_shared_current_time(&self) -> int;
+    // TRUSTED(scope): not verified yet; remove when document/global correspondence is verified
     uninterp spec fn document_relevant_global(&self, document: DocumentView) -> int;
     // TRUSTED(scope): not verified yet; remove when Fetch controller observation is verified
     uninterp spec fn fetch_request(&self, request: RequestView, process_response_consume_body: PreloadCallback) -> int;

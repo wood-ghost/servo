@@ -5,6 +5,18 @@ step-by-step compliance gaps are recorded in [VERIFICATION.md](VERIFICATION.md).
 Its dated task log supersedes historical status below. In particular, a temporary
 carried between numbered steps requires a state machine even when assigned once.
 
+Check the local trust-label convention from the Servo root:
+
+```sh
+python3 components/script/dom/html/document_metadata/processingoptions_specs/check_trust_labels.py
+python3 components/script/dom/html/document_metadata/processingoptions_specs/check_trust_labels.py --inventory
+```
+
+The inventory includes the selected native files and the transitive MIME spec
+tree. This is a textual convention check, not proof of an assumption's truth or
+of standard correspondence. Dependency sources/generated expansions remain part
+of the separately documented trusted toolchain/library base.
+
 The organization follows `mime_classifier_specs`: shared predicates and requirements,
 an external API layer, specification views/model interfaces, numbered algorithms,
 and executable-facing context contracts. The base link-processing algorithms follow

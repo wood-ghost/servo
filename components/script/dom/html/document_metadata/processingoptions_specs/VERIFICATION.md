@@ -469,7 +469,7 @@ the function's final result.
 | Preload destination domain on non-short-circuit paths | Audio + `audio/mpeg` is outside the standard preload-destination domain | Native type checker; callers next |
 | Native parser result agrees with model parser | none found; unproved model correspondence, not a demonstrated implementation defect | Native type checker; callers next |
 | Classification availability agrees with UA support | candidate `image/x-not-supported`; decoder configuration unvalidated | Native type checker; callers next |
-| Requested JS/image/font category agrees with classification | Image + `image/svg+xml`: native classification checks XML before image; font witness none found for this interface | Native type checker; callers next |
+| Requested JS/image/font category agrees with classification | none found; the initially suggested SVG witness was rejected during the final source audit because native is_xml explicitly excludes image types | Native type checker; callers next |
 | CSS full-record equality agrees with essence equality | Style + `text/css; charset=utf-8` | Native type checker; callers next |
 
 Empty type and translated fetch destination bypass these premises, matching the
@@ -1182,3 +1182,54 @@ step audit is unchanged; contract self-check 1/7/9–11 yes. Native per-invocati
 capture, RFC representation and document/effect correspondence remain unproved.
 All three original result hooks now name standard results/relations explicitly;
 their unverified native bridges remain visible rather than becoming silent axioms.
+
+## Task: complete local/transitive trust-label audit (2026-10-30)
+
+Added item-adjacent labels to the remaining StandardModel/DOM observation
+boundaries and the transitive MIME API's type/method/constant/equality/formatting
+contracts. The existing native flag equality assumptions and two legacy model
+stubs are scope-labelled. No Rust/specification semantics changed in this task.
+
+`check_trust_labels.py` checks explicit external/assume/axiom declarations and
+uninterpreted model boundaries (excluding arbitrary test-fixture constants), and
+checks that rewrite labels are followed by original-code comments. It is a
+textual lint, not a Rust parser or a proof. `--inventory` emits every label with
+path/line grouped by kind. Scope: primary file, selected link-element caller,
+local specification tree, native MIME classifier and MIME specification tree.
+
+Result: **80 Rust files, 278 labelled boundary items, 3 rewrites, 0 missing labels**.
+Labels grouped by kind (labels are not proof-coverage counts):
+
+| Kind | Count | Main contents |
+| --- | ---: | --- |
+| external-lib | 119 | mime 0.3.17 API/constants; content-security-policy 0.9.0; nom-rfc8288 0.4.0; url 2.5.8; mozjs 0.26.9; http 1.5.0; bytes 1.12.1; Rust core/alloc 1.99.1 |
+| scope | 164 | Excluded native bodies; DOM/URL/CSS/Fetch/input/effect observations; supplemental view correspondence; native flag equality and legacy model stubs |
+| verus-gap | 2 | Native string-match patterns and macro const-block expansion |
+| rewrite | 3 | Existing let chains, each with its original source immediately below the label |
+
+The MIME constant module's historical ordinary-Rust observation claim is retained
+and qualified: this audit did not revalidate a retained independent test for all
+constants. Labels conservatively say "not yet". In particular, the existing
+general MIME FromStr correspondence and text-only Name equality model remain
+unvalidated external contracts; `mime_parse_requires` currently returns true.
+Successful model/native conditional proofs do **not** independently validate
+those library assumptions. The older transitive MIME algorithms were not all
+migrated to this task's new layout protocol; their library/model boundary remains
+explicit. The trusted base also includes the installed Verus/compiler/SMT and
+vstd specifications, plus generated state-machine machinery. Dependency source
+trees were not edited (the user did not authorize modifying Verus).
+
+**Correction of an earlier witness:** native `MimeClassifier::is_xml` explicitly
+starts with `!Self::is_image(mt)` (`mime_classifier.rs`, inspected lines 577–584).
+Thus `image/svg+xml` is **not** a witness for XML-before-image misclassification.
+The requirement comment and earlier report row now say "none found" for that
+category-agreement premise. The predicate/theorem itself did not change. This
+corrects the earlier commit narrative; no history was amended or erased.
+
+Fresh full focused command after the audit: **servo-net-traits 206 verified,
+0 errors; servo-script 86 verified, 0 errors**. Native locked/offline Rust 1.97.1
+script check with the documented clang environment: **passed**. Both Verus
+exclusions remain in force. Self-check 1/9–11 yes for this annotation audit;
+standard algorithms/results unchanged. Remaining work: small definition-comment
+cleanup, final review/report, and any separately recorded native-effect/model
+correspondence work that is explicitly trusted rather than completed.

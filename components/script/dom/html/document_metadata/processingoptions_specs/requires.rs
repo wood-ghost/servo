@@ -104,7 +104,7 @@ pub(crate) open spec fn type_matches_standard_requires(link_type: Seq<char>, des
                     #[trigger] SpecClassifier::get_media_type_spec(&mime, classified) ==> {
                         // IMPLICIT: category recognition replaces actual UA support; witness candidate: "image/x-not-supported" (decoder configuration not validated).
                         &&& StandardModel.mime_supported(mime) == (classified is Some)
-                        // IMPLICIT: classifier precedence may disagree with MIME categories; witness: Image with "image/svg+xml" is classified as XML first.
+                        // IMPLICIT: native category classification needs agreement with the standard category; none found (is_xml explicitly excludes image MIME types, including SVG).
                         &&& (destination == Destination::Script ==>
                             StandardModel.is_javascript_mime(mime) == (classified == Some(MediaType::JavaScript)))
                         &&& (destination == Destination::Image ==>
