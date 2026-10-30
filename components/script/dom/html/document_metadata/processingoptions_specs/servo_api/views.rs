@@ -182,7 +182,9 @@ impl LinkProcessingModel for StandardModel {
         url.scheme == "http"@ || url.scheme == "https"@
     }
     uninterp spec fn url_origin(&self, url: ServoUrlView) -> OriginView;
-    uninterp spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool;
+    open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool {
+        super::super::processing::algorithms::origin::same_origin(left, right)
+    }
     uninterp spec fn network_partition_key(&self, environment: EnvironmentView) -> int;
     uninterp spec fn network_error(&self) -> ResponseView;
     uninterp spec fn unsafe_shared_current_time(&self) -> int;

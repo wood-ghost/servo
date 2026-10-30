@@ -312,3 +312,21 @@ Self-check: 1, 3, 6, 8–11 yes for this record/adapter; 2, 4, 5, 7 have no numb
 algorithm in this task. Findings: none new. No new Verus limitation encountered.
 Not done: same-origin/effective-domain/same-origin-domain algorithms (next tasks),
 mutable-domain native observation, origin serialization and broader site rules.
+
+## Task: same-origin equality (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/browsers.html#same-origin>,
+snapshot/inspection 2026-10-30. Form: row 3, ordered return branches, no carried
+temporary. Map in `algorithms/origin.rs::same_origin`: step 1→opaque identity
+branch; step 2→tuple scheme/port/host branch; step 3→false fall-through. All three
+step comments are verbatim. Host equality is a separately named URL predicate.
+`origin_equals` follows the origin definition by calling this algorithm, rather
+than structural equality of records including the mutable domain.
+
+Full focused command: **54 verified, 0 errors**. The two new proofs establish
+symmetry and invariance under domain changes. StandardModel and test fixtures
+now use this algorithm. Self-check 1–11: yes for this task; no assertions,
+updates, loops, new executable preconditions or trust boundaries. Labels
+added/removed: none. Findings/Verus limitations: none new. Native host/opaque
+correspondence remains trusted as recorded above. Not done: same-origin-domain,
+effective domain, serialization/site rules, other views and native caller proofs.

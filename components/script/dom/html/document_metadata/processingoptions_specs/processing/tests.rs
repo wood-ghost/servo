@@ -64,7 +64,9 @@ impl LinkProcessingModel for Fixture {
     open spec fn select_image_source(&self, source_set: SourceSetView) -> Seq<char> { "selected.png"@ }
     open spec fn url_is_http_or_https(&self, url: ServoUrlView) -> bool { url.scheme == "https"@ || url.scheme == "http"@ }
     open spec fn url_origin(&self, url: ServoUrlView) -> OriginView { OriginView::Opaque { identity: 100 + url.port.unwrap_or(0) as int } }
-    open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool { left == right }
+    open spec fn same_origin(&self, left: OriginView, right: OriginView) -> bool {
+        super::algorithms::origin::same_origin(left, right)
+    }
     open spec fn network_partition_key(&self, environment: EnvironmentView) -> int { environment.id + 200 }
     open spec fn network_error(&self) -> ResponseView {
         ResponseView { network_error: true, body: None, other: 0 }
