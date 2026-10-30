@@ -455,3 +455,32 @@ integrity policy but the inspected algorithm does not copy report-only integrity
 policy. Do not silently add such a step when that algorithm is formalized.
 Not done: policy parsing/enforcement/clone algorithms, native context production,
 remaining origin/URL operations and legacy algorithm migrations/native proofs.
+
+## Task: type-matching implicit correspondence requirements (2026-10-30)
+
+Added `type_matches_standard_requires`, separate from inherited parser/classifier
+requirements, to the native type checker. Standard URL/snapshot/form/step map
+remain the seven-step machine recorded above. No `ensures` or standard step was
+weakened. The added requirement spells out primitive agreement, not equality to
+the function's final result.
+
+| Clause | Witness / evidence | Current propagation |
+| --- | --- | --- |
+| Preload destination domain on non-short-circuit paths | Audio + `audio/mpeg` is outside the standard preload-destination domain | Native type checker; callers next |
+| Native parser result agrees with model parser | none found; unproved model correspondence, not a demonstrated implementation defect | Native type checker; callers next |
+| Classification availability agrees with UA support | candidate `image/x-not-supported`; decoder configuration unvalidated | Native type checker; callers next |
+| Requested JS/image/font category agrees with classification | Image + `image/svg+xml`: native classification checks XML before image; font witness none found for this interface | Native type checker; callers next |
+| CSS full-record equality agrees with essence equality | Style + `text/css; charset=utf-8` | Native type checker; callers next |
+
+Empty type and translated fetch destination bypass these premises, matching the
+actual pre-call control flow. The premises narrow the theorem and are not a proof
+that arbitrary HTTP/DOM input satisfies them. Parser/UA premises remain explicit
+model/configuration assumptions until independently established.
+
+Full focused command: **55 verified, 0 errors**; native type body is still trusted
+at this requirement checkpoint. Labels added: IMPLICIT comments for each clause
+and the executable requirement. No trust labels removed. No executable body edits.
+Self-check 1–11: yes for this requirement-only task, using the existing seven-step
+spec; no new numbered algorithm. Findings: implementation/model distinctions in
+the table, not new standard ambiguity. Not done: enable/discharge native body,
+inherit/discharge these premises at callers, and remaining algorithm migrations.

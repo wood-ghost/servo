@@ -309,6 +309,8 @@ impl LinkProcessingOptions {
         requires
             // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+            // IMPLICIT: parser/UA/category/CSS differences are itemized with witnesses in type_matches_standard_requires.
+            SpecRequires::type_matches_standard_requires(self.link_type@, self.destination),
         ensures
             result == Spec::type_matches_destination_result(self),
     {
