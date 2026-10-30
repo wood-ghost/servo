@@ -71,6 +71,15 @@ pub closed spec fn selected_source_href(source_set: &SourceSet, document: &Docum
     StandardModel.select_image_source(source_set_view_in_context(source_set, link_headers_document_state(document).document))
 }
 
+pub(crate) proof fn selection_requirement_implies_reference_domain(
+    options: &crate::dom::html::document_metadata::processingoptions::LinkProcessingOptions,
+    document: &Document,
+)
+    requires super::super::requires::preload_selection_requires(options, document),
+    ensures super::super::processing::algorithms::link_types::preload::preload_requires(
+        StandardModel, super::views::view_in_document(options, link_headers_document_state(document).document)),
+{}
+
 // This contract assumes the contextual UA choice agrees with the native choice;
 // it does not verify CSS evaluation, float conversion or URL/string correspondence.
 // TRUSTED(scope): not verified yet; remove when SourceSet::select_image_source_from_source_set is verified

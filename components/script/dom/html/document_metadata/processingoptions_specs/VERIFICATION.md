@@ -1082,3 +1082,25 @@ No standard selection step or executable expression was changed. Self-check
 1/9–11 yes for this dependency contract; no new numbered algorithm is claimed.
 Next: inherit normalization and nonempty selected href into preload/dispatch,
 then quantify the construction-result obligation at the HTTP boundary.
+
+## Task: inherit source-selection/request domains (2026-10-30)
+
+Added `preload_selection_requires(options, document)`: image/source-set paths
+inherit the selection dependency's normalized nonempty domain and require the
+**selected** href to be nonempty; all other paths inherit the original nonempty
+href assertion. Native preload requires this at entry. Header dispatch inherits
+it only for preload relations whose earlier type-match guard succeeds. The DOM
+boundary also explicitly inherits the source-view well-formedness condition.
+
+An owning-module proof connects this native selection requirement to the
+reference preload machine's domain using the same document-context projection.
+It does not prove the contextual native/model correspondence, which remains in
+the labelled dependency contract. No condition is discharged using code after
+its call, and an image selection that replaces href is not confused with the
+original href.
+
+Full focused command: **85 verified, 0 errors**. Added INHERITED comments; no trust
+removed or executable edits. Witnesses remain empty/missing-density source sets
+and empty selected/original href. Self-check 1/9–11 yes for propagation, with
+standard steps unchanged. Preload/dispatch effects remain trusted. Next task
+terminates these obligations at the HTTP-header boundary as input/model assumptions.

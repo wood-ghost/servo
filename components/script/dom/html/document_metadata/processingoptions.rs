@@ -227,6 +227,9 @@ impl LinkProcessingOptions {
         requires
             // INHERITED from type_matches_destination; parser/classifier input obligations.
             SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
+            // INHERITED from preload only after the caller's type-match guard succeeds.
+            rel@ == "preload"@ && Spec::type_matches_destination_result(&self)
+                ==> SpecRequires::preload_selection_requires(&self, document),
         ensures
             Spec::process_link_header_ok(&self, rel@, document),
     {
@@ -401,6 +404,8 @@ impl LinkProcessingOptions {
             SpecRequires::type_matches_standard_requires(self.link_type@, self.destination),
             // IMPLICIT: Servo asserts a match instead of returning on mismatch; witness: type = "invalid", destination = Style.
             Spec::type_matches_destination_result(&self),
+            // INHERITED from SourceSet selection and create_link_request, accounting for href replacement.
+            SpecRequires::preload_selection_requires(&self, document),
         ensures
             // TODO: Capture the operation plan required by the standard preload_ensures.
             Spec::preload_execution_ensures(&self, webview_id, &link, document),

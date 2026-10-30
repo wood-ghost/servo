@@ -47,6 +47,8 @@ pub(crate) open spec fn element_preload_requires(element: &HTMLLinkElement) -> b
                 &&& options.fetch_priority == LinkFetchPriorityView::Auto
                 &&& if destination.as_native() == Destination::Image && options.source_set is Some {
                     let sources = options.source_set->Some_0.image_sources.entries;
+                    // INHERITED from the contextual native source-selection domain.
+                    &&& options.source_set->Some_0.well_formed()
                     // IMPLICIT: native source selection removes index zero and unwraps densities; witnesses: empty set or an entry without a density descriptor.
                     &&& sources.len() > 0
                     &&& (forall|i: int| 0 <= i < sources.len() ==>

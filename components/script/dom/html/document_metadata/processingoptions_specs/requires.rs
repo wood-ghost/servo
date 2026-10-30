@@ -46,6 +46,25 @@ pub(crate) open spec fn create_link_request_requires(options: &LinkProcessingOpt
     options.href@.len() > 0
 }
 
+/// The source-selection result, rather than the original href, controls the
+/// request assertion on image paths. This is evaluated at preload entry.
+pub(crate) open spec fn preload_selection_requires(options: &LinkProcessingOptions, document: &crate::dom::document::Document) -> bool {
+    if options.destination == Destination::Image {
+        match options.source_set {
+            Some(source_set) => {
+                // INHERITED from SourceSet::select_image_source_from_source_set.
+                &&& super::servo_api::preload::source_selection_precondition(&source_set, document)
+                // INHERITED from create_link_request after selected href replaces options.href.
+                &&& super::servo_api::preload::selected_source_href(&source_set, document).len() > 0
+            },
+            None => create_link_request_requires(options),
+        }
+    } else {
+        // INHERITED from create_link_request; no source selection changes href.
+        create_link_request_requires(options)
+    }
+}
+
 /// Inherit requirements only along the calls made by type_matches_destination.
 /// Empty types and fetch destinations skip parsing. A parse failure imposes no
 /// classifier requirement; every allowed successful result must satisfy the
