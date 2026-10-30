@@ -83,25 +83,22 @@ pub(crate) open spec fn value_for_key_in_link_header_result(
 // LinkProcessingOptions predicates
 // ----------------------------------------
 
-/// Boolean result of applying parsed header attributes to link processing options.
+/// Result-only compatibility projection for parsed header attributes.
 /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
 /// The Boolean result depends on the preload destination check in step 1.
 pub(crate) open spec fn apply_link_options_from_parsed_header_result(
     link_object: &LinkHeader,
     rel: Seq<char>,
 ) -> bool {
-    // 1. If rel is "preload":
+    // The canonical numbered algorithm is apply_attributes::apply_attributes_machine.
     if rel == "preload"@ {
-        // 1.1. If attribs["as"] does not exist, then return false.
         match value_for_key_in_link_header_result(link_object.params@, "as"@) {
             None => false,
             Some(as_) => {
-                // 1.2–1.3. Translate the destination; null returns false.
                 translate_a_preload_destination_result(as_) is Some
             },
         }
     } else {
-        // 8. Return true after applying the other attributes.
         true
     }
 }

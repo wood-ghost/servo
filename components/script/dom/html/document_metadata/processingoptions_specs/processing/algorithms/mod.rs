@@ -7,6 +7,7 @@
 
 pub(crate) mod headers;
 pub(crate) mod options;
+pub(crate) mod apply_attributes;
 pub(crate) mod origin;
 pub(crate) mod url;
 pub(crate) mod enumerated_attributes;

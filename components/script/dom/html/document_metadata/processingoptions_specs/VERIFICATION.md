@@ -658,3 +658,40 @@ Every step retains its complete text and order. Full focused command:
 Self-check 1–11: yes for this algorithm. No labels added/removed, runtime changes,
 new preconditions, findings or limitations. Other migration/native-effect work
 remains as recorded above.
+
+## Task: attribute-application state machine (2026-10-30)
+
+Algorithm: <https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes>,
+snapshot/inspection 2026-10-30. Row 1: options updates, a destination temporary,
+and nested early returns. `apply_attributes.rs` is the canonical specification;
+the old functional expression is an explicitly named computation helper whose
+equivalence is proved, with its duplicate numbered comments removed.
+
+| Step | `apply_attributes_machine` item | Self-check |
+| --- | --- | --- |
+| 1 | step1 / Step1 | Yes: enter preload block |
+| 1.1 | step1_1 / Step1_1 | Yes: missing as returns false |
+| 1.2 | step1_2 / Step1_2 | Yes: linked destination translation |
+| 1.3 | step1_3 / Step1_3 | Yes: null destination returns false |
+| 1.4 | step1_4 / Step1_4 | Yes: destination update |
+| 2 | step2 / Step2 | Yes: keyword-only CORS update |
+| 3 | step3 / Step3 | Yes: integrity update |
+| 4 | step4 / Step4 | Yes: valid referrer-policy update |
+| 5 | step5 / Step5 | Yes: nonce update |
+| 6 | step6 / Step6 | Yes: type update |
+| 7 | step7 / Step7 | Yes: keyword-only fetch-priority update |
+| 8 | step8 / Step8 | Yes: true return |
+
+Full verbatim step text precedes each transition. Each option setter changes one
+field and preserves the rest. Destination substep completion and whole-machine
+termination/result equivalence are proved from generated relations. The existing
+keyword/default/order/frame/trace regressions consume the new machine through
+its derived theorem. Full focused command: **66 verified, 0 errors**.
+
+Self-check 1–11: yes for this algorithm's steps; linked destination translation
+still has its separately reported inlining cleanup pending. Labels added/removed:
+none. No executable changes/new preconditions. FINDING retained at step 7:
+standard says keyword but the record field is a state; use its explicit table
+mapping without changing the quoted sentence. No new Verus limitation. Native
+attribute updates remain trusted and may differ on invalid attributes/fetch
+priority. Native effects and remaining preload/header/callback migrations remain.

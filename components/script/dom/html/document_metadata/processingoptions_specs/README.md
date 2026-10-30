@@ -18,7 +18,7 @@ attributes, CORS settings, and fetch-priority definitions were checked against t
 processing/algorithms/headers.rs
   extract_links_from_headers                         HTML steps 1–4
   process_link_headers_ensures                        HTML steps 1, 2.1–2.9
-    -> options.rs: apply_link_options_from_parsed_header   steps 1–8
+    -> apply_attributes.rs: apply_link_options_from_parsed_header   steps 1–8
        -> link_types/preload.rs: translate_a_preload_destination
         -> cors.rs: CORS keyword recognition
            -> enumerated_attributes.rs: ASCII case-insensitive keyword matching
