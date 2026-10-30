@@ -151,6 +151,9 @@ impl LinkProcessingOptions {
         link_object: &LinkHeader,
         rel: &str,
     ) -> (result: bool)
+        requires
+            // IMPLICIT: invalid keyword resets and absent priority; witnesses: old nondefault state with "bad", or fetchpriority="high". See apply_link_options_requires.
+            SpecRequires::apply_link_options_requires(old(self), link_object, rel@),
         ensures
             // result == Spec::apply_link_options_from_parsed_header_result(link_object, rel@),
             Spec::apply_link_options_from_parsed_header_ensures(

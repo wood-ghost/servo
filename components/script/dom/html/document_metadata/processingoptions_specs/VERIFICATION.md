@@ -1014,3 +1014,24 @@ existing-style `verus_only` cfg warnings; none suppressed. Remaining work:
 HTTP-boundary requirements, local/transitive trust audit, small linked definition
 comments and final report. No runtime meaning change is claimed from compilation
 alone; the diff also preserves every executable expression in this task.
+
+## Task: implicit attribute-update requirements (2026-10-30)
+
+Added `apply_link_options_requires(old(self), link_object, rel)` without changing
+the canonical state-update `ensures` or executable body. Early invalid/missing
+preload destinations return before the other attributes, so they impose none
+of the later-attribute restrictions.
+
+| Clause | Witness | Discharge / propagation |
+| --- | --- | --- |
+| Invalid crossorigin may reset only an already-No-CORS state | old UseCredentials plus `crossorigin="bad"` | Header loop initializes No CORS; standalone calls must require it |
+| Invalid referrerpolicy may reset only an already-empty policy | old Origin plus `referrerpolicy="bad"` | Header loop initializes EmptyString; standalone calls must require it |
+| Recognized fetchpriority must be Auto | `fetchpriority="high"` / `"low"` | Native record has no priority field; HTTP input assumption pending |
+
+All clauses carry IMPLICIT labels and witnesses. Full focused command:
+**82 verified, 0 errors**; native attribute body remains labelled trusted at this
+checkpoint. Standard algorithm URL/snapshot/form/steps remain the previously
+proved application machine. Self-check 1–11 passes for the requirement-only
+change; no standard-result weakening or runtime edits. Findings are the known
+implementation differences above, not new standard ambiguity. Next: attempt
+the native body, then inherit the applicable condition at the HTTP boundary.

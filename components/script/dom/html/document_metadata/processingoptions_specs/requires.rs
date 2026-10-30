@@ -4,6 +4,7 @@ use net_traits::request::Destination;
 use vstd::prelude::*;
 
 use super::super::processingoptions::LinkProcessingOptions;
+use super::super::processingoptions::LinkHeader;
 use super::processing::model_trait::LinkProcessingModel;
 use super::servo_api::views::{StandardModel, destination_name};
 use super::predicates::is_preload_destination;
@@ -11,6 +12,34 @@ use net_traits::mime_classifier::MediaType;
 use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
 
 verus! {
+
+pub(crate) open spec fn apply_link_options_requires(options: &LinkProcessingOptions, link_object: &LinkHeader, rel: Seq<char>) -> bool {
+    if !super::processing::context_specs::apply_link_options_from_parsed_header_result(link_object, rel) {
+        true
+    } else {
+        let parameters = link_object.params@;
+        // IMPLICIT: native invalid crossorigin resets to No CORS instead of preserving the old state; witness: old UseCredentials and crossorigin="bad".
+        &&& match super::servo_api::link_header::first_value(parameters, "crossorigin"@) {
+            Some(value) => super::processing::algorithms::cors::determine_cors_settings_for_token(value) is None
+                ==> options.cross_origin is None,
+            None => true,
+        }
+        // IMPLICIT: native invalid referrerpolicy resets to empty instead of preserving the old state; witness: old Origin and referrerpolicy="bad".
+        &&& match super::servo_api::link_header::first_value(parameters, "referrerpolicy"@) {
+            Some(value) => super::processing::types::ReferrerPolicyView::from_name(super::predicates::ascii_lowercase(value)) is None
+                ==> options.referrer_policy == net_traits::ReferrerPolicy::EmptyString,
+            None => true,
+        }
+        // IMPLICIT: native options omit fetch priority; witness: fetchpriority="high" or "low".
+        &&& match super::servo_api::link_header::first_value(parameters, "fetchpriority"@) {
+            Some(value) => match super::processing::algorithms::options::fetch_priority_keyword_state(value) {
+                Some(priority) => priority == super::processing::types::LinkFetchPriorityView::Auto,
+                None => true,
+            },
+            None => true,
+        }
+    }
+}
 
 /// Step 1 of create_link_request asserts that href is nonempty.
 pub(crate) open spec fn create_link_request_requires(options: &LinkProcessingOptions) -> bool {
