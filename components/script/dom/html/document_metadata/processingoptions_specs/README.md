@@ -93,10 +93,11 @@ document-context adapter for lazy native size-list evaluation and URL resolution
 observations. `servo_api/environment.rs` combines GlobalScope URL observations,
 partial RequestClient data, and explicit supplemental context.
 
-`PolicyContainerView`, `DocumentView`, and `DocsAlgoView` are distinct typed
-abstract identities. Their contents and operations remain external-model
-boundaries. Requests, document snapshots, source-set call records, callbacks,
-and `LinkProcessingModel` use the corresponding view types throughout.
+`PolicyContainerView` contains CSP, embedder, referrer, integrity and report-only
+integrity policies. `servo_api/policy_container.rs` projects native fields and
+requires explicit context for missing standard data, including CSP self-origin.
+`DocumentView` and `DocsAlgoView` remain typed identities as requested. Requests,
+document snapshots, callbacks and `LinkProcessingModel` use these views throughout.
 
 The policy container retains the user's `Arc<PolicyContainerView>` representation,
 including in document snapshots and constructed requests. Regression proofs check

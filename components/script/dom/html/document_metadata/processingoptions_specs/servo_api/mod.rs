@@ -13,5 +13,6 @@ pub(crate) mod preload;
 pub(crate) mod views;
 pub(crate) mod url;
 pub(crate) mod environment;
+pub(crate) mod policy_container;
 
 pub(crate) use self::external_specs::*;

@@ -156,7 +156,6 @@ pub struct ExLinkDataOwned(LinkDataOwned);
 
 // TRUSTED(scope): not verified yet; remove when net_traits::policy_container is verified
 #[verifier::external_type_specification]
-#[verifier::external_body]
 pub struct ExPolicyContainer(PolicyContainer);
 
 // ----------------------------------------

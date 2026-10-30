@@ -413,3 +413,45 @@ yes for this view task; 2, 4, 5, 7 have no numbered algorithm. FINDING/Verus
 limitations: none new. Not done: context production, global ID uniqueness,
 navigation/worker/realm/module-map proofs, policy contents, remaining algorithms
 and native chain obligations. These context inputs are not browser-state proofs.
+
+## Task: complete policy-container fields and native adapter (2026-10-30)
+
+Definitions: <https://html.spec.whatwg.org/multipage/browsers.html#policy-container>
+and `#embedder-policy` (HTML snapshot/inspection 2026-10-30);
+<https://w3c.github.io/webappsec-subresource-integrity/#integrity-policy>
+(Editor's Draft 2026-03-20); <https://w3c.github.io/webappsec-csp/#csp-list>
+and `#content-security-policy-object` (Editor's Draft **2026-10-27**), both
+inspected 2026-10-30.
+
+Definition map: CSP list→csp_list, embedder policy→embedder_policy, referrer
+policy→referrer_policy, integrity policy→integrity_policy, report-only integrity
+policy→report_only_integrity_policy: **yes**. Nested embedder and integrity
+fields/defaults are explicit. CSP includes policies plus self-origin; policies
+include directive set, disposition and source, and directives contain name/value.
+Ordered-set validity is an explicit predicate; projecting a native Vec does not
+prove its validity or silently remove duplicate tokens.
+
+`servo_api/policy_container.rs` projects the actual native public fields and
+CSP records transparently. Supplemental context supplies fields absent from
+native code: CSP self-origin; embedder reporting endpoint/report-only value and
+endpoint; integrity and report-only integrity policies. Native Credentialless
+is absent, while the standard-facing enum retains it. Native `None` CSP list
+projects to empty policies. The shared-handle correspondence is a defined
+relation on Arc contents, preserving the user's Arc representation without an
+allocation/reference-counting assumption. The existing context-free Arc view
+remains an unresolved labelled bridge until callers supply this relation.
+
+Full focused command: **55 verified, 0 errors**. Labels added: five external-lib
+type declarations for content-security-policy 0.9.0, two scope type declarations
+for native embedder policy/value. Removed opaque-body annotation from native
+PolicyContainer; its type trust label remains. No runtime edits or new requirements.
+Self-check 1, 3, 6, 8–11 yes for this view task; 2, 4, 5, 7 no numbered algorithm.
+No new Verus limitation. Default referrer policy is StrictOriginWhenCrossOrigin.
+
+FINDING: HTML initializes an "empty" CSP list, whereas the current CSP definition
+also requires self-origin without a default there. `initial(self_origin)` makes
+that missing context explicit. FINDING: HTML clone-policy-container step 5 copies
+integrity policy but the inspected algorithm does not copy report-only integrity
+policy. Do not silently add such a step when that algorithm is formalized.
+Not done: policy parsing/enforcement/clone algorithms, native context production,
+remaining origin/URL operations and legacy algorithm migrations/native proofs.

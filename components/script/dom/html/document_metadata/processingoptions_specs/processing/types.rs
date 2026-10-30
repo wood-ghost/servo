@@ -617,9 +617,122 @@ pub(crate) struct SerializedUrlKeyView { pub serialization: Seq<char> }
 /// Abstract contents of the user's Arc<PolicyContainerView> representation.
 /// https://html.spec.whatwg.org/multipage/browsers.html#policy-container
 /// A policy container is a struct containing policies that apply to a Document, a WorkerGlobalScope, or a WorkletGlobalScope. It has the following items:
-/// TODO: the PolicyContainer should follow previous structs as well, especially the connection with NaitivePolicyContainer in Servo
+// HTML snapshot/inspection 2026-10-30.
 pub(crate) struct PolicyContainerView {
-    pub id: int,
+    // A CSP list, which is a CSP list. It is initially empty.
+    pub csp_list: CspListView,
+    // An embedder policy, which is an embedder policy. It is initially a new embedder policy.
+    pub embedder_policy: EmbedderPolicyView,
+    // A referrer policy, which is a referrer policy. It is initially the default referrer policy.
+    pub referrer_policy: ReferrerPolicyView,
+    // An integrity policy, which is an integrity policy, initially a new integrity policy.
+    pub integrity_policy: IntegrityPolicyView,
+    // A report-only integrity policy, which is an integrity policy, initially a new integrity policy.
+    pub report_only_integrity_policy: IntegrityPolicyView,
+}
+
+impl PolicyContainerView {
+    // FINDING: HTML says an initially empty CSP list; CSP's current definition
+    // additionally requires self-origin. Supply it explicitly rather than invent
+    // an origin default or drop that field from the linked definition.
+    pub(crate) open spec fn initial(self_origin: OriginView) -> Self {
+        Self {
+            csp_list: CspListView { policies: Seq::empty(), self_origin },
+            embedder_policy: EmbedderPolicyView::initial(),
+            referrer_policy: ReferrerPolicyView::from_native(NativeReferrerPolicy::StrictOriginWhenCrossOrigin),
+            integrity_policy: IntegrityPolicyView::initial(),
+            report_only_integrity_policy: IntegrityPolicyView::initial(),
+        }
+    }
+}
+
+// https://html.spec.whatwg.org/multipage/browsers.html#embedder-policy
+// An embedder policy consists of:
+pub(crate) struct EmbedderPolicyView {
+    // A value, which is an embedder policy value, initially "unsafe-none".
+    pub value: EmbedderPolicyValueView,
+    // A reporting endpoint string, initially the empty string.
+    pub reporting_endpoint: Seq<char>,
+    // A report-only value, which is an embedder policy value, initially "unsafe-none".
+    pub report_only_value: EmbedderPolicyValueView,
+    // A report-only reporting endpoint string, initially the empty string.
+    pub report_only_reporting_endpoint: Seq<char>,
+}
+
+impl EmbedderPolicyView {
+    pub(crate) open spec fn initial() -> Self {
+        Self {
+            value: EmbedderPolicyValueView::UnsafeNone, reporting_endpoint: Seq::empty(),
+            report_only_value: EmbedderPolicyValueView::UnsafeNone, report_only_reporting_endpoint: Seq::empty(),
+        }
+    }
+}
+
+// https://html.spec.whatwg.org/multipage/browsers.html#embedder-policy-value
+pub(crate) enum EmbedderPolicyValueView { UnsafeNone, RequireCorp, Credentialless }
+
+// https://w3c.github.io/webappsec-subresource-integrity/#integrity-policy
+// Editor's Draft 2026-03-20; inspected 2026-10-30.
+// An integrity policy, is a struct that contains the following:
+pub(crate) struct IntegrityPolicyView {
+    // sources, a list of sources, initially empty.
+    pub sources: Seq<IntegritySourceView>,
+    // blocked destinations, a list of destinations, initially empty.
+    pub blocked_destinations: Seq<IntegrityDestinationView>,
+    // endpoints, a list of strings, initially empty.
+    pub endpoints: Seq<Seq<char>>,
+}
+
+impl IntegrityPolicyView {
+    pub(crate) open spec fn initial() -> Self {
+        Self { sources: Seq::empty(), blocked_destinations: Seq::empty(), endpoints: Seq::empty() }
+    }
+}
+
+// A source is a string. The only possible value for it is "inline".
+pub(crate) enum IntegritySourceView { Inline }
+// A destination is a destination type. The possible values for it are "script" and "style".
+pub(crate) enum IntegrityDestinationView { Script, Style }
+
+// https://w3c.github.io/webappsec-csp/#csp-list
+// Editor's Draft 2026-10-27; inspected 2026-10-30.
+// A CSP list is a struct consisting of policies (a list of policies) and a self-origin (an origin which is used when matching the 'self' keyword).
+pub(crate) struct CspListView {
+    pub policies: Seq<CspPolicyView>,
+    pub self_origin: OriginView,
+}
+
+// https://w3c.github.io/webappsec-csp/#content-security-policy-object
+pub(crate) struct CspPolicyView {
+    // Each policy has an associated directive set, which is an ordered set of directives that define the policy’s implications when applied.
+    pub directive_set: Seq<CspDirectiveView>,
+    // Each policy has an associated disposition, which is either "enforce" or "report".
+    pub disposition: CspDispositionView,
+    // Each policy has an associated source, which is either "header" or "meta".
+    pub source: CspSourceView,
+}
+
+impl CspPolicyView {
+    pub(crate) open spec fn well_formed(self) -> bool {
+        &&& self.directive_set.no_duplicates()
+        &&& (forall|i: int| 0 <= i < self.directive_set.len() ==>
+            (#[trigger] self.directive_set[i]).well_formed())
+    }
+}
+
+pub(crate) enum CspDispositionView { Enforce, Report }
+pub(crate) enum CspSourceView { Header, Meta }
+
+// https://w3c.github.io/webappsec-csp/#directives
+// Each directive is a name / value pair. The name is a non-empty string, and the value is a set of non-empty strings. The value MAY be empty.
+pub(crate) struct CspDirectiveView { pub name: Seq<char>, pub value: Seq<Seq<char>> }
+
+impl CspDirectiveView {
+    pub(crate) open spec fn well_formed(self) -> bool {
+        &&& self.name.len() > 0
+        &&& self.value.no_duplicates()
+        &&& (forall|i: int| 0 <= i < self.value.len() ==> (#[trigger] self.value[i]).len() > 0)
+    }
 }
 
 // =========================
