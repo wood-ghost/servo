@@ -10,7 +10,7 @@ members = [
     "tests/unit/*",
 ]
 default-members = ["ports/servoshell"]
-exclude = [".cargo", "support/crown"]
+exclude = [".cargo", "support/crown", ".verus-source"]
 
 [workspace.package]
 version = "0.7.0"
@@ -460,10 +460,12 @@ lto = "thin"
 codegen-units = 1
 
 [patch.crates-io]
-vstd = { path = "/home/yizhiy/Desktop/verus/source/vstd" }
-verus_builtin = { path = "/home/yizhiy/Desktop/verus/source/builtin" }
-verus_builtin_macros = { path = "/home/yizhiy/Desktop/verus/source/builtin_macros" }
-# verus_state_machines_macros = { path = "/home/yizhiy/Desktop/verus/source/state_machines_macros" }
+# All builds, including ordinary Cargo/mach builds, use this pinned snapshot.
+# Prepare it once with `bash verus_cmd.sh prepare /path/to/verus-git-clone`.
+# The published vstd with the same version differs from this Verus revision.
+vstd = { path = ".verus-source/source/vstd" }
+verus_builtin = { path = ".verus-source/source/builtin" }
+verus_builtin_macros = { path = ".verus-source/source/builtin_macros" }
 # If you need to temporarily test Servo with a local fork of some upstream
 # crate, add that here. Use the form:
 #

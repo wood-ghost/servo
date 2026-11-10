@@ -6,6 +6,8 @@
 /.wpt
 /.vs
 /target
+/.verus-source/
+/.verus-source.*/
 /tests/wpt/reftests-report/report.html
 /python/_virtualenv*
 /python/_venv*

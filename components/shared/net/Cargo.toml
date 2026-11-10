@@ -72,7 +72,7 @@ rustls = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
-vstd = "0.0.0-2026-07-12-0122"
+vstd = "=0.0.0-2026-10-25-0158"
 webrender_api = { workspace = true }
 verus_state_machines_macros = "=0.0.0-2026-06-14-0213"
 

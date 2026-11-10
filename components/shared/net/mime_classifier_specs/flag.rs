@@ -40,6 +40,7 @@ impl FromSpecImpl<bool> for NoSniffFlag {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when NoSniffFlag::eq is verified
 pub assume_specification[
     <NoSniffFlag as core::cmp::PartialEq<NoSniffFlag>>::eq
 ](
@@ -50,6 +51,7 @@ pub assume_specification[
         result == (*left == *right),
 ;
 
+// TRUSTED(scope): not verified yet; remove when ApacheBugFlag::eq is verified
 pub assume_specification[
     <ApacheBugFlag as core::cmp::PartialEq<ApacheBugFlag>>::eq
 ](
@@ -60,12 +62,14 @@ pub assume_specification[
         result == (*left == *right),
 ;
 
+// TRUSTED(scope): not verified yet; remove when NoSniffFlag equality correspondence is verified
 pub broadcast axiom fn axiom_no_sniff_flag_obeys_eq_spec()
     ensures
         #[trigger]
         <NoSniffFlag as PartialEqSpec<NoSniffFlag>>::obeys_eq_spec(),
 ;
 
+// TRUSTED(scope): not verified yet; remove when NoSniffFlag equality correspondence is verified
 pub broadcast axiom fn axiom_no_sniff_flag_eq_spec(
     left: &NoSniffFlag,
     right: &NoSniffFlag,

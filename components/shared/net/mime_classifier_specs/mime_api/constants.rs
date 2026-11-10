@@ -7,6 +7,10 @@
 //! (including the deprecated alias) in mime 0.3.17. These are trusted value
 //! contracts, checked against ordinary-Rust observations of that pinned crate.
 //! Marked blocks are for library completeness rather than classifier/proof use.
+//! The 2026-10-30 trust-label audit preserves the historical observation claim
+//! above. Its labels conservatively say "not yet" because no retained independent
+//! constant-observation test was revalidated in this audit; model proofs alone
+//! are not validation of these external bindings.
 
 use ::mime::{self, Mime, Name};
 use vstd::prelude::*;
@@ -22,54 +26,63 @@ verus! {
 
 // NAME
 pub open spec fn image_name() -> Seq<char> { "image"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::IMAGE] -> (result: Name<'static>)
     ensures
         name_identity(&result) == image_name(),
 ;
 
 pub open spec fn audio_name() -> Seq<char> { "audio"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::AUDIO] -> (result: Name<'static>)
     ensures
         name_identity(&result) == audio_name(),
 ;
 
 pub open spec fn video_name() -> Seq<char> { "video"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::VIDEO] -> (result: Name<'static>)
     ensures
         name_identity(&result) == video_name(),
 ;
 
 pub open spec fn xml_name() -> Seq<char> { "xml"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::XML] -> (result: Name<'static>)
     ensures
         name_identity(&result) == xml_name(),
 ;
 
 pub open spec fn application_name() -> Seq<char> { "application"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::APPLICATION] -> (result: Name<'static>)
     ensures
         name_identity(&result) == application_name(),
 ;
 
 pub open spec fn star_name() -> Seq<char> { "*"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::STAR] -> (result: Name<'static>)
     ensures
         name_identity(&result) == star_name(),
 ;
 
 pub open spec fn text_name() -> Seq<char> { "text"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::TEXT] -> (result: Name<'static>)
     ensures
         name_identity(&result) == text_name(),
 ;
 
 pub open spec fn json_name() -> Seq<char> { "json"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::JSON] -> (result: Name<'static>)
     ensures
         name_identity(&result) == json_name(),
 ;
 
 pub open spec fn font_name() -> Seq<char> { "font"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::FONT] -> (result: Name<'static>)
     ensures
         name_identity(&result) == font_name(),
@@ -78,174 +91,203 @@ pub assume_specification [mime::FONT] -> (result: Name<'static>)
 // =====================> Not used in mime_classifier
 // Remaining names from https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#596-650
 pub open spec fn multipart_name() -> Seq<char> { "multipart"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MULTIPART] -> (result: Name<'static>)
     ensures
         name_identity(&result) == multipart_name(),
 ;
 
 pub open spec fn message_name() -> Seq<char> { "message"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MESSAGE] -> (result: Name<'static>)
     ensures
         name_identity(&result) == message_name(),
 ;
 
 pub open spec fn model_name() -> Seq<char> { "model"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MODEL] -> (result: Name<'static>)
     ensures
         name_identity(&result) == model_name(),
 ;
 
 pub open spec fn plain_name() -> Seq<char> { "plain"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::PLAIN] -> (result: Name<'static>)
     ensures
         name_identity(&result) == plain_name(),
 ;
 
 pub open spec fn html_name() -> Seq<char> { "html"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::HTML] -> (result: Name<'static>)
     ensures
         name_identity(&result) == html_name(),
 ;
 
 pub open spec fn javascript_name() -> Seq<char> { "javascript"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::JAVASCRIPT] -> (result: Name<'static>)
     ensures
         name_identity(&result) == javascript_name(),
 ;
 
 pub open spec fn css_name() -> Seq<char> { "css"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::CSS] -> (result: Name<'static>)
     ensures
         name_identity(&result) == css_name(),
 ;
 
 pub open spec fn csv_name() -> Seq<char> { "csv"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::CSV] -> (result: Name<'static>)
     ensures
         name_identity(&result) == csv_name(),
 ;
 
 pub open spec fn event_stream_name() -> Seq<char> { "event-stream"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::EVENT_STREAM] -> (result: Name<'static>)
     ensures
         name_identity(&result) == event_stream_name(),
 ;
 
 pub open spec fn vcard_name() -> Seq<char> { "vcard"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::VCARD] -> (result: Name<'static>)
     ensures
         name_identity(&result) == vcard_name(),
 ;
 
 pub open spec fn www_form_urlencoded_name() -> Seq<char> { "x-www-form-urlencoded"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::WWW_FORM_URLENCODED] -> (result: Name<'static>)
     ensures
         name_identity(&result) == www_form_urlencoded_name(),
 ;
 
 pub open spec fn msgpack_name() -> Seq<char> { "msgpack"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MSGPACK] -> (result: Name<'static>)
     ensures
         name_identity(&result) == msgpack_name(),
 ;
 
 pub open spec fn octet_stream_name() -> Seq<char> { "octet-stream"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::OCTET_STREAM] -> (result: Name<'static>)
     ensures
         name_identity(&result) == octet_stream_name(),
 ;
 
 pub open spec fn pdf_name() -> Seq<char> { "pdf"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::PDF] -> (result: Name<'static>)
     ensures
         name_identity(&result) == pdf_name(),
 ;
 
 pub open spec fn woff_name() -> Seq<char> { "woff"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::WOFF] -> (result: Name<'static>)
     ensures
         name_identity(&result) == woff_name(),
 ;
 
 pub open spec fn woff2_name() -> Seq<char> { "woff2"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::WOFF2] -> (result: Name<'static>)
     ensures
         name_identity(&result) == woff2_name(),
 ;
 
 pub open spec fn form_data_name() -> Seq<char> { "form-data"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::FORM_DATA] -> (result: Name<'static>)
     ensures
         name_identity(&result) == form_data_name(),
 ;
 
 pub open spec fn bmp_name() -> Seq<char> { "bmp"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::BMP] -> (result: Name<'static>)
     ensures
         name_identity(&result) == bmp_name(),
 ;
 
 pub open spec fn gif_name() -> Seq<char> { "gif"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::GIF] -> (result: Name<'static>)
     ensures
         name_identity(&result) == gif_name(),
 ;
 
 pub open spec fn jpeg_name() -> Seq<char> { "jpeg"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::JPEG] -> (result: Name<'static>)
     ensures
         name_identity(&result) == jpeg_name(),
 ;
 
 pub open spec fn png_name() -> Seq<char> { "png"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::PNG] -> (result: Name<'static>)
     ensures
         name_identity(&result) == png_name(),
 ;
 
 pub open spec fn svg_name() -> Seq<char> { "svg"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::SVG] -> (result: Name<'static>)
     ensures
         name_identity(&result) == svg_name(),
 ;
 
 pub open spec fn basic_name() -> Seq<char> { "basic"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::BASIC] -> (result: Name<'static>)
     ensures
         name_identity(&result) == basic_name(),
 ;
 
 pub open spec fn mpeg_name() -> Seq<char> { "mpeg"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MPEG] -> (result: Name<'static>)
     ensures
         name_identity(&result) == mpeg_name(),
 ;
 
 pub open spec fn mp4_name() -> Seq<char> { "mp4"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::MP4] -> (result: Name<'static>)
     ensures
         name_identity(&result) == mp4_name(),
 ;
 
 pub open spec fn ogg_name() -> Seq<char> { "ogg"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::OGG] -> (result: Name<'static>)
     ensures
         name_identity(&result) == ogg_name(),
 ;
 
 pub open spec fn charset_name() -> Seq<char> { "charset"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::CHARSET] -> (result: Name<'static>)
     ensures
         name_identity(&result) == charset_name(),
 ;
 
 pub open spec fn boundary_name() -> Seq<char> { "boundary"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::BOUNDARY] -> (result: Name<'static>)
     ensures
         name_identity(&result) == boundary_name(),
 ;
 
 pub open spec fn utf_8_name() -> Seq<char> { "utf-8"@ }
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::UTF_8] -> (result: Name<'static>)
     ensures
         name_identity(&result) == utf_8_name(),
@@ -267,6 +309,7 @@ pub open spec fn text_plain_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_PLAIN] -> (result: Mime)
     ensures
         view(&result) == text_plain_identity(),
@@ -283,6 +326,7 @@ pub open spec fn text_plain_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_PLAIN_UTF_8] -> (result: Mime)
     ensures
         view(&result) == text_plain_utf_8_identity(),
@@ -299,6 +343,7 @@ pub open spec fn text_html_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_HTML] -> (result: Mime)
     ensures
         view(&result) == text_html_identity(),
@@ -316,6 +361,7 @@ pub open spec fn text_html_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_HTML_UTF_8] -> (result: Mime)
     ensures
         view(&result) == text_html_utf_8_identity(),
@@ -333,6 +379,7 @@ pub open spec fn text_css_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_CSS] -> (result: Mime)
     ensures
         view(&result) == text_css_identity(),
@@ -350,6 +397,7 @@ pub open spec fn text_css_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_CSS_UTF_8] -> (result: Mime)
     ensures
         view(&result) == text_css_utf_8_identity(),
@@ -367,6 +415,7 @@ pub open spec fn text_javascript_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_JAVASCRIPT] -> (result: Mime)
     ensures
         view(&result) == text_javascript_identity(),
@@ -383,6 +432,7 @@ pub open spec fn text_xml_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub assume_specification [mime::TEXT_XML] -> (result: Mime)
     ensures
         view(&result) == text_xml_identity(),
@@ -399,6 +449,7 @@ pub open spec fn text_event_stream_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_EVENT_STREAM] -> (result: Mime)
     ensures
         view(&result) == text_event_stream_identity(),
@@ -413,6 +464,7 @@ pub open spec fn text_csv_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_CSV] -> (result: Mime)
     ensures
         view(&result) == text_csv_identity(),
@@ -427,6 +479,7 @@ pub open spec fn text_csv_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_CSV_UTF_8] -> (result: Mime)
     ensures
         view(&result) == text_csv_utf_8_identity(),
@@ -441,6 +494,7 @@ pub open spec fn text_tab_separated_values_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_TAB_SEPARATED_VALUES] -> (result: Mime)
     ensures
         view(&result) == text_tab_separated_values_identity(),
@@ -455,6 +509,7 @@ pub open spec fn text_tab_separated_values_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_TAB_SEPARATED_VALUES_UTF_8] -> (result: Mime)
     ensures
         view(&result) == text_tab_separated_values_utf_8_identity(),
@@ -469,6 +524,7 @@ pub open spec fn text_vcard_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_VCARD] -> (result: Mime)
     ensures
         view(&result) == text_vcard_identity(),
@@ -486,6 +542,7 @@ pub open spec fn image_jpeg_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_JPEG] -> (result: Mime)
     ensures
         view(&result) == image_jpeg_identity(),
@@ -502,6 +559,7 @@ pub open spec fn image_gif_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_GIF] -> (result: Mime)
     ensures
         view(&result) == image_gif_identity(),
@@ -518,6 +576,7 @@ pub open spec fn image_png_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_PNG] -> (result: Mime)
     ensures
         view(&result) == image_png_identity(),
@@ -534,6 +593,7 @@ pub open spec fn image_bmp_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_BMP] -> (result: Mime)
     ensures
         view(&result) == image_bmp_identity(),
@@ -551,6 +611,7 @@ pub open spec fn image_svg_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_SVG] -> (result: Mime)
     ensures
         view(&result) == image_svg_identity(),
@@ -566,6 +627,7 @@ pub open spec fn star_star_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::STAR_STAR] -> (result: Mime)
     ensures
         view(&result) == star_star_identity(),
@@ -580,6 +642,7 @@ pub open spec fn text_star_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::TEXT_STAR] -> (result: Mime)
     ensures
         view(&result) == text_star_identity(),
@@ -594,6 +657,7 @@ pub open spec fn image_star_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::IMAGE_STAR] -> (result: Mime)
     ensures
         view(&result) == image_star_identity(),
@@ -609,6 +673,7 @@ pub open spec fn font_woff_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::FONT_WOFF] -> (result: Mime)
     ensures
         view(&result) == font_woff_identity(),
@@ -623,6 +688,7 @@ pub open spec fn font_woff2_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::FONT_WOFF2] -> (result: Mime)
     ensures
         view(&result) == font_woff2_identity(),
@@ -638,6 +704,7 @@ pub open spec fn application_json_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_JSON] -> (result: Mime)
     ensures
         view(&result) == application_json_identity(),
@@ -656,6 +723,7 @@ pub open spec fn application_javascript_identity() -> MimeView {
 }
 
 // =====================> Not used in mime_classifier
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_JAVASCRIPT] -> (result: Mime)
     ensures
         view(&result) == application_javascript_identity(),
@@ -670,6 +738,7 @@ pub open spec fn application_javascript_utf_8_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_JAVASCRIPT_UTF_8] -> (result: Mime)
     ensures
         view(&result) == application_javascript_utf_8_identity(),
@@ -684,6 +753,7 @@ pub open spec fn application_www_form_urlencoded_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_WWW_FORM_URLENCODED] -> (result: Mime)
     ensures
         view(&result) == application_www_form_urlencoded_identity(),
@@ -701,6 +771,7 @@ pub open spec fn application_octet_stream_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_OCTET_STREAM] -> (result: Mime)
     ensures
         view(&result) == application_octet_stream_identity(),
@@ -717,6 +788,7 @@ pub open spec fn application_msgpack_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_MSGPACK] -> (result: Mime)
     ensures
         view(&result) == application_msgpack_identity(),
@@ -734,6 +806,7 @@ pub open spec fn application_pdf_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::APPLICATION_PDF] -> (result: Mime)
     ensures
         view(&result) == application_pdf_identity(),
@@ -750,6 +823,7 @@ pub open spec fn multipart_form_data_identity() -> MimeView {
     }
 }
 
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 pub(crate) assume_specification [mime::MULTIPART_FORM_DATA] -> (result: Mime)
     ensures
         view(&result) == multipart_form_data_identity(),
@@ -757,6 +831,7 @@ pub(crate) assume_specification [mime::MULTIPART_FORM_DATA] -> (result: Mime)
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#786-788
 // Deprecated compatibility spelling: TEXT_JAVSCRIPT = TEXT_JAVASCRIPT.
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
 #[allow(deprecated)]
 pub(crate) assume_specification [mime::TEXT_JAVSCRIPT] -> (result: Mime)
     ensures

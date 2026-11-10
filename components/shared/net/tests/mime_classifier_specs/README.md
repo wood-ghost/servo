@@ -758,3 +758,41 @@ The `get_param` cases still need method contracts, even though `CHARSET` is now
 specified. The isolated specification/proof-module check still reports
 **47 verified, 0 errors**. Lifetime and trait-conflict checks remain enabled,
 and the default SMT resource limit was retained. Formatting and diff checks passed.
+
+### Params iterator migration audit: 2026-11-10
+
+The link-processing squash migrated `Mime::params` from `will_return_none()` to
+`produces() == Seq::new(len, |_| true)` for the vstd API in Verus revision
+`dea85441338f13fbab017b7c0ebafc9ad11464ce` (package `2026-10-25-0158`). The API
+change is Verus commit `ef1443266293b1f4f47093a053bec1a0576ec3d9`, PR #3330.
+This is not merely a renamed predicate: production flags describe individual
+potential items. Finite exhaustion uses the retained finite `remaining()` sequence
+and prophetic iterator laws together with `next`: a nonempty sequence drops its
+first item; an empty sequence returns None and remains empty. The explicit
+decrease metric is also retained. This external contract does not verify native
+termination or the correspondence of the uninterpreted `parameter_entries` view.
+
+The new generic client counts an arbitrary Mime's parameters, proves the count
+equals `parameter_entries(mt).len()`, and checks two further None results. Its
+loop uses the non-prophetic bound `entries.len() - count`; attempting to use
+`remaining().len()` as a termination measure was correctly rejected as prophetic.
+A negative control expecting an extra item must fail with exactly one assertion
+failure. The ordinary-Rust oracle independently checks the None, optimized Utf8,
+and Custom-vector representations, including duplicate names and repeated None.
+Source inspection of mime 0.3.17 `src/lib.rs:207–220,537–572` agrees with these cases.
+
+After preparing the pinned dependency snapshot with `bash verus_cmd.sh prepare`,
+run from the Servo root. The root Cargo patches now apply without `--config`:
+
+```sh
+cargo +1.97.1 test -p servo-net-traits --test mime_api --locked --offline \
+  -- params_contract link_css_full_record_differs_from_essence --nocapture
+```
+
+Result: **4 passed, 0 failed, 48 filtered out**. Two are ordinary-Rust tests;
+the two Verus clients are a positive exhaustion proof (**2 verified checks**) and
+the expected-failure control. The isolated clients use the installed
+`0.2026.10.29.62a9ca4.dirty` verifier with lifetime/trait-conflict checking enabled.
+The full pre-existing API/parser suites were not rerun. The independent CSS test
+confirms `text/css; charset=utf-8` has essence `text/css` but differs from TEXT_CSS;
+this is library-level evidence for the native link type-matching finding, not WPT.

@@ -118,6 +118,95 @@ test_verify_one_file! {
 
 // Parameter lookup and iterator state, including duplicates and exhaustion.
 
+// Audit of the will_return_none -> produces migration. This client is generic
+// over the native MIME value and does not assume a parser/constant entry count.
+test_verify_one_file! {
+    #[test] params_contract_finite_exhaustion verus_code! {
+        use vstd::prelude::*;
+        use vstd::std_specs::iter::IteratorSpec;
+
+        fn count(mt: &mime::Mime) -> (count: usize)
+            ensures count == crate::mime_api::parameter_entries(mt).len(),
+        {
+            let mut params = mt.params();
+            let ghost entries = crate::mime_api::parameter_entries(mt);
+            let mut count = 0usize;
+            loop
+                invariant
+                    params.obeys_prophetic_iter_laws(),
+                    entries == crate::mime_api::parameter_entries(mt),
+                    entries.len() <= usize::MAX,
+                    count <= entries.len(),
+                    params.remaining().len() + count == entries.len(),
+                    params.produces() == Seq::new(params.remaining().len(), |i: int| true),
+                decreases entries.len() - count,
+            {
+                let next = params.next();
+                if next.is_none() {
+                    assert(count == entries.len());
+                    let again = params.next();
+                    let third = params.next();
+                    assert(again.is_none());
+                    assert(third.is_none());
+                    return count;
+                }
+                count += 1;
+            }
+        }
+    } => Ok(())
+}
+
+test_verify_one_file! {
+    #[test] params_contract_rejects_extra_item verus_code! {
+        use vstd::prelude::*;
+
+        fn test(mt: &mime::Mime)
+            requires crate::mime_api::parameter_entries(mt).len() == 0,
+        {
+            let mut params = mt.params();
+            let result = params.next();
+            assert(result.is_some());
+        }
+    } => Err(err) => common::assert_one_fails(err)
+}
+
+// Independent ordinary-Rust oracle for all three ParamsInner representations:
+// None, optimized Utf8, and a custom vector (including duplicate names).
+#[test]
+fn params_contract_rust_oracle() {
+    let cases = [
+        (mime::TEXT_PLAIN, vec![]),
+        (mime::TEXT_PLAIN_UTF_8, vec![("charset", "utf-8")]),
+        (
+            "text/plain;foo=first;FOO=second;bar=last"
+                .parse::<mime::Mime>()
+                .unwrap(),
+            vec![("foo", "first"), ("foo", "second"), ("bar", "last")],
+        ),
+    ];
+    for (mt, expected) in cases {
+        let mut params = mt.params();
+        for (name, value) in expected {
+            let actual = params.next().expect("the next declared parameter");
+            assert_eq!((actual.0.as_str(), actual.1.as_str()), (name, value));
+        }
+        assert!(params.next().is_none());
+        assert!(params.next().is_none());
+        assert!(params.next().is_none());
+    }
+}
+
+#[test]
+fn link_css_full_record_differs_from_essence() {
+    let mt = "text/css; charset=utf-8".parse::<mime::Mime>().unwrap();
+    assert!(matches!(
+        net_traits::mime_classifier::MimeClassifier::get_media_type(&mt),
+        Some(net_traits::mime_classifier::MediaType::Css)
+    ));
+    assert_eq!(mt.essence_str(), "text/css");
+    assert_ne!(mt, mime::TEXT_CSS);
+}
+
 // FIXME: (support): `Mime::get_param` lacks a specification; absence is not checked.
 test_verify_one_file! {
     #[test] get_param_absent verus_code! {

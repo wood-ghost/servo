@@ -84,6 +84,7 @@ pub open spec fn padded_webm_match(
 
 // https://mimesniff.spec.whatwg.org/#parse-a-vint
 // pub(crate) uninterp spec fn parse_vint(sequence: Seq<u8>, iter: int) -> Option<(nat, nat)>; 
+// TRUSTED(scope): not verified yet; remove when the VINT number/size specification is completed and verified
 pub uninterp spec fn parse_vint_number_size(sequence: Seq<u8>, iter: int) -> nat; // incorrect output type
 
 pub(crate) open spec fn is_video_webm(bm: &ByteMatcher) -> bool {

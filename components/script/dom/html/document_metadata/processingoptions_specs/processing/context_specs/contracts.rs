@@ -1,0 +1,382 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+//! Executable-facing contracts and representation/effect boundaries.
+//!
+//! Thin wrappers connect runtime values to numbered reference algorithms. Native
+//! storage/conversion behavior is identified explicitly where it differs from the
+//! standard. Parser, UA-support, representation, and effect-observation agreement
+//! remain separate obligations; execution hooks do not establish conformance.
+
+use std::cell::Ref;
+use std::sync::Arc;
+
+use js::context::NoGC;
+use mime::Mime;
+use net_traits::ReferrerPolicy;
+use net_traits::mime_classifier::MediaType;
+use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
+use net_traits::policy_container::PolicyContainer;
+use net_traits::request::{CorsSettings, Destination, Referrer, RequestBuilder, RequestClient};
+use nom_rfc8288::complete::LinkParamOwned;
+use script_bindings::conversions::DerivedFrom;
+use script_bindings::reflector::DomObject;
+use script_bindings::root::DomRoot;
+use servo_base::id::WebViewId;
+use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
+use vstd::prelude::*;
+
+use crate::dom::document::Document;
+use crate::dom::globalscope::GlobalScope;
+use crate::dom::node::Node;
+use crate::dom::srcset::SourceSet;
+use crate::dom::window::Window;
+
+use crate::dom::html::document_metadata::processingoptions::{
+    LinkHeader, LinkProcessingOptions, LinkProcessingPhase,
+};
+use super::super::model as SpecModel;
+use super::super::algorithms as SpecAlgorithms;
+use super::super::super::servo_api::destination_is_script_like;
+use super::super::super::servo_api::views as SpecViews;
+use super::super::super::servo_api::link_header as SpecLinkHeader;
+use super::super::super::predicates::ascii_lowercase;
+
+verus! {
+
+// ----------------------------------------
+// ValueForKeyInLinkHeader predicates
+// ----------------------------------------
+
+/// Compare returned string contents without prescribing reference identity.
+pub(crate) open spec fn option_str_view(value: Option<&str>) -> Option<Seq<char>> {
+    match value {
+        Some(value) => Some(value@),
+        None => None,
+    }
+}
+
+/// Membership using Servo's exact, case-sensitive key comparison.
+/// HTML's attribute-existence operations use RFC 8288 parsed parameters; parser
+/// normalization and agreement with those standards remain separate obligations.
+pub(crate) open spec fn has_key_in_link_header_result(
+    params: Seq<LinkParamOwned>,
+    key: Seq<char>,
+) -> bool {
+    SpecLinkHeader::has_key(params, key)
+}
+
+/// Return the optional value of the first matching key. A first match with
+/// no value returns None even when a later duplicate has a value. This differs
+/// from key membership and must preserve Some("") versus None.
+pub(crate) open spec fn value_for_key_in_link_header_result(
+    params: Seq<LinkParamOwned>,
+    key: Seq<char>,
+) -> Option<Seq<char>> {
+    SpecLinkHeader::first_value(params, key)
+}
+
+// ----------------------------------------
+// LinkProcessingOptions predicates
+// ----------------------------------------
+
+/// Result-only compatibility projection for parsed header attributes.
+/// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
+/// The Boolean result depends on the preload destination check in step 1.
+pub(crate) open spec fn apply_link_options_from_parsed_header_result(
+    link_object: &LinkHeader,
+    rel: Seq<char>,
+) -> bool {
+    // The canonical numbered algorithm is apply_attributes::apply_attributes_machine.
+    if rel == "preload"@ {
+        match value_for_key_in_link_header_result(link_object.params@, "as"@) {
+            None => false,
+            Some(as_) => {
+                translate_a_preload_destination_result(as_) is Some
+            },
+        }
+    } else {
+        true
+    }
+}
+
+/// Field updates, preserved fields, and early failure are defined by the numbered
+/// algorithm in processing/algorithms/apply_attributes.rs. This is a native proof goal.
+/// The before/after arguments are snapshots around the mutable options borrow.
+// https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
+// To apply link options from parsed header attributes to a link processing options options given attribs and a string rel:
+#[verifier::auto_reveal_strlit]
+pub(crate) open spec fn apply_link_options_from_parsed_header_ensures(
+    before: &LinkProcessingOptions,
+    after: &LinkProcessingOptions,
+    link_object: &LinkHeader,
+    rel: Seq<char>,
+    result: bool,
+) -> bool {
+    // Native-only frame: referrer is deliberately absent from the HTML options
+    // record, but applying attributes must still preserve this executable field.
+    &&& after.referrer == before.referrer
+    &&& SpecAlgorithms::options::apply_link_options_from_parsed_header_ensures(
+        SpecViews::view(before),
+        SpecViews::view(after),
+        SpecLinkHeader::valued_attributes(link_object.params@),
+        rel,
+        result,
+    )
+}
+
+/// Full per-type obligation over supplied invocation inputs. A future ghost
+/// bridge must capture the snapshot and plan; neither is a function of &Document.
+// https://html.spec.whatwg.org/multipage/semantics.html#process-a-link-header
+pub(crate) open spec fn process_link_header_ok(
+    options: &LinkProcessingOptions,
+    rel: Seq<char>,
+    document: SpecModel::LinkHeaderDocumentState,
+    observed: SpecModel::LinkHeaderPlan,
+) -> bool {
+    // All link types that can be external resource links define a process a link header algorithm, which takes a link processing options. This algorithm defines whether and how they react to appearing in an HTTP `Link` response header.
+    SpecAlgorithms::link_types::process_link_header_ensures(
+        SpecViews::StandardModel,
+        SpecViews::view_in_document(options, document),
+        rel,
+        observed,
+    )
+}
+
+/// <https://html.spec.whatwg.org/multipage/#translate-a-preload-destination>
+pub(crate) open spec fn translate_a_preload_destination_result(
+    potential_destination: Seq<char>,
+) -> Option<Destination> {
+    match SpecAlgorithms::link_types::preload::translate_a_preload_destination(potential_destination) {
+        Some(destination) => Some(SpecViews::destination_from_view(destination)),
+        None => None,
+    }
+}
+
+/// <https://html.spec.whatwg.org/multipage/#create-a-link-request>
+/// Reference postcondition through RequestView. The native request-view and URL
+/// primitive correspondence must be established before attaching this to a trusted body.
+pub(crate) open spec fn create_link_request_ensures(
+    options: &LinkProcessingOptions,
+    webview_id: WebViewId,
+    global: &GlobalScope,
+    result: &Option<RequestBuilder>,
+) -> bool {
+    SpecAlgorithms::request::create_link_request_ensures(
+        SpecViews::StandardModel, SpecViews::view(options), SpecViews::option_request_view(result),
+    )
+}
+
+/// Exact standard result through the current views. The native external-body
+/// annotation trusts this correspondence until URL/Fetch/context views are proved;
+/// the postcondition itself is no longer an uninterpreted Boolean hook.
+pub(crate) open spec fn create_link_request_execution_ensures(
+    options: &LinkProcessingOptions,
+    webview_id: WebViewId,
+    global: &GlobalScope,
+    result: &Option<RequestBuilder>,
+) -> bool {
+    create_link_request_ensures(options, webview_id, global, result)
+}
+
+/// <https://html.spec.whatwg.org/multipage/#preload>
+/// Standard preload postcondition over an explicit observed operation plan.
+pub(crate) open spec fn preload_ensures(
+    options: &LinkProcessingOptions,
+    document: SpecModel::LinkHeaderDocumentState,
+    response_callback: Option<int>,
+    observed: SpecModel::PreloadPlan,
+) -> bool {
+    SpecAlgorithms::link_types::preload::preload_ensures(
+        SpecViews::StandardModel,
+        SpecViews::view_in_document(options, document),
+        response_callback,
+        observed,
+    )
+}
+
+/// Compatibility predicate for Servo's current classifier-side acceptance. This
+/// is useful for an agreement proof, but is not the WHATWG preload-type algorithm.
+pub(crate) open spec fn destination_matches_media_type(
+    destination: Destination,
+    mime: &Mime,
+    media_type: MediaType,
+) -> bool {
+    ||| (destination_is_script_like(destination) && media_type == MediaType::JavaScript)
+    ||| match destination {
+        Destination::Audio | Destination::Video => media_type == MediaType::AudioVideo,
+        Destination::Image => media_type == MediaType::Image,
+        Destination::Font => media_type == MediaType::Font,
+        Destination::Json => media_type == MediaType::Json,
+        // Preserve Servo's full-record comparison, including parameters.
+        Destination::Style => SpecMime::view(mime) == SpecMime::text_css_identity(),
+        Destination::Track => SpecMime::essence_str(mime) == "text/vtt"@,
+        _ => false,
+    }
+}
+
+/// Standard algorithm: processing/algorithms/link_types/preload.rs, steps 1–7.
+/// UA support and WHATWG/Rust MIME parser agreement remain primitive-model obligations.
+pub(crate) open spec fn type_matches_destination_result(
+    options: &LinkProcessingOptions,
+) -> bool {
+    SpecAlgorithms::link_types::preload::type_matches_destination(
+        SpecViews::StandardModel, options.link_type@, SpecViews::destination_view(options.destination),
+    )
+}
+
+// ----------------------------------------
+// Link header processing predicates
+// ----------------------------------------
+
+/// Keyword recognition follows HTML's CORS keyword table. Full enumerated-
+/// attribute defaulting is a separate algorithm in algorithms/cors.rs.
+pub(crate) open spec fn determine_cors_settings_for_token_result(
+    token: Seq<char>,
+) -> Option<CorsSettings> {
+    match SpecAlgorithms::cors::determine_cors_settings_for_token(token) {
+        Some(settings) => Some(settings.as_native()),
+        None => None,
+    }
+}
+
+/// Exact behavior of the pinned native ReferrerPolicy conversion; invalid tokens
+/// become EmptyString. The standard's apply-attributes algorithm has a validity
+/// guard and preserves the old policy for invalid tokens.
+pub open spec fn native_referrer_policy_result(token: Seq<char>) -> ReferrerPolicy {
+    let token = ascii_lowercase(token);
+    if token == "no-referrer"@ { ReferrerPolicy::NoReferrer }
+    else if token == "no-referrer-when-downgrade"@ { ReferrerPolicy::NoReferrerWhenDowngrade }
+    else if token == "origin"@ { ReferrerPolicy::Origin }
+    else if token == "same-origin"@ { ReferrerPolicy::SameOrigin }
+    else if token == "origin-when-cross-origin"@ { ReferrerPolicy::OriginWhenCrossOrigin }
+    else if token == "unsafe-url"@ { ReferrerPolicy::UnsafeUrl }
+    else if token == "strict-origin"@ { ReferrerPolicy::StrictOrigin }
+    else if token == "strict-origin-when-cross-origin"@ { ReferrerPolicy::StrictOriginWhenCrossOrigin }
+    else { ReferrerPolicy::EmptyString }
+}
+
+/// TODO: Establish the representation bridge to the standard's extracted links,
+/// including relation splitting, parameter normalization, and attribute lookup.
+/// No correspondence with nom-rfc8288 is assumed by this declaration.
+// TRUSTED(scope): not verified yet; remove when native/standard parsed-header representation correspondence is verified
+pub(crate) uninterp spec fn parsed_link_headers_view(
+    link_headers: Seq<LinkHeader>,
+) -> Seq<SpecModel::ParsedLinkHeader>;
+
+/// WHATWG process-link-headers relation over an explicitly supplied execution trace.
+/// <https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers>
+/// This checks the caller algorithm. Its referenced algorithms keep their separate
+/// contracts; capturing an actual trace and proving the input views are follow-ups.
+pub(crate) open spec fn process_link_headers_ensures(
+    link_headers: &[LinkHeader],
+    document: SpecModel::LinkHeaderDocumentState,
+    phase: LinkProcessingPhase,
+    trace: SpecModel::ProcessLinkHeadersTrace,
+) -> bool {
+    SpecAlgorithms::headers::process_link_headers_ensures(
+        parsed_link_headers_view(link_headers@),
+        document,
+        match phase {
+            LinkProcessingPhase::Media => SpecModel::LinkHeadersPhase::Media,
+            LinkProcessingPhase::PreMedia => SpecModel::LinkHeadersPhase::PreMedia,
+        },
+        trace,
+    )
+}
+
+// ----------------------------------------
+// External Servo API predicates
+// ----------------------------------------
+
+// These uninterpreted relations are scaffolds for the assume_specification
+// declarations in servo_api. Defining their behavior will strengthen trusted
+// contracts and must be justified against the corresponding implementations.
+
+/// TODO: Relate the returned global to the node's current owner document/window.
+/// A result relation avoids asserting equality of separately allocated root wrappers.
+// TRUSTED(scope): not verified yet; remove when NodeTraits::owner_global result correspondence is verified
+pub(crate) uninterp spec fn node_owner_global_ensures<T: DerivedFrom<Node> + DomObject>(
+    node: &T,
+    result: &DomRoot<GlobalScope>,
+) -> bool;
+
+/// TODO: Relate the returned window to the document.
+// TRUSTED(scope): not verified yet; remove when Document::window result correspondence is verified
+pub(crate) uninterp spec fn document_window_ensures<'a>(
+    document: &'a Document,
+    result: &'a Window,
+) -> bool;
+
+/// TODO: Relate the returned identifier to the window's webview.
+// TRUSTED(scope): not verified yet; remove when Window::webview_id result correspondence is verified
+pub(crate) uninterp spec fn window_webview_id_ensures(
+    window: &Window,
+    result: WebViewId,
+) -> bool;
+
+/// TODO: Model the document's origin and the Ref borrow guard.
+// TRUSTED(scope): not verified yet; remove when Document::origin result correspondence is verified
+pub(crate) uninterp spec fn document_origin_ensures<'a>(
+    document: &'a Document,
+    result: &Ref<'a, MutableOrigin>,
+) -> bool;
+
+/// TODO: Relate the mutable-origin wrapper to its immutable component.
+// TRUSTED(scope): not verified yet; remove when MutableOrigin::immutable result correspondence is verified
+pub uninterp spec fn mutable_origin_immutable_ensures<'a>(
+    origin: &'a MutableOrigin,
+    result: &'a ImmutableOrigin,
+) -> bool;
+
+/// TODO: Model the document's policy container and the Ref borrow guard.
+// TRUSTED(scope): not verified yet; remove when Document::policy_container result correspondence is verified
+pub(crate) uninterp spec fn document_policy_container_ensures<'a>(
+    document: &'a Document,
+    result: &Ref<'a, Arc<PolicyContainer>>,
+) -> bool;
+
+/// TODO: Define the document base-URL selection algorithm.
+// TRUSTED(scope): not verified yet; remove when Document::base_url result correspondence is verified
+pub(crate) uninterp spec fn document_base_url_ensures(
+    document: &Document,
+    result: &ServoUrl,
+) -> bool;
+
+/// TODO: Model the request-client fields for the relevant global environment.
+// TRUSTED(scope): not verified yet; remove when GlobalScope::request_client result correspondence is verified
+pub(crate) uninterp spec fn global_scope_request_client_ensures(
+    global: &GlobalScope,
+    no_gc: Option<&NoGC>,
+    result: &RequestClient,
+) -> bool;
+
+/// TODO: Model the referrer selected from the global environment.
+// TRUSTED(scope): not verified yet; remove when GlobalScope::get_referrer result correspondence is verified
+pub(crate) uninterp spec fn global_scope_get_referrer_ensures(
+    global: &GlobalScope,
+    result: &Referrer,
+) -> bool;
+
+/// Obligation for a captured media query at this snapshot. This is deliberately
+/// not attached to the native getter until instrumentation binds the snapshot.
+// TRUSTED(scope): not verified yet; remove when MediaList::matches_environment result correspondence is verified
+pub(crate) uninterp spec fn media_list_matches_environment_ensures(
+    document: SpecModel::LinkHeaderDocumentState,
+    media_query: Seq<char>,
+    result: bool,
+) -> bool;
+
+/// Obligation for source-set construction at the supplied document snapshot.
+/// No timeless relation to the interior-mutable native Document is assumed.
+// TRUSTED(scope): not verified yet; remove when SourceSet::create_source_set result correspondence is verified
+pub uninterp spec fn source_set_create_source_set_ensures(
+    default_source: Seq<char>,
+    srcset: Seq<char>,
+    sizes: Seq<char>,
+    document: SpecModel::LinkHeaderDocumentState,
+    result: &SourceSet,
+) -> bool;
+
+} // verus!
