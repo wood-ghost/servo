@@ -4,5 +4,6 @@
 
 //! Temporary Verus support for checking link-processing options incrementally.
 
+pub(crate) mod processing;
 pub(crate) mod requires;
 mod servo_support;

@@ -9,6 +9,7 @@
 //! Replace these declarations as their owning modules gain Verus support.
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
+use content_security_policy::{PolicyDisposition, PolicySource};
 use net_traits::ReferrerPolicy;
 use net_traits::policy_container::PolicyContainer;
 use net_traits::request::{CorsSettings, Destination, Referrer, RequestClient};
@@ -60,12 +61,19 @@ pub assume_specification[ <Destination as PartialEq<Destination>>::eq ](
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::CorsSettings is verified
 #[verifier::external_type_specification]
-#[verifier::external_body]
 pub struct ExCorsSettings(CorsSettings);
 
 // TRUSTED(scope): not verified yet; remove when net_traits::ReferrerPolicy is verified
 #[verifier::external_type_specification]
 pub struct ExReferrerPolicy(ReferrerPolicy);
+
+// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
+#[verifier::external_type_specification]
+pub struct ExPolicyDisposition(PolicyDisposition);
+
+// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
+#[verifier::external_type_specification]
+pub struct ExPolicySource(PolicySource);
 
 // TRUSTED(scope): not verified yet; remove when net_traits::policy_container is verified
 #[verifier::external_type_specification]
