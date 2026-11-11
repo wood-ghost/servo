@@ -25,6 +25,9 @@ use servo_url::{ImmutableOrigin, ServoUrl};
 use strum::IntoStaticStr;
 use vstd::prelude::*;
 
+#[cfg(verus_only)]
+use super::processingoptions_specs::requires as SpecRequires;
+
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
 use crate::dom::document::Document;
@@ -69,8 +72,7 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
-// TRUSTED(scope): not verified yet; remove when LinkProcessingOptions's field types are modeled
-#[verifier::external]
+// Field types needed by the contracts are declared in processingoptions_specs::servo_support.
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -242,9 +244,11 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
-    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::type_matches_destination is verified
-    #[verifier::external]
-    pub(crate) fn type_matches_destination(&self) -> bool {
+    pub(crate) fn type_matches_destination(&self) -> (result: bool)
+        requires
+            // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
+            SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+    {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
             return true;
