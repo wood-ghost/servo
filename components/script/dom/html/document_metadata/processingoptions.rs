@@ -23,6 +23,7 @@ use nom_rfc8288::complete::link_lenient as parse_link_header;
 use servo_base::id::WebViewId;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use strum::IntoStaticStr;
+use vstd::prelude::*;
 
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
@@ -39,11 +40,18 @@ use crate::fetch::network_listener::{
 };
 use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
+verus! {
+
+// Setup-only: external items are excluded from verification. Enable individual
+// functions and introduce their type models and contracts in subsequent steps.
+
 trait ValueForKeyInLinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool;
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str>;
 }
 
+// TRUSTED(scope): not verified yet; remove when ValueForKeyInLinkHeader's implementation is verified
+#[verifier::external]
 impl ValueForKeyInLinkHeader for LinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool {
         self.params.iter().any(|p| p.key == key)
@@ -61,6 +69,8 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
+// TRUSTED(scope): not verified yet; remove when LinkProcessingOptions's field types are modeled
+#[verifier::external]
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -98,6 +108,8 @@ pub(crate) struct LinkProcessingOptions {
 
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::apply_link_options_from_parsed_header is verified
+    #[verifier::external]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -149,6 +161,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::process_link_header is verified
+    #[verifier::external]
     fn process_link_header(self, rel: &str, document: &Document) {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -162,6 +176,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#translate-a-preload-destination>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::translate_a_preload_destination is verified
+    #[verifier::external]
     pub(crate) fn translate_a_preload_destination(
         potential_destination: &str,
     ) -> Option<Destination> {
@@ -180,6 +196,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-link-request>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::create_link_request is verified
+    #[verifier::external]
     pub(crate) fn create_link_request(
         self,
         webview_id: WebViewId,
@@ -224,6 +242,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::type_matches_destination is verified
+    #[verifier::external]
     pub(crate) fn type_matches_destination(&self) -> bool {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
@@ -275,6 +295,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
+    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::preload is verified
+    #[verifier::external]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
@@ -330,6 +352,8 @@ impl LinkProcessingOptions {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when determine_cors_settings_for_token is verified
+#[verifier::external]
 pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSettings> {
     match_ignore_ascii_case! { token,
         "anonymous" => Some(CorsSettings::Anonymous),
@@ -339,6 +363,8 @@ pub(crate) fn determine_cors_settings_for_token(token: &str) -> Option<CorsSetti
 }
 
 /// <https://html.spec.whatwg.org/multipage/#extract-links-from-headers>
+// TRUSTED(scope): not verified yet; remove when extract_links_from_headers is verified
+#[verifier::external]
 pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> Vec<LinkHeader> {
     // Step 1. Let links be a new list.
     let mut links = Vec::new();
@@ -369,6 +395,8 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 }
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
+// TRUSTED(scope): not verified yet; remove when process_link_headers is verified
+#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -446,6 +474,8 @@ pub(crate) fn process_link_headers(
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContextType is verified
+#[verifier::external]
 #[derive(Clone, IntoStaticStr)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum LinkFetchContextType {
@@ -453,6 +483,8 @@ pub(crate) enum LinkFetchContextType {
     Preload,
 }
 
+// TRUSTED(scope): not verified yet; remove when InitiatorType::from is verified
+#[verifier::external]
 impl From<LinkFetchContextType> for InitiatorType {
     fn from(other: LinkFetchContextType) -> Self {
         let name: &'static str = other.into();
@@ -460,6 +492,8 @@ impl From<LinkFetchContextType> for InitiatorType {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext is verified
+#[verifier::external]
 pub(crate) struct LinkFetchContext {
     /// The `<link>` element (if any) that caused this fetch
     pub(crate) link: Option<Trusted<HTMLLinkElement>>,
@@ -473,6 +507,8 @@ pub(crate) struct LinkFetchContext {
     pub(crate) response_body: BytesMut,
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext's FetchResponseListener implementation is verified
+#[verifier::external]
 impl FetchResponseListener for LinkFetchContext {
     fn process_request_body(&mut self, _: &GlobalScope, _: RequestId) {}
 
@@ -538,8 +574,12 @@ impl FetchResponseListener for LinkFetchContext {
     }
 }
 
+// TRUSTED(scope): not verified yet; remove when LinkFetchContext::resource_timing_information is verified
+#[verifier::external]
 impl ResourceTimingListener for LinkFetchContext {
     fn resource_timing_information(&self) -> (InitiatorType, ServoUrl) {
         (self.type_.clone().into(), self.url.clone())
     }
 }
+
+} // verus!
