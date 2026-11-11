@@ -151,7 +151,11 @@ pub assume_specification<'a> [Mime::params](mt: &'a Mime) -> (result: Params<'a>
         parameter_entries_well_formed(mt),
         result.obeys_prophetic_iter_laws(),
         result.remaining() == parameter_entries(mt),
-        result.will_return_none(),
+        // vstd dea854413 / PR #3330 replaced will_return_none with per-item
+        // production flags. All entries are produced. Exhaustion additionally
+        // uses finite remaining(), obeys_prophetic_iter_laws(), and next's rule:
+        // each Some drops one entry; empty remaining returns None and stays empty.
+        result.produces() == Seq::new(parameter_entries(mt).len(), |i: int| true),
         result.decrease() == Some(parameter_entries(mt).len()),
 ;
 
