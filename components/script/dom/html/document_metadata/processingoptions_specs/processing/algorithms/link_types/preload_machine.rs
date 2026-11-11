@@ -18,8 +18,8 @@ use super::super::request;
 use super::preload::{type_matches_destination, create_preload_key, preload_computation};
 
 verus! {
-pub closed spec fn type_matches<M: LinkProcessingModel>(model: M, options: LinkProcessingOptionsView) -> bool {
-    type_matches_destination(model, options.type_, options.destination)
+pub closed spec fn type_matches(options: LinkProcessingOptionsView) -> bool {
+    type_matches_destination(options.type_, options.destination)
 }
 pub closed spec fn image_with_source_set(options: LinkProcessingOptionsView) -> bool {
     options.destination.as_native() == NativeDestination::Image && options.source_set is Some
@@ -117,7 +117,7 @@ state_machine! {
         transition! {
             step1() {
                 require(pre.state == PreloadState::Step1);
-                if !type_matches(pre.model, pre.options) {
+                if !type_matches(pre.options) {
                     update state = PreloadState::Final;
                     update outcome = PreloadOutcome::TypeMismatch;
                 } else { update state = PreloadState::Step2; }
@@ -242,7 +242,7 @@ state_machine! {
 verus! {
 pub(crate) open spec fn preload_requires<M: LinkProcessingModel>(model: M, options: LinkProcessingOptionsView) -> bool {
     // INHERITED from create-a-link-request Step 1 on the path reaching that call.
-    type_matches_destination(model, options.type_, options.destination) ==> {
+    type_matches_destination(options.type_, options.destination) ==> {
         let selected_href = if options.destination.as_native() == NativeDestination::Image {
             match options.source_set {
                 Some(source_set) => model.select_image_source(source_set), None => options.href,

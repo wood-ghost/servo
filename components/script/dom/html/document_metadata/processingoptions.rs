@@ -56,7 +56,6 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 verus! {
 
 broadcast use {
-    super::processingoptions_specs::processing::algorithms::link_types::match_preload_type::runner_finishes,
     super::processingoptions_specs::processing::algorithms::apply_attributes::attribute_result,
 };
 
@@ -316,8 +315,6 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
-    // Checked against the seven-step machine under the explicit correspondence
-    // requirements below; the executable body is unchanged.
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
             // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
@@ -325,7 +322,11 @@ impl LinkProcessingOptions {
             // IMPLICIT: parser/UA/category/CSS differences are itemized with witnesses in type_matches_standard_requires.
             SpecRequires::type_matches_standard_requires(self.link_type@, self.destination),
         ensures
-            result == Spec::type_matches_destination_result(self),
+            result == Spec::processing::algorithms::link_types::preload::type_matches_destination(
+                // Spec::servo_api::views::StandardModel,
+                self.link_type@,
+                Spec::servo_api::views::destination_view(self.destination),
+            ),
     {
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {

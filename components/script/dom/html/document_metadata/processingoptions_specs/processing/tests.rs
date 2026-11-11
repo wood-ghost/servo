@@ -9,6 +9,7 @@
 use std::sync::Arc;
 use net_traits::ReferrerPolicy as NativeReferrerPolicy;
 use net_traits::request::{CorsSettings as NativeCorsSettings, Destination as NativeDestination};
+use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
 use vstd::prelude::*;
 use super::model::*;
 use super::types::*;
@@ -22,7 +23,10 @@ use super::super::servo_api::views as SpecViews;
 verus! {
 
 broadcast use {
-    super::algorithms::link_types::match_preload_type::runner_finishes,
+    super::types::lemma_destination_name_valid,
+    super::algorithms::destination::translation_has_destination_type,
+    SpecMime::mime_parse_lemmas,
+    SpecMime::parse_mime_type_properties,
     super::algorithms::request::request_result,
     super::algorithms::potential_cors::potential_cors_result,
     super::algorithms::apply_attributes::attribute_result,
@@ -33,13 +37,11 @@ broadcast use {
 };
 
 pub(crate) struct Fixture {
-    pub mime: Option<int>,
-    pub supported: bool,
     pub url: Option<ServoUrlView>,
 }
 
 impl LinkProcessingModel for Fixture {
-    type Mime = int;
+    type Mime = SpecMime::MimeView;
     open spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>> {
         headers.map_values(|header: (Seq<char>, Seq<char>)| header.1)
     }
@@ -54,14 +56,12 @@ impl LinkProcessingModel for Fixture {
             })]
         } else { seq![Some(link(value, attributes()))] }
     }
-    open spec fn parse_mime_type(&self, value: Seq<char>) -> Option<int> { self.mime }
-    open spec fn mime_supported(&self, mime: int) -> bool { self.supported }
-    open spec fn is_javascript_mime(&self, mime: int) -> bool { mime == 1 }
-    open spec fn is_image_mime(&self, mime: int) -> bool { mime == 2 }
-    open spec fn is_font_mime(&self, mime: int) -> bool { mime == 3 }
-    open spec fn mime_essence(&self, mime: int) -> Seq<char> {
-        if mime == 0 { "text/css"@ } else if mime == 4 { "text/vtt"@ } else { "other/type"@ }
-    }
+    open spec fn parse_mime_type(&self, value: Seq<char>) -> Option<SpecMime::MimeView> { SpecMime::parse_mime_type(value) }
+    open spec fn mime_supported(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_supported_by_user_agent(&mime) }
+    open spec fn is_javascript_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_javascript_view(&mime) }
+    open spec fn is_image_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_image_view(&mime) }
+    open spec fn is_font_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_font_view(&mime) }
+    open spec fn mime_essence(&self, mime: SpecMime::MimeView) -> Seq<char> { SpecMime::essence_str_view(&mime) }
     open spec fn encoding_parse_url(&self, href: Seq<char>, base_url: ServoUrlView) -> Option<ServoUrlView> { self.url }
     open spec fn new_request(&self) -> RequestView {
         RequestView {
@@ -90,7 +90,7 @@ impl LinkProcessingModel for Fixture {
 }
 
 pub(crate) open spec fn fixture() -> Fixture {
-    Fixture { mime: Some(0int), supported: true, url: Some(fixture_url(7)) }
+    Fixture { url: Some(fixture_url(7)) }
 }
 
 pub(crate) open spec fn fixture_url(port: u16) -> ServoUrlView {
@@ -187,10 +187,12 @@ pub(crate) open spec fn dispatch(index: nat, link: ParsedLinkHeader, state: Link
 }
 
 proof fn destination_type_domain(destination: DestinationView) {
+    hide(DestinationView::as_str);
     let empty = DestinationView::from_native(NativeDestination::None);
     let script = DestinationView::from_native(NativeDestination::Script);
     assert(destination.well_formed());
     assert(destination_types().contains(destination.as_str()));
+    reveal(DestinationView::as_str);
     assert(empty.as_str() == ""@);
     assert(script.as_str() == "script"@);
     assert(!destination_types().contains("fetch"@));
@@ -394,7 +396,17 @@ proof fn fetch_priority_definition_and_defaults()
     assert(options::fetch_priority_keyword_state("bad"@) is None);
 }
 
-proof fn destination_translation() {
+proof fn destination_translation(potential_destination: Seq<char>)
+    requires super::algorithms::destination::is_potential_destination(potential_destination),
+{
+    hide(super::algorithms::destination::translate_a_potential_destination);
+    assert(super::algorithms::destination::is_destination(
+        super::algorithms::destination::translate_a_potential_destination(potential_destination)));
+    reveal(super::algorithms::destination::translate_a_potential_destination);
+    assert(!super::algorithms::destination::is_potential_destination(""@));
+    assert(super::algorithms::destination::is_potential_destination("fetch"@));
+    assert(super::algorithms::destination::is_destination(""@));
+    assert(!super::algorithms::destination::is_destination("fetch"@));
     let fetch = DestinationView::from_native(NativeDestination::None);
     let font = DestinationView::from_native(NativeDestination::Font);
     let image = DestinationView::from_native(NativeDestination::Image);
@@ -512,18 +524,43 @@ proof fn matching_type_order_and_essence() {
     let style = DestinationView::from_native(NativeDestination::Style);
     let fetch = DestinationView::from_native(NativeDestination::None);
     let script = DestinationView::from_native(NativeDestination::Script);
-    let unavailable = Fixture { mime: None, supported: false, ..fixture() };
-    assert(link_types::preload::type_matches_destination(unavailable, ""@, style));
-    assert(link_types::preload::type_matches_destination(unavailable, "invalid"@, fetch));
-    assert(!link_types::preload::type_matches_destination(unavailable, "invalid"@, script));
-    let unsupported = Fixture { supported: false, ..fixture() };
-    assert(!link_types::preload::type_matches_destination(unsupported, "text/css"@, style));
-    // The fixture supplies a successfully parsed CSS record. Parameters do not
-    // change its essence, and full-record equality with TEXT_CSS is not required.
-    assert(link_types::preload::type_matches_destination(fixture(), "text/css; charset=utf-8"@, style));
-    assert(!link_types::preload::type_matches_destination(fixture(), "text/css"@, script));
-    let javascript = Fixture { mime: Some(1int), ..fixture() };
-    assert(link_types::preload::type_matches_destination(javascript, "text/javascript"@, script));
+    assert(link_types::preload::type_matches_destination(""@, style));
+    assert(link_types::preload::type_matches_destination("invalid"@, fetch));
+    slash_mime_parse_fails();
+    assert(!link_types::preload::type_matches_destination("/"@, script));
+
+    let css = SpecMime::parse_mime_type("text/css"@);
+    assert(css is Some);
+    assert(SpecMime::essence_str_view(&css->Some_0) == "text/css"@);
+    assert(link_types::preload::type_matches_destination("text/css"@, style)
+        == SpecMimePredicates::is_supported_by_user_agent(&css->Some_0));
+    assert(!link_types::preload::type_matches_destination("text/css"@, script));
+}
+
+proof fn matching_parameterized_css_essence() {
+    let style = DestinationView::from_native(NativeDestination::Style);
+    // Parse the parameterized input through the actual parser specification.
+    // UA support remains explicit; the category test depends on CSS essence.
+    SpecMime::mime_parse_unquoted_header("text/css; charset=utf-8"@, 4, 8);
+    let parameterized_css = SpecMime::parse_mime_type("text/css; charset=utf-8"@);
+    assert(parameterized_css is Some);
+    assert(SpecMime::essence_str_view(&parameterized_css->Some_0) == "text/css"@);
+    assert(link_types::preload::type_matches_destination("text/css; charset=utf-8"@, style)
+        == SpecMimePredicates::is_supported_by_user_agent(&parameterized_css->Some_0));
+}
+
+proof fn matching_javascript_type() {
+    let script = DestinationView::from_native(NativeDestination::Script);
+    let javascript = SpecMime::parse_mime_type("text/javascript"@);
+    assert(javascript is Some);
+    assert(link_types::preload::type_matches_destination("text/javascript"@, script)
+        == SpecMimePredicates::is_supported_by_user_agent(&javascript->Some_0));
+}
+
+proof fn slash_mime_parse_fails()
+    ensures SpecMime::parse_mime_type("/"@) is None,
+{
+    SpecMime::mime_parse_empty_type_fails("/"@);
 }
 
 proof fn potential_cors_request_modes() {
@@ -559,9 +596,10 @@ proof fn link_request_failure_and_fields(policy_container: Arc<PolicyContainerVi
 
 proof fn preload_branches_and_commit_timing() {
     let invalid_type = LinkProcessingOptionsView {
-        type_: "invalid"@, destination: DestinationView::from_native(NativeDestination::Script), ..initial()
+        type_: "/"@, destination: DestinationView::from_native(NativeDestination::Script), ..initial()
     };
-    assert(link_types::preload::preload(Fixture { mime: None, ..fixture() }, invalid_type, None) is TypeMismatch);
+    slash_mime_parse_fails();
+    assert(link_types::preload::preload(fixture(), invalid_type, None) is TypeMismatch);
     assert(link_types::preload::preload(Fixture { url: None, ..fixture() }, initial(), None) is RequestFailure);
     let normal = link_types::preload::preload(fixture(), initial(), None);
     assert(normal is Fetch);
@@ -587,8 +625,7 @@ proof fn image_source_selection_and_preload_key() {
     let options = LinkProcessingOptionsView { destination: image, source_set: Some(fixture_source_set(8)), ..initial() };
     assert(options.type_ =~= ""@);
     assert(image.as_str() == "image"@);
-    link_types::match_preload_type::runner_finishes(fixture(), options.type_, "image"@);
-    assert(link_types::preload::type_matches_destination(fixture(), options.type_, image));
+    assert(link_types::preload::type_matches_destination(options.type_, image));
     let plan = link_types::preload::preload(fixture(), options, None);
     assert(plan is Fetch);
     assert(plan->Fetch_options.href == "selected.png"@);

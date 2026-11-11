@@ -1617,3 +1617,71 @@ Trust lint remains **80 files / 278 boundaries / 0 missing labels**; no label or
 specification formula changed. Cargo.lock stayed byte-for-byte unchanged. The
 Cargo check alternative was used; no full `mach build`, WPT run or new library
 correctness claim is made. Self-check 1/9–11 yes; normative-layout checks unchanged.
+
+## Direct type matching and destination facts (2026-11-10)
+
+The user's later instructions replace the type-matching adapter with a direct
+steps-1–7 spec, preserve the supplied comment text, and remove its model parameter.
+The native ensures now calls that spec directly; the old result wrapper is removed.
+Step 2 compares the destination name with Fetch's separate translation of `"fetch"`.
+The translation now recommends the actual potential-destination domain, excluding
+the empty string as an input while permitting it as the translated result.
+
+`lemma_destination_name_valid` and `translation_has_destination_type` are proved
+broadcast lemmas with triggers on `d.as_str()` and the translation call respectively.
+Both empty bodies pass without per-variant assertions, extra fuel or increased
+limits. Preload and regression modules import the broadcasts. Existing regressions
+hide the relevant definitions to check automatic use of the facts. No manual
+destination-lemma calls were present to remove. DestinationView's type invariant
+is retained because the existing tracked-value regression constructs it and calls
+`use_type_invariant`; arbitrary spec-mode values use the separate proved fact.
+No ensures was added to native external-body destination translation.
+
+MIME parsing now calls a record/failure projection of the existing parser runner,
+not an uninterpreted model method. Its result theorem excludes nonterminal states.
+Record-level image/JavaScript/font predicates share their definitions with the
+existing native-value predicates. Native parser result correspondence is obtained
+from the existing trusted FromStr contract, so the additional free-parser agreement
+premise is removed. UA support is a separately labelled predicate; support/category
+agreement and the CSS restriction remain conditional obligations. The existing
+parser model's documented Rust/WHATWG differences, especially quoted values, are
+not resolved by this integration.
+
+Actual parser regression proofs replace configurable fake MIME results. Shared
+parser lemmas prove empty-type failure and successful header preservation through
+unquoted-parameter processing. The CSS-with-charset regression proves its parse
+outcome from syntax rather than assuming it. Successful CSS/JavaScript matching is
+related to the explicit UA-support predicate rather than asserting decoder support.
+The older generic matching machine remains checked separately, but is no longer
+called by the active spec or its native proof/regressions.
+
+Proof engineering: generated parser `take_step`/`next` helpers were not callable
+across the crate boundary, so transition reasoning stays in proved parser-owned
+lemmas. Native JavaScript/font checks initially failed after their predicates lost
+the `essence_str(mt)` term that triggers existing decomposition lemmas. Shared
+essence-list helpers retain that term for native values and also accept record
+essences, restoring the proofs without changing the tables. The combined concrete
+type-matching regression exceeded the default solver budget; separating the
+independent cases resolved it without increasing any resource limit.
+
+A minimal check confirmed `spec functions cannot have requires/ensures` in the
+installed verifier. `when_used_as_spec` was also inspected: it needs matching
+parameter and result types. Native `FromStr` returns `Result<Mime, FromStrError>`
+from `&str`, unlike the record-level `Seq<char> -> Option<MimeView>` projection.
+No native autospec binding or new native-result assumption was introduced.
+
+Checks: `bash verus_cmd.sh verify` completed with **91 script verified, 0 errors**.
+The unchanged net-traits sources were freshly checked at **210 verified, 0 errors**
+in the preceding full run and reused by the final script rebuild. The command is
+the full recorded cargo-verus command with `--compile --no-lifetime
+--no-trait-conflicts --expand-errors --multiple-errors 20`. `bash verus_cmd.sh native`
+**passed** (6.47s); Cargo.lock and native executable statements are unchanged.
+Trust lint: **80 files, 276 boundary items, 0 missing labels**; 119 external-lib,
+162 scope, 2 Verus gaps, 3 rewrites. Three formerly uninterpreted StandardModel
+methods became defined; one labelled UA-support predicate replaces that method's
+boundary. Self-check: native meaning/result obligations retained, standard ordering
+visible, comment text preserved, assumptions explicit, no solver-limit increase.
+
+Per the user's final publication instruction, these changes are a **new commit**
+above `c81886f107b`, preserved on a backup branch before resetting `mime_classifier`
+to `0ad88c2b74641a1ae675caea3d98858d19180ff9` and updating its remote branch.

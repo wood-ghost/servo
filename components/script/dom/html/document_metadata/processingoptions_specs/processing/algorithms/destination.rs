@@ -10,10 +10,15 @@ use super::super::types::destination_types;
 
 verus! {
 
+// https://fetch.spec.whatwg.org/#destination-type
+pub(crate) open spec fn is_destination(value: Seq<char>) -> bool {
+    destination_types().contains(value)
+}
+
 // https://fetch.spec.whatwg.org/#concept-potential-destination
 // A potential destination is "fetch" or a destination which is not the empty string.
 pub(crate) open spec fn is_potential_destination(potential_destination: Seq<char>) -> bool {
-    potential_destination == "fetch"@ || (destination_types().contains(potential_destination) && potential_destination != ""@)
+    potential_destination == "fetch"@ || (is_destination(potential_destination) && potential_destination != ""@)
 }
 
 // https://fetch.spec.whatwg.org/#concept-potential-destination-translate
@@ -22,23 +27,21 @@ pub(crate) open spec fn is_potential_destination(potential_destination: Seq<char
 // The intervening Assert is exported as a domain obligation under rule 6.3;
 // it is neither a failure branch nor a conjunct of the result.
 pub(crate) open spec fn translate_a_potential_destination(potential_destination: Seq<char>) -> Seq<char>
-    // 2. Assert: potentialDestination is a destination.
-    recommends potential_destination == "fetch"@ || destination_types().contains(potential_destination),
+    recommends is_potential_destination(potential_destination),
 {
     // 1. If potentialDestination is "fetch", then return the empty string.
     if potential_destination == "fetch"@ {
-        Seq::empty()
+        ""@
     } else {
         // 3. Return potentialDestination.
         potential_destination
     }
 }
 
-pub(crate) proof fn translation_has_destination_type(potential_destination: Seq<char>)
+pub(crate) broadcast proof fn translation_has_destination_type(potential_destination: Seq<char>)
     requires is_potential_destination(potential_destination),
-    ensures destination_types().contains(translate_a_potential_destination(potential_destination)),
-{
-    assert(Seq::<char>::empty() =~= ""@);
-}
+    ensures
+        destination_types().contains(#[trigger] translate_a_potential_destination(potential_destination)),
+{}
 
 } // verus!

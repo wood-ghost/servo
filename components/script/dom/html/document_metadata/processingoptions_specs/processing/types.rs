@@ -76,6 +76,9 @@ impl DestinationView {
         match native { Some(value) => Some(Self::from_native(value)), None => None }
     }
 
+    // Retained for the tracked constructor/use_type_invariant regression in
+    // processing/tests.rs::domain_type_invariants_apply_to_tracked_values.
+    // Spec-mode clients obtain this fact from lemma_destination_name_valid.
     #[verifier::type_invariant]
     pub(crate) open spec fn well_formed(&self) -> bool {
         destination_types().contains(self.as_str())
@@ -114,10 +117,10 @@ pub open spec fn destination_types() -> Set<Seq<char>> {
 }
 
 /// Also establishes the domain for arbitrary spec-mode values.
-// pub(crate) proof fn lemma_destination_name_valid(destination: DestinationView)
-//     ensures
-//         destination.well_formed(),
-// {}
+pub(crate) broadcast proof fn lemma_destination_name_valid(d: DestinationView)
+    ensures
+        destination_types().contains(#[trigger] d.as_str()),
+{}
 
 pub(crate) proof fn destination_from_name_roundtrip(destination: DestinationView)
     ensures DestinationView::from_name(destination.as_str()) == Some(destination),

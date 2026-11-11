@@ -1,8 +1,8 @@
 # Current link-processing verification scope
 
-**Revalidated 2026-11-10 — `wood-ghost/servo`, branch `mime_classifier`**
+**Working-tree status 2026-11-10 — `wood-ghost/servo`, branch `mime_classifier`**
 
-Reviewed squash: `073ff48555e`. Its parent is `0ad88c2b746`; the original task and
+Reviewed squash: `c81886f107b`. Its parent is `0ad88c2b746`; the original task and
 review checkpoints mentioned in the historical log were combined into this commit.
 The earlier clean-source validation was at the pre-squash **`cd1f1134795`**.
 The per-task commands, results, step tables, self-checks, witnesses and corrections
@@ -14,13 +14,86 @@ not prove that a formal specification equals the standard's prose.
 
 | Check | Result |
 | --- | --- |
-| Fresh script-crate focused verification | **87 verified, 0 errors** |
-| Fresh net-traits focused verification | **206 verified, 0 errors** |
-| Native Rust 1.97.1 script check, locked/offline | **Passed** |
-| Plain `cargo check -p servo-script --locked`, without `--config` | **Passed after source preparation; Cargo.lock unchanged** |
-| Local/transitive trust-label lint | **80 Rust files; 278 labelled boundary items; 0 missing labels** |
+| Current script verification via `bash verus_cmd.sh verify` | **91 verified, 0 errors** |
+| Last fresh net-traits verification of these changes | **210 verified, 0 errors** (reused by the final script-only rebuild) |
+| Current `bash verus_cmd.sh native`, Rust 1.97.1, locked/offline | **Passed** |
+| Earlier plain `cargo check -p servo-script --locked`, without `--config` | **Passed after source preparation; Cargo.lock unchanged** |
+| Local/transitive trust-label lint | **80 Rust files; 276 labelled boundary items; 0 missing labels** |
 | Temporary rewrite inventory | **3 let chains, each with original code retained** |
 | Focused MIME iterator/CSS regressions (preceding review) | **4 passed, 0 failed** (including one expected-failure Verus control) |
+
+### Destination broadcast facts — current working changes
+
+- Retained `DestinationView::well_formed`'s type-invariant attribute under the
+  requested tracked-construction exception. The existing
+  `processing/tests.rs::domain_type_invariants_apply_to_tracked_values` accepts a
+  tracked DestinationView, constructs `let tracked empty_destination =
+  DestinationView { value: NativeDestination::None }`, and calls
+  `use_type_invariant` on both. This is a proof regression, not a browser-runtime
+  constructor. Arbitrary spec-mode values still need an independent domain fact.
+- Enabled `lemma_destination_name_valid` as a broadcast proof with the requested
+  `d.as_str()` trigger and `destination_types().contains(d.as_str())` conclusion.
+  Restored `translation_has_destination_type` as a broadcast proof requiring
+  `is_potential_destination(pd)` and triggering on
+  `translate_a_potential_destination(pd)`.
+- Translation now recommends `is_potential_destination(pd)`: the empty string
+  is a destination type but is excluded from the recommended input domain;
+  `"fetch"` is a potential destination and translates to the empty string.
+- Added both broadcasts to `processing/algorithms/link_types/preload.rs` and
+  `processing/tests.rs`. The existing domain/translation regression proofs hide
+  the relevant definitions while checking the broadcast consequences, then reveal
+  them for their concrete cases. No explicit calls to these destination lemmas
+  remained to remove; `preload_translation_meets_linked_domain` already had an
+  empty body. Native `translate_a_preload_destination` received no new contract.
+- Both broadcast lemmas **verify with empty bodies**, and the hidden-definition
+  regression checks pass. No per-variant assertions, extra fuel or resource-limit
+  changes were needed for these facts. Native `translate_a_preload_destination`
+  still has its original trusted contract, with no added result assumption.
+
+### Direct MIME parsing in type matching
+
+`type_matches_destination(type_, destination)` now directly expresses the seven
+ordered steps and calls `mime_api::parse_mime_type`. It has no model parameter,
+does not call the old matching-machine runner, and compares the destination with
+`translate_a_potential_destination("fetch")` instead of checking the native None
+variant. The supplied step-comment text and the native executable body are kept.
+The older matching machine remains a separately checked reference artifact; its
+broadcast/manual uses in the active native proof and regressions were removed.
+
+`parse_mime_type` is a record/failure projection of the existing
+`mime_parse_final_state` run. A new theorem proves that None corresponds to its
+Failure state, not an unfinished run. Existing image, JavaScript and font
+predicates now expose record-level forms, sharing their definitions with native
+Mime predicates. Native parsing correspondence follows the **existing trusted
+FromStr contract**; the extra uninterpreted `StandardModel.parse_mime_type`
+agreement premise is removed. UA support remains an explicitly labelled
+`is_supported_by_user_agent(&MimeView)` predicate and a native correspondence
+premise. Legacy generic model methods delegate to these same direct operations.
+
+This does not certify the parser model as a complete WHATWG parser. Its documented
+Rust/WHATWG differences, notably quoted parameters, remain. The new parser proofs
+establish termination/result projection, empty-type failure, and preservation of
+the normalized header during unquoted-parameter processing, not external-library
+or general standards correspondence.
+
+Regressions now use actual parser-spec results instead of configurable fake MIME
+results. They cover early returns, malformed input, plain/parameterized CSS and
+JavaScript, with successful matching related explicitly to the UA-support
+predicate. The parameterized CSS case proves success and essence from input
+syntax alone. Its initial combined regression exceeded the default solver budget;
+splitting independent cases resolved that without increasing the limit. Factoring
+native MIME predicates initially hid the `essence_str(mt)` trigger used by existing
+lemmas; shared essence-list helpers now preserve that trigger as well as record
+entry points. No executable predicate or assumed contract was changed for this.
+
+Final checks: `bash verus_cmd.sh verify` reports **91 script verified, 0 errors**;
+the unchanged net-traits sources were freshly verified at **210/0** in the preceding
+run. `bash verus_cmd.sh native` **passed** (6.47s). Trust lint and `git diff --check`
+passed; Cargo.lock is unchanged. The earlier unresolved-model and private
+generated-transition-helper errors are resolved using direct operations and proved
+parser lemmas in the owning crate.
+
+### Earlier successful checks
 
 Both package results and both native checks were re-run on **2026-11-10** after
 review of `073ff48`, using root patches to the recorded `.verus-source` snapshot
@@ -55,8 +128,9 @@ the header loop are excluded, and servoparser's HTTP ingress is unverified.
 Network/DOM input is not asserted to satisfy them. The type-matching proof checks
 composition of the seven-step control flow, not independent component agreement.
 
-- `type_matches_destination`: inherited MIME requirements plus parser/UA/category
-  correspondence, preload-destination domain and CSS essence/full-record agreement.
+- `type_matches_destination`: inherited MIME library requirements and its trusted
+  parsing contract, plus UA/category correspondence, preload-destination domain
+  and CSS essence/full-record agreement.
 - `apply_link_options_from_parsed_header`: invalid CORS/referrer resets must preserve
   the old state, and recognized fetch priority must be representable as Auto.
   A finite-map lookup theorem supplies the native/attribute-map bridge. This
@@ -121,7 +195,7 @@ HTML snapshots below were inspected **2026-10-30**. Fetch/URL use the recorded
 
 | Standard algorithm | Form and correspondence |
 | --- | --- |
-| [Type matches preload destination](https://html.spec.whatwg.org/multipage/links.html#match-preload-type) | 7 transitions; MIME temporary carried across steps |
+| [Type matches preload destination](https://html.spec.whatwg.org/multipage/links.html#match-preload-type) | Direct ordered specification, steps 1–7; direct MIME parser/predicate calls |
 | [Apply parsed attributes](https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes) | Separate 1, 1.1–1.4, 2–8 transitions; updates and nested returns |
 | [Create link request](https://html.spec.whatwg.org/multipage/semantics.html#create-a-link-request) | 11 transitions; assertion guard and individual field updates |
 | [Potential-CORS request](https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request) | 5 transitions; mode/credentials updates |
@@ -139,7 +213,9 @@ HTML snapshots below were inspected **2026-10-30**. Fetch/URL use the recorded
 | [Same origin-domain](https://html.spec.whatwg.org/multipage/browsers.html#same-origin-domain) | Separate parent/substep transitions; preserves nested returns |
 | [URL equality](https://url.spec.whatwg.org/#concept-url-equals) | 3 transitions; serialization remains a labelled linked primitive |
 
-The approved form rule includes a once-assigned temporary carried between steps.
+For type matching, the user's later instruction selects a direct specification
+with an immutable MIME temporary, superseding the earlier once-assigned-temporary
+state-machine rule for this algorithm.
 One textual-order qualification remains explicit: Fetch translation's Assert is
 written in its entry recommendation, as allowed by the assertion-to-contract
 rule, while return branches retain order. Older transitive MIME algorithms were
@@ -154,15 +230,16 @@ documented rather than certified by the label lint.
 | --- | --- |
 | Preload destinations only | Theorem-domain restriction; excluded example: Audio with `audio/mpeg` |
 | CSS full-record comparison agrees with essence | Input restriction; `text/css; charset=utf-8` violates it, reproduced with the native classifier and mime crate |
-| Native/standard MIME parse results | Model-agreement assumption; standard-side parser is uninterpreted, no independent correspondence established |
+| Native/model MIME parse results | Derived from the existing trusted FromStr contract and parser-result projection; external-library and full WHATWG correspondence remain unproved |
 | Native recognition equals UA support | Model-agreement assumption; actual decoder support unmodeled. An unrecognized but supported type is ruled out by the premise rather than discovered |
 | JS/image category agreement | Agreement premise against the defined MIME predicates; no mismatch witness found here |
-| Font category agreement | Model-agreement assumption; standard-side font primitive remains uninterpreted |
+| Font category agreement | Agreement premise against the defined record-level MIME predicate |
 
-The uninterpreted functions are not independently defined to match a concrete
-standard/decoder implementation. The theorem *assumes* those equalities; a model
-can satisfy them by following native classification. They therefore supply no
-evidence that classification adequately represents actual UA support. The separate
+The UA-support predicate is not independently defined by a decoder implementation.
+The theorem assumes its agreement with native recognition, so it supplies no
+evidence that recognition adequately represents actual UA support. Parsing and
+font-category results are now defined rather than free primitive choices, but
+their library/standard correspondence must still be assessed separately. The
 inherited MIME library requirements are obligations too, not web-input validation.
 
 Requirements are labelled `IMPLICIT` or `INHERITED` and stop at HTTP/DOM inputs:
@@ -207,12 +284,16 @@ for the thesis fork; it is not presented as an upstream-ready documentation patc
 
 ## Trusted base and reproduction
 
-Labels: **119 external-lib, 164 scope, 2 Verus gaps, 3 rewrites**. The complete
+Labels: **119 external-lib, 162 scope, 2 Verus gaps, 3 rewrites**. The complete
 grouped item inventory is reproducible with the checker below. Many library
 contracts are marked **not yet independently validated**, including the existing
 general MIME FromStr correspondence and text-only Name equality model. Passing
 these proofs does not validate those assumptions. The compiler/SMT/Verus/vstd and
 generated machinery are also part of the trusted base; Verus sources were not edited.
+
+The three old uninterpreted parser/support/font methods on StandardModel became
+defined delegations; one standalone UA-support predicate replaces the support
+method's trust boundary. No new parser or font assumption was introduced.
 
 The `Mime::params` migration was audited against vstd's PR #3330: production
 flags plus finite `remaining()` and `next`'s laws retain exact exhaustion behavior.

@@ -36,7 +36,7 @@ pub(crate) open spec fn element_preload_requires(input: LinkElementPreloadObserv
             &&& type_matches_destination_requires(options.type_, destination.as_native())
             // INHERITED from type_matches_destination; witnesses and model assumptions are in requires.rs.
             &&& type_matches_standard_requires(options.type_, destination.as_native())
-            &&& (preload::type_matches_destination(StandardModel, options.type_, destination) ==> {
+            &&& (preload::type_matches_destination(options.type_, destination) ==> {
                 // IMPLICIT: native options/request construction lacks fetch priority; witness: fetchpriority="high".
                 &&& options.fetch_priority == LinkFetchPriorityView::Auto
                 &&& if destination.as_native() == Destination::Image && options.source_set is Some {

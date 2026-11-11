@@ -6,7 +6,6 @@
 //! Opaque identities and external primitive implementations remain model boundaries.
 
 use std::sync::Arc;
-use mime::Mime;
 use net_traits::ReferrerPolicy as NativeReferrerPolicy;
 use net_traits::policy_container::PolicyContainer;
 use net_traits::request::{CorsSettings, Destination as NativeDestination, RequestBuilder, RequestClient};
@@ -204,7 +203,7 @@ pub(crate) open spec fn view_in_environment(
 pub(crate) struct StandardModel;
 
 impl LinkProcessingModel for StandardModel {
-    type Mime = Mime;
+    type Mime = SpecMime::MimeView;
 
     // TRUSTED(scope): not verified yet; remove when Fetch header decoding/splitting correspondence is verified
     uninterp spec fn get_decode_and_split_link_headers(&self, headers: HeaderListView) -> Seq<Seq<char>>;
@@ -212,17 +211,14 @@ impl LinkProcessingModel for StandardModel {
     uninterp spec fn parse_standard_link_header(&self, value: Seq<char>) -> Option<ParsedLinkHeader>;
     // TRUSTED(external-lib): nom-rfc8288 0.4.0; validated by not yet
     uninterp spec fn parse_link_header(&self, value: Seq<char>) -> Seq<Option<ParsedLinkHeader>>;
-    // TRUSTED(scope): not verified yet; remove when WHATWG/native MIME parser correspondence is verified
-    uninterp spec fn parse_mime_type(&self, value: Seq<char>) -> Option<Mime>;
-    // TRUSTED(scope): not verified yet; remove when user-agent decoder support correspondence is verified
-    uninterp spec fn mime_supported(&self, mime: Mime) -> bool;
-    open spec fn is_javascript_mime(&self, mime: Mime) -> bool { SpecMimePredicates::is_javascript(&mime) }
-    open spec fn is_image_mime(&self, mime: Mime) -> bool { SpecMimePredicates::is_image(&mime) }
+    open spec fn parse_mime_type(&self, value: Seq<char>) -> Option<SpecMime::MimeView> { SpecMime::parse_mime_type(value) }
+    open spec fn mime_supported(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_supported_by_user_agent(&mime) }
+    open spec fn is_javascript_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_javascript_view(&mime) }
+    open spec fn is_image_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_image_view(&mime) }
     // Keep the standard's font-category contract separate from current classifier
     // compatibility extensions until their agreement is established.
-    // TRUSTED(scope): not verified yet; remove when the standard font-category correspondence is verified
-    uninterp spec fn is_font_mime(&self, mime: Mime) -> bool;
-    open spec fn mime_essence(&self, mime: Mime) -> Seq<char> { SpecMime::essence_str(&mime) }
+    open spec fn is_font_mime(&self, mime: SpecMime::MimeView) -> bool { SpecMimePredicates::is_font_view(&mime) }
+    open spec fn mime_essence(&self, mime: SpecMime::MimeView) -> Seq<char> { SpecMime::essence_str_view(&mime) }
     // TRUSTED(scope): not verified yet; remove when encoding-parse-a-URL correspondence is verified
     uninterp spec fn encoding_parse_url(&self, href: Seq<char>, base_url: ServoUrlView) -> Option<ServoUrlView>;
     // TRUSTED(scope): not verified yet; remove when Fetch request-default correspondence is verified

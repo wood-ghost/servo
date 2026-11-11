@@ -7,15 +7,22 @@
 //! Inspected 2026-10-29; standard last updated 2026-10-26.
 
 use net_traits::request::Destination as NativeDestination;
+use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
 use vstd::prelude::*;
 use super::super::super::model::*;
 use super::super::super::types::DestinationView;
 use super::super::super::model_trait::LinkProcessingModel;
 use super::super::super::super::predicates::is_preload_destination;
+use super::super::destination::translate_a_potential_destination;
 use super::super::request::create_link_request;
 pub(crate) use super::preload_machine::{preload, preload_requires};
 
 verus! {
+
+broadcast use {
+    super::super::super::types::lemma_destination_name_valid,
+    super::super::destination::translation_has_destination_type,
+};
 
 // https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination
 // Snapshot/inspection 2026-10-30.
@@ -43,15 +50,53 @@ pub(crate) proof fn preload_translation_meets_linked_domain(destination: Seq<cha
 // FINDING: HTML's algorithm says "fetch" but link options carry the translated
 // Fetch destination (the empty string). Keep that representation choice here,
 // outside the standard's step 2.
-pub(crate) open spec fn type_matches_destination<M: LinkProcessingModel>(
-    model: M,
+// For the purposes of this section, a string type matches a preload destination destination if the following algorithm returns true:
+pub(crate) open spec fn type_matches_destination(
+    // model: M,
     type_: Seq<char>,
     destination: DestinationView,
 ) -> bool {
-    let destination = if destination.as_native() == NativeDestination::None {
-        "fetch"@
-    } else { destination.as_str() };
-    super::match_preload_type::run(model, type_, destination).result
+    // 1. If type is an empty string, then return true.
+    if type_ == ""@ {
+        true
+    } else {
+        // 2. If destination is "fetch", then return true.
+        if destination.as_str() == translate_a_potential_destination("fetch"@) {
+            true
+        } else {
+            // 3. Let mimeTypeRecord be the result of parsing type.
+            let mime_type_record = SpecMime::parse_mime_type(type_);
+            // 4. If mimeTypeRecord is failure, then return false.
+            if mime_type_record is None {
+                false
+            } else {
+                // 5. If mimeTypeRecord is not supported by the user agent, then return false.
+                if !SpecMimePredicates::is_supported_by_user_agent(&mime_type_record->Some_0) {
+                    false
+                } else {
+                    // 6. If any of the following are true:
+                    if
+                        // 6.1 destination is "script" and mimeTypeRecord is a JavaScript MIME type;
+                        (destination.as_str() == "script"@ && SpecMimePredicates::is_javascript_view(&mime_type_record->Some_0))
+                        // 6.2 destination is "image" and mimeTypeRecord is an image MIME type;
+                        || (destination.as_str() == "image"@ && SpecMimePredicates::is_image_view(&mime_type_record->Some_0))
+                        // 6.3 destination is "font" and mimeTypeRecord is a font MIME type;
+                        || (destination.as_str() == "font"@ && SpecMimePredicates::is_font_view(&mime_type_record->Some_0))
+                        // 6.4 destination is "style" and mimeTypeRecord's essence is text/css; or
+                        || (destination.as_str() == "style"@ && SpecMime::essence_str_view(&mime_type_record->Some_0) == "text/css"@)
+                        // 6.5 destination is "track" and mimeTypeRecord's essence is text/vtt,
+                        || (destination.as_str() == "track"@ && SpecMime::essence_str_view(&mime_type_record->Some_0) == "text/vtt"@)
+                    {
+                        // 6.6 then return true.
+                        true
+                    } else {
+                        // 7. Return false.
+                        false
+                    }
+                }
+            }
+        }
+    }
 }
 
 // https://html.spec.whatwg.org/multipage/links.html#create-a-preload-key
@@ -75,7 +120,7 @@ pub(crate) open spec fn preload_computation<M: LinkProcessingModel>(
     options: LinkProcessingOptionsView,
     process_response: Option<int>,
 ) -> PreloadPlan {
-    if !type_matches_destination(model, options.type_, options.destination) {
+    if !type_matches_destination(options.type_, options.destination) {
         PreloadPlan::TypeMismatch
     } else {
         let options = if options.destination.as_native() == NativeDestination::Image {

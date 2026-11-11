@@ -5,12 +5,11 @@ use vstd::prelude::*;
 
 use super::super::processingoptions::LinkProcessingOptions;
 use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
-use super::processing::model_trait::LinkProcessingModel;
 use super::processing::model::LinkHeaderDocumentState;
-use super::servo_api::views::{StandardModel, destination_name};
+use super::servo_api::views::destination_name;
 use super::predicates::is_preload_destination;
 use net_traits::mime_classifier::MediaType;
-use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
+use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime, predicates as SpecMimePredicates};
 
 verus! {
 
@@ -102,34 +101,27 @@ pub(crate) open spec fn type_matches_input_restrictions(link_type: Seq<char>, de
     }
 }
 
-/// Unproved per-input component-agreement premises. In particular, the parser,
-/// support and font functions of StandardModel have no independent definitions.
-/// These equalities constrain those model choices to agree with native outcomes;
-/// they do not discover decoder/parser/category mismatches or establish callers.
+/// Per-input support/category agreement. Parsing now uses the existing MIME
+/// parser specification directly; native parsing correspondence still relies on
+/// its trusted FromStr contract. UA decoder support remains uninterpreted.
 pub(crate) open spec fn type_matches_component_agreement(link_type: Seq<char>, destination: Destination) -> bool {
     if link_type.len() == 0 || destination == Destination::None {
         true
     } else {
-        // IMPLICIT: MODEL AGREEMENT between native and standard parsing; witness: none independently established for this interface.
-        &&& (forall|parsed: Result<Mime, FromStrError>|
-            #[trigger] <Mime as FromStrSpec>::from_str_ensures(link_type, parsed) ==>
-                StandardModel.parse_mime_type(link_type) == match parsed {
-                    Ok(mime) => Some(mime), Err(_) => None,
-                })
         &&& (forall|mime: Mime|
             #[trigger] <Mime as FromStrSpec>::from_str_ensures(link_type, Ok(mime)) ==> {
                 &&& (forall|classified: Option<MediaType>|
                     #[trigger] SpecClassifier::get_media_type_spec(&mime, classified) ==> {
                         // IMPLICIT: MODEL AGREEMENT of recognition and actual UA support; witness: none validated against the decoder configuration. An unrecognized but supported type is excluded by this premise, not detected as a finding.
-                        &&& StandardModel.mime_supported(mime) == (classified is Some)
+                        &&& SpecMimePredicates::is_supported_by_user_agent(&SpecMime::view(&mime)) == (classified is Some)
                         // IMPLICIT: MODEL AGREEMENT of JS/image categories; witness: none found (is_xml explicitly excludes image MIME types, including SVG).
                         &&& (destination == Destination::Script ==>
-                            StandardModel.is_javascript_mime(mime) == (classified == Some(MediaType::JavaScript)))
+                            SpecMimePredicates::is_javascript_view(&SpecMime::view(&mime)) == (classified == Some(MediaType::JavaScript)))
                         &&& (destination == Destination::Image ==>
-                            StandardModel.is_image_mime(mime) == (classified == Some(MediaType::Image)))
-                        // IMPLICIT: MODEL AGREEMENT of font categories; witness: none independently established while the standard font primitive is uninterpreted.
+                            SpecMimePredicates::is_image_view(&SpecMime::view(&mime)) == (classified == Some(MediaType::Image)))
+                        // IMPLICIT: MODEL AGREEMENT of font categories; witness: none found for the current input domain.
                         &&& (destination == Destination::Font ==>
-                            StandardModel.is_font_mime(mime) == (classified == Some(MediaType::Font)))
+                            SpecMimePredicates::is_font_view(&SpecMime::view(&mime)) == (classified == Some(MediaType::Font)))
                     })
             })
     }
@@ -215,7 +207,7 @@ pub(crate) open spec fn header_input_requires(link_object: &LinkHeader, document
                                 // INHERITED from type_matches_destination; explicit model/configuration agreement.
                                 &&& type_matches_standard_requires(type_, destination)
                                 &&& (super::processing::algorithms::link_types::preload::type_matches_destination(
-                                    StandardModel, type_, super::processing::types::DestinationView::from_native(destination)) ==> {
+                                    type_, super::processing::types::DestinationView::from_native(destination)) ==> {
                                     if destination == Destination::Image {
                                         match (super::servo_api::link_header::first_value(parameters, "imagesrcset"@),
                                             super::servo_api::link_header::first_value(parameters, "imagesizes"@)) {

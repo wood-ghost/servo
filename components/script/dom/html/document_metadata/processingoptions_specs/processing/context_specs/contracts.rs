@@ -216,15 +216,6 @@ pub(crate) open spec fn destination_matches_media_type(
     }
 }
 
-/// Standard algorithm: processing/algorithms/link_types/preload.rs, steps 1–7.
-/// UA support and WHATWG/Rust MIME parser agreement remain primitive-model obligations.
-pub(crate) open spec fn type_matches_destination_result(
-    options: &LinkProcessingOptions,
-) -> bool {
-    SpecAlgorithms::link_types::preload::type_matches_destination(
-        SpecViews::StandardModel, options.link_type@, SpecViews::destination_view(options.destination),
-    )
-}
 
 // ----------------------------------------
 // Link header processing predicates

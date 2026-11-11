@@ -77,6 +77,49 @@ pub open spec fn mime_parse_done_view(final_state: mime_parse_automaton::State) 
     }
 }
 
+/// Record/failure result of the existing parser run, for callers of the MIME
+/// parsing specification. This adds no alternative parsing algorithm.
+pub open spec fn parse_mime_type(input: Seq<char>) -> Option<MimeView> {
+    let final_state = mime_parse_final_state(input);
+    if final_state.state == MimeParseState::Done {
+        Some(mime_parse_done_view(final_state))
+    } else {
+        None
+    }
+}
+
+/// The runner is terminal for every input, so None denotes actual Failure,
+/// never an unfinished run. Library correspondence remains the FromStr boundary.
+pub broadcast proof fn parse_mime_type_properties(input: Seq<char>)
+    ensures
+        (#[trigger] parse_mime_type(input) is None)
+            == (mime_parse_final_state(input).state == MimeParseState::Failure),
+        parse_mime_type(input) is Some ==>
+            mime_parse_final_state(input).state == MimeParseState::Done,
+{
+    mime_parse_final_state_properties(input);
+}
+
+/// Parsing fails when trimming leaves no type before the first slash.
+/// Keep the generated transition reasoning in the parser's owning crate.
+pub proof fn mime_parse_empty_type_fails(input: Seq<char>)
+    requires {
+        let trimmed = remove_http_whitespace(input);
+        trimmed.len() == 0 || trimmed[0] == '/'
+    },
+    ensures parse_mime_type(input) is None,
+{
+    hide(mime_parse_run);
+    reveal(mime_parse_automaton::State::next);
+    reveal(mime_parse_automaton::State::next_by);
+    let initial = mime_parse_automaton::take_step::initialize(input);
+    mime_parse_initialize_properties(input, initial);
+    let s = mime_parse_run_one_step(initial);
+    let s = mime_parse_run_one_step(s);
+    let result = mime_parse_run_one_step(s);
+    assert(result.state == MimeParseState::Failure);
+}
+
 // A parameter-free MIME string: nonempty HTTP-token components separated by one
 // slash, with no surrounding whitespace. This is a syntactic success criterion,
 // not a restriction on the external parsing contract or on the automaton.
@@ -983,6 +1026,97 @@ pub proof fn mime_parse_final_state_properties(input: Seq<char>)
     let trace = mime_parse_run_trace(initial);
     // Expose the constructed trace as the existential postcondition's witness.
     assert(mime_parse_complete_trace(input, trace));
+}
+
+/// Phases after the type/subtype record has been constructed.
+pub open spec fn mime_parse_parameter_phase(state: MimeParseState) -> bool {
+    matches!(state,
+        MimeParseState::AwaitingParameters | MimeParseState::LoopHead
+        | MimeParseState::SemicolonSkipped | MimeParseState::HttpWhitespaceSkipped
+        | MimeParseState::ParameterNameCollected | MimeParseState::ParameterNameLowercased
+        | MimeParseState::AwaitingParameterValue | MimeParseState::ReadyToParseParameterValue
+        | MimeParseState::QuotedParameterValueCollected | MimeParseState::UnquotedParameterValueCollected
+        | MimeParseState::UnquotedParameterValueTrimmed | MimeParseState::Done)
+}
+
+/// Unquoted parameter processing terminates successfully without changing the
+/// already parsed type/subtype. Quoted-value behavior remains separately modeled.
+pub proof fn mime_parse_unquoted_parameter_run(pre: mime_parse_automaton::State)
+    requires
+        pre.invariant(),
+        mime_parse_parameter_phase(pre.state),
+        !pre.input.contains('"'),
+    ensures
+        mime_parse_run(pre).state == MimeParseState::Done,
+        mime_parse_run(pre).type_ == pre.type_,
+        mime_parse_run(pre).subtype == pre.subtype,
+    decreases pre.input.len() - pre.position, mime_parse_phase_rank(pre.state),
+{
+    if pre.state != MimeParseState::Done {
+        let post = mime_parse_run_one_step(pre);
+        mime_parse_next_properties(pre, post);
+        assert(mime_parse_parameter_phase(post.state)
+            && post.type_ == pre.type_ && post.subtype == pre.subtype) by {
+            case_on_next! { pre, post, mime_parse_automaton => {
+                remove_whitespace() => {}
+                collect_type() => {}
+                validate_type_and_skip_slash() => {}
+                collect_subtype() => {}
+                trim_and_validate_subtype() => {}
+                create_mime_record() => {}
+                enter_loop() => {}
+                check_loop_continuation() => {}
+                skip_http_whitespace() => {}
+                collect_parameter_name() => {}
+                lowercase_parameter_name() => {}
+                handle_parameter_name_delimiter() => {}
+                check_parameter_value_available() => {}
+                collect_parameter_value() => {}
+                trim_unquoted_parameter_value() => {}
+                continue_after_empty_unquoted_value() => {}
+                store_parameter_if_valid() => {}
+            }}
+        }
+        mime_parse_unquoted_parameter_run(post);
+    }
+}
+
+/// A valid token/token header followed by unquoted parameters retains its
+/// normalized components. All premises are input syntax, not a parse outcome.
+pub proof fn mime_parse_unquoted_header(input: Seq<char>, slash: int, semicolon: int)
+    requires
+        0 < slash,
+        slash + 1 < semicolon < input.len(),
+        input[slash] == '/',
+        input[semicolon] == ';',
+        forall|i: int| 0 <= i < semicolon && i != slash ==>
+            is_http_token_code_point(#[trigger] input[i]),
+        !is_http_whitespace(input.last()),
+        !input.contains('"'),
+    ensures
+        parse_mime_type(input) is Some,
+        parse_mime_type(input)->Some_0.type_ == ascii_lowercase(input.subrange(0, slash)),
+        parse_mime_type(input)->Some_0.subtype == mime_parse_subtype_and_suffix(
+            ascii_lowercase(input.subrange(slash + 1, semicolon))).0,
+        parse_mime_type(input)->Some_0.suffix == mime_parse_subtype_and_suffix(
+            ascii_lowercase(input.subrange(slash + 1, semicolon))).1,
+{
+    hide(mime_parse_run);
+    hide(collect_code_points);
+    reveal(mime_parse_automaton::State::next);
+    reveal(mime_parse_automaton::State::next_by);
+    collect_code_points_range(input, 0, slash, |c: char| c != '/');
+    collect_code_points_range(input, slash + 1, semicolon, |c: char| c != ';');
+    let initial = mime_parse_automaton::take_step::initialize(input);
+    mime_parse_initialize_properties(input, initial);
+    let s = mime_parse_run_one_step(initial);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    let s = mime_parse_run_one_step(s);
+    assert(s.state == MimeParseState::AwaitingParameters);
+    mime_parse_unquoted_parameter_run(s);
 }
 
 // Prove collection of any range whose characters meet the condition, stopping

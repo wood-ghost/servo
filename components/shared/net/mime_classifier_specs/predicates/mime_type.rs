@@ -76,7 +76,12 @@ pub open spec fn is_text_plain(mt: &Mime) -> bool {
     essence_str(mt) == "text/plain"@
 }
 pub open spec fn is_image(mt: &Mime) -> bool {
-    view(mt).type_ == image_name()
+    is_image_view(&view(mt))
+}
+
+/// <https://mimesniff.spec.whatwg.org/#image-mime-type>
+pub open spec fn is_image_view(mt: &MimeView) -> bool {
+    mt.type_ == image_name()
 }
 pub open spec fn is_audio(mt: &Mime) -> bool {
     view(mt).type_ == audio_name()
@@ -147,36 +152,59 @@ pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
 
 /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
 pub open spec fn is_javascript(mt: &Mime) -> bool {
-    ||| essence_str(mt) == "application/ecmascript"@
-    ||| essence_str(mt) == "application/javascript"@
-    ||| essence_str(mt) == "application/x-ecmascript"@
-    ||| essence_str(mt) == "application/x-javascript"@
-    ||| essence_str(mt) == "text/ecmascript"@
-    ||| essence_str(mt) == "text/javascript"@
-    ||| essence_str(mt) == "text/javascript1.0"@
-    ||| essence_str(mt) == "text/javascript1.1"@
-    ||| essence_str(mt) == "text/javascript1.2"@
-    ||| essence_str(mt) == "text/javascript1.3"@
-    ||| essence_str(mt) == "text/javascript1.4"@
-    ||| essence_str(mt) == "text/javascript1.5"@
-    ||| essence_str(mt) == "text/jscript"@
-    ||| essence_str(mt) == "text/livescript"@
-    ||| essence_str(mt) == "text/x-ecmascript"@
-    ||| essence_str(mt) == "text/x-javascript"@
+    is_javascript_essence(essence_str(mt))
+}
+
+/// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
+pub open spec fn is_javascript_view(mt: &MimeView) -> bool {
+    is_javascript_essence(essence_str_view(mt))
+}
+
+/// Case-sensitive membership in the JavaScript MIME type essence list.
+pub open spec fn is_javascript_essence(essence: Seq<char>) -> bool {
+    ||| essence == "application/ecmascript"@
+    ||| essence == "application/javascript"@
+    ||| essence == "application/x-ecmascript"@
+    ||| essence == "application/x-javascript"@
+    ||| essence == "text/ecmascript"@
+    ||| essence == "text/javascript"@
+    ||| essence == "text/javascript1.0"@
+    ||| essence == "text/javascript1.1"@
+    ||| essence == "text/javascript1.2"@
+    ||| essence == "text/javascript1.3"@
+    ||| essence == "text/javascript1.4"@
+    ||| essence == "text/javascript1.5"@
+    ||| essence == "text/jscript"@
+    ||| essence == "text/livescript"@
+    ||| essence == "text/x-ecmascript"@
+    ||| essence == "text/x-javascript"@
 }
 
 /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
 pub open spec fn is_font(mt: &Mime) -> bool { 
-    ||| view(mt).type_ == font_name()
-    ||| essence_str(mt) == "application/font-cff"@
-    // https://github.com/servo/servo/issues/47903
-    ||| essence_str(mt) == "application/font-otf"@
-    ||| essence_str(mt) == "application/font-sfnt"@
-    ||| essence_str(mt) == "application/font-ttf"@
-    ||| essence_str(mt) == "application/font-woff"@
-    ||| essence_str(mt) == "application/vnd.ms-fontobject"@
-    ||| essence_str(mt) == "application/vnd.ms-opentype"@
+    is_font_type_or_essence(view(mt).type_, essence_str(mt))
 }
+
+/// <https://mimesniff.spec.whatwg.org/#font-mime-type>
+pub open spec fn is_font_view(mt: &MimeView) -> bool {
+    is_font_type_or_essence(mt.type_, essence_str_view(mt))
+}
+
+pub open spec fn is_font_type_or_essence(type_: Seq<char>, essence: Seq<char>) -> bool {
+    ||| type_ == font_name()
+    ||| essence == "application/font-cff"@
+    // https://github.com/servo/servo/issues/47903
+    ||| essence == "application/font-otf"@
+    ||| essence == "application/font-sfnt"@
+    ||| essence == "application/font-ttf"@
+    ||| essence == "application/font-woff"@
+    ||| essence == "application/vnd.ms-fontobject"@
+    ||| essence == "application/vnd.ms-opentype"@
+}
+
+/// <https://mimesniff.spec.whatwg.org/#supported-by-the-user-agent>
+// TRUSTED(scope): not verified yet; remove when user-agent decoder support correspondence is verified
+pub uninterp spec fn is_supported_by_user_agent(mt: &MimeView) -> bool;
 
 /// <https://mimesniff.spec.whatwg.org/#json-mime-type>
 pub open spec fn is_json(mt: &Mime) -> bool { 

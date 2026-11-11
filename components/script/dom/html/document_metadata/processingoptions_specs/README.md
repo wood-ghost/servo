@@ -40,7 +40,7 @@ processing/algorithms/
     -> create-a-source-set                            external CSS/image algorithm
     -> link_types/dispatch.rs: process_link_header
         -> link_types/preload_machine.rs: preload      steps 1–13
-          -> link_types/match_preload_type.rs          steps 1–7
+          -> link_types/preload.rs: type_matches_destination   steps 1–7
           -> select-image-source                      external image algorithm
           -> request.rs: create_link_request           steps 1–11
              -> encoding-parse-a-URL                   external URL algorithm
@@ -162,7 +162,7 @@ consistency.
 | `apply_link_options_from_parsed_header` | `processing/algorithms/apply_attributes.rs` and the before/after wrapper in `processing/context_specs/contracts.rs` |
 | `process_link_header` | `processing/algorithms/link_types/dispatch.rs` |
 | `translate_a_preload_destination` | `processing/algorithms/link_types/preload.rs`, linked to `processing/algorithms/destination.rs` |
-| `type_matches_destination`, `preload` | `processing/algorithms/link_types/match_preload_type.rs`, `processing/algorithms/link_types/preload_machine.rs` |
+| `type_matches_destination`, `preload` | `processing/algorithms/link_types/preload.rs`, `processing/algorithms/link_types/preload_machine.rs` |
 | `create_link_request` | `processing/algorithms/request.rs` |
 | `determine_cors_settings_for_token` | `processing/algorithms/cors.rs` |
 | `extract_links_from_headers`, `process_link_headers` | `processing/algorithms/extract_headers.rs`, `processing/algorithms/process_headers.rs`; computation adapters in `processing/algorithms/headers.rs` |
@@ -178,9 +178,11 @@ algorithm is defined over the header/parser model interface.
 
 ## Proof and model boundaries
 
-- `processing/model_trait.rs` has the same role as `MimeClassifierModel`: it names
-  algorithms delegated to MIME Sniffing, URL, Fetch, and RFC 8288. A fixture or
-  `StandardModel` implementation is **not** a proof of those primitives.
+- `processing/model_trait.rs` names operations delegated to URL, Fetch, and RFC
+  8288 and retains a MIME interface for the older matching-machine artifact.
+  The active `type_matches_destination` directly calls the shared MIME parser
+  specification and record predicates, without a model parameter. A fixture or
+  `StandardModel` implementation is **not** proof of external correspondence.
 - `servo_api/views.rs` is the runtime/view layer. Opaque identities, parser agreement,
   UA format support, and RequestView correspondence need their own proofs.
 - `servo_api/preload.rs` supplies trusted external API contracts for the native
@@ -216,7 +218,8 @@ invalid-keyword/priority restrictions, with a proved finite-map lookup bridge.
 These are **native-body/standard equivalence results assuming component agreement
 on the input**, not established caller or arbitrary-HTTP-input guarantees.
 `type_matches_input_restrictions` separates concrete domain/CSS restrictions from
-`type_matches_component_agreement` (parser, UA support and category assumptions).
+`type_matches_component_agreement` (UA support and category agreement). Parser
+result correspondence comes from the existing trusted FromStr contract.
 In particular, an uninterpreted UA-support predicate cannot independently detect
 missing decoder support or a supported MIME type that native classification misses.
 The attribute contract also proves native `referrer` preservation, independently
