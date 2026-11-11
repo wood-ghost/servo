@@ -223,6 +223,40 @@ impl FromStrSpecImpl for Mime {
     }
 }
 
+/// A native-valued representative of the existing FromStr result relation.
+/// Properties of this choice require a result satisfying that relation; the
+/// lemma below uses such a witness without assuming global representability.
+pub open spec fn spec_from_str(input: &str) -> Result<Mime, <Mime as FromStr>::Err> {
+    choose|result: Result<Mime, <Mime as FromStr>::Err>|
+        <Mime as FromStrSpec>::from_str_ensures(input@, result)
+}
+
+// Autospec routing only: the requirements and result relation are inherited
+// from ExFromStr above. This adds no stronger native-result postcondition.
+// TRUSTED(external-lib): mime 0.3.17; validated by not yet
+#[verifier::when_used_as_spec(spec_from_str)]
+pub assume_specification[<Mime as FromStr>::from_str](
+    input: &str,
+) -> Result<Mime, <Mime as FromStr>::Err>;
+
+/// An existing contract result witnesses that the spec choice is valid.
+/// Successful results agree through MimeView; error payloads remain abstract.
+pub broadcast proof fn lemma_spec_from_str_matches_result(
+    input: &str,
+    actual: Result<Mime, <Mime as FromStr>::Err>,
+)
+    requires
+        <Mime as FromStrSpec>::from_str_ensures(input@, actual),
+    ensures
+        #![trigger <Mime as FromStrSpec>::from_str_ensures(input@, actual), spec_from_str(input)]
+        <Mime as FromStrSpec>::from_str_ensures(input@, spec_from_str(input)),
+        match (actual, spec_from_str(input)) {
+            (Ok(native), Ok(modeled)) => view(&native) == view(&modeled),
+            (Err(_), Err(_)) => true,
+            _ => false,
+        },
+{}
+
 // --------------------
 // str::parse for Mime
 // --------------------

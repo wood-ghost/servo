@@ -9,9 +9,9 @@ The production specification modules are under
 | --- | --- |
 | `mod.rs` | Existing umbrella exports, including the `SpecMime` import alias used by the classifier |
 | `constants.rs` | All 38 `Name` and 33 `Mime` constants from mime 0.3.17, paired with their trusted external bindings; a separate section for parsing-literal identities |
-| `mime.rs` | `MimeView`, view/essence functions, the `Mime` external type and operation contracts, and the essence proof lemmas |
+| `mime.rs` | `MimeView`, view/essence functions, external API contracts including `FromStr`/`str::parse`, and native-valued parsing/essence proof support |
 | `name.rs` | `name_identity`, the `Name` external type and operation contracts, and equality axioms |
-| `parser.rs` | `FromStr`/`str::parse` contracts, `FromStrError`, parsing requirements/results, automata and the existing legacy model |
+| `parser.rs` | Parsing requirements, parser automata, execution model and state-machine proofs |
 
 The `mime` and `name` implementation modules are private, with their public
 items re-exported through `mime_api`. In particular, a glob import of `mime_api`
@@ -85,6 +85,47 @@ Three `harness_*` controls distinguish a verified assertion, a deliberately
 failing assertion, and Rust type error `E0308`. Only the latter two controls
 expect an error. Missing tools, crashes, timeouts, and arbitrary compiler errors
 do not count as an expected assertion failure.
+
+### Spec-callable `Mime::from_str`: 2026-11-11
+
+`Mime::from_str` now also works in spec mode with its original
+`&str -> Result<Mime, FromStrError>` interface. A concrete
+`#[verifier::when_used_as_spec(spec_from_str)]` binding inherits the existing
+`FromStr` trait contract; it adds no stronger native-result postcondition.
+The generic `str::parse` contract retains its original form.
+The concrete binding retains `<Mime as FromStr>::Err` for exact signature
+matching. A trait-extension-level binding in the installed verifier failed to
+resolve `ExFromStr::from_str_spec`; the concrete implementation binding passed
+both positive checks and a missing-precondition negative control.
+
+`spec_from_str` uses `choose` over the existing `from_str_ensures` relation.
+Its proved `lemma_spec_from_str_matches_result` takes a valid result as an
+existence witness and establishes agreement of success/failure and successful
+MIME views. There is no blanket representation-existence axiom or assumption
+that opaque `Mime` values or error payloads are logically equal. The original
+parser model and MIME classification predicates are restored without the
+intermediate `Option<MimeView>` parsing adapter or record-level predicate copies.
+
+Run the focused regressions from the Servo root:
+
+```bash
+BINDGEN_EXTRA_CLANG_ARGS="-isystem /usr/include/c++/13 -isystem /usr/include/x86_64-linux-gnu/c++/13 -isystem /usr/include/c++/13/backward" \
+  cargo +1.97.1 test -p servo-net-traits --test mime_api from_str_spec_ --locked --offline -- --nocapture
+```
+
+With Verus `0.2026.10.29.62a9ca4.dirty` (Rust 1.99.1), **4 tests passed**:
+native/spec result-view agreement, equal-character string slices, CSS parsing
+in spec mode using a known constant as its witness, and an expected-failure
+control rejecting raw-result equality. These isolated clients retain lifetime
+and trait-conflict checking. They validate the model interface, not the native
+MIME parser's general correctness or WHATWG correspondence.
+
+A fresh `servo-net-traits` run with `--compile --no-lifetime --no-trait-conflicts
+--expand-errors --multiple-errors 20 --num-threads 1` reported **207 verified,
+0 errors**. The native Rust 1.97.1 script check passed. The script package still
+reports **2 verified, 1 error** at native type matching's equality postcondition;
+UA-support correspondence and the native/preload-standard differences remain
+separate obligations. No solver resource limit was increased.
 
 ### Parent-parser execution: 2026-10-13
 

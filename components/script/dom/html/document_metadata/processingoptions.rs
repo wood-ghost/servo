@@ -26,6 +26,8 @@ use strum::IntoStaticStr;
 use vstd::prelude::*;
 
 #[cfg(verus_only)]
+use super::processingoptions_specs as Spec;
+#[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
 
 use crate::dom::bindings::refcounted::Trusted;
@@ -44,6 +46,8 @@ use crate::fetch::network_listener::{
 use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 verus! {
+
+broadcast use net_traits::mime_classifier_specs::mime_api::lemma_spec_from_str_matches_result;
 
 // Setup-only: external items are excluded from verification. Enable individual
 // functions and introduce their type models and contracts in subsequent steps.
@@ -244,11 +248,20 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
+    #[verifier::auto_reveal_strlit]
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
             // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+        ensures
+            // String-to-str coercion is executable; relate all slices with the
+            // same characters to the native string instead of calling it here.
+            forall|type_: &str| type_@ == self.link_type@ ==>
+                result == #[trigger] Spec::type_matches_destination_ok(type_, self.destination),
     {
+        proof {
+            assert(self.link_type@.len() == 0 ==> self.link_type@ =~= ""@);
+        }
         // Step 1. If type is an empty string, then return true.
         if self.link_type.is_empty() {
             return true;
@@ -300,13 +313,24 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
     // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::preload is verified
-    #[verifier::external]
+    #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
         link: Option<Trusted<HTMLLinkElement>>,
         document: &Document,
-    ) {
+    )
+        requires
+            // INHERITED from type_matches_destination.
+            SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
+            // IMPLICIT: native preload asserts a match instead of returning; witness: type="text/plain", destination=Style.
+            // Mirror type_matches_destination's slice-based postcondition.
+            forall|type_: &str| type_@ == self.link_type@ ==>
+                #[trigger] Spec::type_matches_destination_ok(type_, self.destination),
+        ensures
+            // Setup-only placeholder; document-state and fetch-effect guarantees are pending.
+            Spec::preload_ensures(&self, webview_id, &link, document),
+    {
         // Step 1. If options's type doesn't match options's destination, then return.
         //
         // Handled by callers, since we need to check the previous destination type

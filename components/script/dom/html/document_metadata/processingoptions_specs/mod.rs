@@ -4,6 +4,9 @@
 
 //! Temporary Verus support for checking link-processing options incrementally.
 
+pub(crate) mod postconditions;
 pub(crate) mod processing;
 pub(crate) mod requires;
 mod servo_support;
+
+pub(crate) use self::postconditions::{preload_ensures, type_matches_destination_ok};

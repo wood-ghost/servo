@@ -10,13 +10,19 @@
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
 use content_security_policy::{PolicyDisposition, PolicySource};
+use js::gc::Traceable;
 use net_traits::ReferrerPolicy;
 use net_traits::policy_container::PolicyContainer;
 use net_traits::request::{CorsSettings, Destination, Referrer, RequestClient};
+use script_bindings::refcounted::Trusted;
+use script_bindings::reflector::DomObject;
+use servo_base::id::WebViewId;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use vstd::prelude::*;
 
+use crate::dom::document::Document;
 use crate::dom::srcset::SourceSet;
+use crate::dom::types::HTMLLinkElement;
 
 verus! {
 
@@ -110,5 +116,43 @@ pub struct ExReferrer(Referrer);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExRequestClient(RequestClient);
+
+// Types needed by preload's callable signature. Their declarations expose type
+// identities and bounds; document state, GC, and reference-counting remain unmodeled.
+
+// TRUSTED(scope): not verified yet; remove when servo_base::id::WebViewId is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExWebViewId(WebViewId);
+
+// Bound-only declaration; tracing operations and GC safety remain unmodeled.
+// TRUSTED(external-lib): mozjs 0.26.9; validated by not yet
+#[verifier::external_trait_specification]
+pub unsafe trait ExTraceable {
+    type ExternalTraitSpecificationFor: Traceable;
+}
+
+// Preserve the native supertrait/lifetime bounds required by Trusted<T>.
+// TRUSTED(scope): not verified yet; remove when script_bindings::reflector is verified
+#[verifier::external_trait_specification]
+pub trait ExDomObject: Traceable + 'static {
+    type ExternalTraitSpecificationFor: DomObject;
+}
+
+// TRUSTED(scope): not verified yet; remove when script_bindings::refcounted is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+#[verifier::reject_recursive_types(T)]
+pub struct ExTrusted<T: DomObject>(Trusted<T>);
+
+// TRUSTED(scope): not verified yet; remove when dom::html::document_metadata::htmllinkelement is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExHTMLLinkElement(HTMLLinkElement);
+
+// TRUSTED(scope): not verified yet; remove when dom::document is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExDocument(Document);
 
 } // verus!

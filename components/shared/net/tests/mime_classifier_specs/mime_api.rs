@@ -11,6 +11,101 @@
 #[allow(dead_code)] // The error-expectation helpers are exercised in mime_parse.rs.
 mod common;
 
+// Native-valued parsing in spec mode. These check the existing contract and
+// autospec binding; external-library correspondence remains a trusted boundary.
+
+test_verify_one_file! {
+    #[test] from_str_spec_matches_native_result verus_code! {
+        use std::str::FromStr;
+        use vstd::prelude::*;
+        use crate::mime_api::{FromStrSpec, view};
+
+        broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
+
+        fn test(input: &str)
+            requires <mime::Mime as FromStrSpec>::from_str_requires(input@),
+        {
+            let actual = mime::Mime::from_str(input);
+            let ghost modeled = mime::Mime::from_str(input);
+            assert(match (actual, modeled) {
+                (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
+                (Err(_), Err(_)) => true,
+                _ => false,
+            });
+        }
+    } => Ok(())
+}
+
+test_verify_one_file! {
+    #[test] from_str_spec_equal_text_slices verus_code! {
+        use std::str::FromStr;
+        use vstd::prelude::*;
+        use crate::mime_api::{FromStrSpec, view};
+
+        broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
+
+        fn test(input: &str, same_text: &str)
+            requires
+                input@ == same_text@,
+                <mime::Mime as FromStrSpec>::from_str_requires(input@),
+        {
+            let actual = mime::Mime::from_str(input);
+            let ghost modeled = mime::Mime::from_str(same_text);
+            assert(match (actual, modeled) {
+                (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
+                (Err(_), Err(_)) => true,
+                _ => false,
+            });
+        }
+    } => Ok(())
+}
+
+test_verify_one_file! {
+    #[test] from_str_spec_css_without_exec_parse verus_code! {
+        use std::str::FromStr;
+        use vstd::prelude::*;
+        use crate::mime_api::{FromStrSpec, essence_str};
+
+        broadcast use {
+            crate::mime_api::mime_parse_lemmas,
+            crate::mime_api::lemma_spec_from_str_matches_result,
+        };
+
+        fn test() {
+            let witness = mime::TEXT_CSS;
+            assert(<mime::Mime as FromStrSpec>::from_str_ensures("text/css"@, Ok(witness)));
+            let ghost parsed = mime::Mime::from_str("text/css");
+            assert(parsed is Ok);
+            assert(essence_str(&parsed->Ok_0) == "text/css"@);
+        }
+    } => Ok(())
+}
+
+// Negative control: the original contract identifies parsed views, not opaque
+// Mime values or error payloads. Autospec must not strengthen that contract.
+test_verify_one_file! {
+    #[test] from_str_spec_does_not_assume_raw_equality verus_code! {
+        use std::str::FromStr;
+        use vstd::prelude::*;
+        use crate::mime_api::{FromStrSpec, view};
+
+        broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
+
+        fn test(input: &str)
+            requires <mime::Mime as FromStrSpec>::from_str_requires(input@),
+        {
+            let actual = mime::Mime::from_str(input);
+            let ghost modeled = mime::Mime::from_str(input);
+            assert(match (actual, modeled) {
+                (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
+                (Err(_), Err(_)) => true,
+                _ => false,
+            });
+            assert(actual == modeled); // FAILS
+        }
+    } => Err(err) => common::assert_one_fails(err)
+}
+
 // Accessors and cloning. Constants isolate these cases from parsing requirements.
 
 test_verify_one_file! {
