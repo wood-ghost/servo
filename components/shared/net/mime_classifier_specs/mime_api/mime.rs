@@ -189,6 +189,7 @@ pub trait ExFromStr: Sized {
 
     spec fn from_str_requires(i: Seq<char>) -> bool;
     spec fn from_str_ensures(i: Seq<char>, r: Result<Self, Self::Err>) -> bool;
+    spec fn from_str_spec(input: Seq<char>) -> Result<Self, Self::Err>;
 
     fn from_str(s: &str) -> (r: Result<Self, Self::Err>)
         requires
@@ -221,36 +222,28 @@ impl FromStrSpecImpl for Mime {
             _ => false,
         }
     }
-}
 
-/// A native-valued representative of the existing FromStr result relation.
-/// Properties of this choice require a result satisfying that relation; the
-/// lemma below uses such a witness without assuming global representability.
-pub open spec fn spec_from_str(input: &str) -> Result<Mime, <Mime as FromStr>::Err> {
-    choose|result: Result<Mime, <Mime as FromStr>::Err>|
-        <Mime as FromStrSpec>::from_str_ensures(input@, result)
+    /// A native-valued representative of the existing FromStr result relation.
+    /// Properties of this choice require a result satisfying that relation; the
+    /// lemma below uses such a witness without assuming global representability.
+    open spec fn from_str_spec(input: Seq<char>) -> Result<Mime, <Mime as FromStr>::Err> {
+        choose|result: Result<Mime, <Mime as FromStr>::Err>|
+            <Mime as FromStrSpec>::from_str_ensures(input, result)
+    }
 }
-
-// Autospec routing only: the requirements and result relation are inherited
-// from ExFromStr above. This adds no stronger native-result postcondition.
-// TRUSTED(external-lib): mime 0.3.17; validated by not yet
-#[verifier::when_used_as_spec(spec_from_str)]
-pub assume_specification[<Mime as FromStr>::from_str](
-    input: &str,
-) -> Result<Mime, <Mime as FromStr>::Err>;
 
 /// An existing contract result witnesses that the spec choice is valid.
 /// Successful results agree through MimeView; error payloads remain abstract.
 pub broadcast proof fn lemma_spec_from_str_matches_result(
-    input: &str,
+    input: Seq<char>,
     actual: Result<Mime, <Mime as FromStr>::Err>,
 )
     requires
-        <Mime as FromStrSpec>::from_str_ensures(input@, actual),
+        <Mime as FromStrSpec>::from_str_ensures(input, actual),
     ensures
-        #![trigger <Mime as FromStrSpec>::from_str_ensures(input@, actual), spec_from_str(input)]
-        <Mime as FromStrSpec>::from_str_ensures(input@, spec_from_str(input)),
-        match (actual, spec_from_str(input)) {
+        #![trigger <Mime as FromStrSpec>::from_str_ensures(input, actual), <Mime as FromStrSpec>::from_str_spec(input)]
+        <Mime as FromStrSpec>::from_str_ensures(input, <Mime as FromStrSpec>::from_str_spec(input)),
+        match (actual, <Mime as FromStrSpec>::from_str_spec(input)) {
             (Ok(native), Ok(modeled)) => view(&native) == view(&modeled),
             (Err(_), Err(_)) => true,
             _ => false,

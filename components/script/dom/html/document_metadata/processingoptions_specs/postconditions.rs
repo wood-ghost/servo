@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::str::FromStr;
 use mime::{FromStrError, Mime};
 use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
+use SpecMime::FromStrSpec;
 use net_traits::request::Destination;
 use script_bindings::refcounted::Trusted;
 use servo_base::id::WebViewId;
@@ -24,12 +24,12 @@ pub(crate) uninterp spec fn is_supported_by_user_agent(mt: &SpecMime::MimeView) 
 // <https://html.spec.whatwg.org/multipage/#match-preload-type>
 // For the purposes of this section, a string type matches a preload destination destination if the following algorithm returns true:
 pub(crate) open spec fn type_matches_destination_ok(
-    type_: &str,
+    type_: Seq<char>,
     destination: Destination, 
     // NOTE: preload destination is translated into Destination before LinkProcessingOptions 
 ) -> bool {
     // 1. If type is an empty string, then return true.
-    if type_@ == ""@ {
+    if type_ == ""@ {
         true
     } else {
         // 2. If destination is "fetch", then return true.
@@ -37,7 +37,7 @@ pub(crate) open spec fn type_matches_destination_ok(
             true
         } else {
             // 3. Let mimeTypeRecord be the result of parsing type.
-            let mime_type_record: Result<Mime, FromStrError> = Mime::from_str(type_);
+            let mime_type_record: Result<Mime, FromStrError> = Mime::from_str_spec(type_);
             match mime_type_record {
                 // 4. If mimeTypeRecord is failure, then return false.
                 Err(_) => false,

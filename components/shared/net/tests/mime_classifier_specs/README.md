@@ -86,19 +86,15 @@ failing assertion, and Rust type error `E0308`. Only the latter two controls
 expect an error. Missing tools, crashes, timeouts, and arbitrary compiler errors
 do not count as an expected assertion failure.
 
-### Spec-callable `Mime::from_str`: 2026-11-11
+### Sequence-based MIME parsing: 2026-11-11
 
-`Mime::from_str` now also works in spec mode with its original
-`&str -> Result<Mime, FromStrError>` interface. A concrete
-`#[verifier::when_used_as_spec(spec_from_str)]` binding inherits the existing
-`FromStr` trait contract; it adds no stronger native-result postcondition.
-The generic `str::parse` contract retains its original form.
-The concrete binding retains `<Mime as FromStr>::Err` for exact signature
-matching. A trait-extension-level binding in the installed verifier failed to
-resolve `ExFromStr::from_str_spec`; the concrete implementation binding passed
-both positive checks and a missing-precondition negative control.
+The `FromStrSpec` trait exposes
+`Mime::from_str_spec(Seq<char>) -> Result<Mime, FromStrError>`.
+Both the parsing specification and `type_matches_destination_ok` take character
+sequences. Native matching and preload contracts pass `self.link_type@` directly.
+The executable `FromStr` and `str::parse` contracts retain their original forms.
 
-`spec_from_str` uses `choose` over the existing `from_str_ensures` relation.
+`from_str_spec` uses `choose` over the existing `from_str_ensures` relation.
 Its proved `lemma_spec_from_str_matches_result` takes a valid result as an
 existence witness and establishes agreement of success/failure and successful
 MIME views. There is no blanket representation-existence axiom or assumption
@@ -114,18 +110,22 @@ BINDGEN_EXTRA_CLANG_ARGS="-isystem /usr/include/c++/13 -isystem /usr/include/x86
 ```
 
 With Verus `0.2026.10.29.62a9ca4.dirty` (Rust 1.99.1), **4 tests passed**:
-native/spec result-view agreement, equal-character string slices, CSS parsing
+native/spec result-view agreement, equal character sequences, CSS parsing
 in spec mode using a known constant as its witness, and an expected-failure
 control rejecting raw-result equality. These isolated clients retain lifetime
 and trait-conflict checking. They validate the model interface, not the native
 MIME parser's general correctness or WHATWG correspondence.
 
 A fresh `servo-net-traits` run with `--compile --no-lifetime --no-trait-conflicts
---expand-errors --multiple-errors 20 --num-threads 1` reported **207 verified,
+--expand-errors --multiple-errors 20` reported **207 verified,
 0 errors**. The native Rust 1.97.1 script check passed. The script package still
 reports **2 verified, 1 error** at native type matching's equality postcondition;
 UA-support correspondence and the native/preload-standard differences remain
 separate obligations. No solver resource limit was increased.
+
+An earlier same-day concrete autospec experiment passed positive checks and a
+missing-precondition negative control. It was superseded by this sequence-based
+interface at the user's request.
 
 ### Parent-parser execution: 2026-10-13
 

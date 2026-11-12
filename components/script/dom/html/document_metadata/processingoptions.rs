@@ -254,10 +254,7 @@ impl LinkProcessingOptions {
             // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
         ensures
-            // String-to-str coercion is executable; relate all slices with the
-            // same characters to the native string instead of calling it here.
-            forall|type_: &str| type_@ == self.link_type@ ==>
-                result == #[trigger] Spec::type_matches_destination_ok(type_, self.destination),
+            result == Spec::type_matches_destination_ok(self.link_type@, self.destination),
     {
         proof {
             assert(self.link_type@.len() == 0 ==> self.link_type@ =~= ""@);
@@ -324,9 +321,7 @@ impl LinkProcessingOptions {
             // INHERITED from type_matches_destination.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
             // IMPLICIT: native preload asserts a match instead of returning; witness: type="text/plain", destination=Style.
-            // Mirror type_matches_destination's slice-based postcondition.
-            forall|type_: &str| type_@ == self.link_type@ ==>
-                #[trigger] Spec::type_matches_destination_ok(type_, self.destination),
+            Spec::type_matches_destination_ok(self.link_type@, self.destination),
         ensures
             // Setup-only placeholder; document-state and fetch-effect guarantees are pending.
             Spec::preload_ensures(&self, webview_id, &link, document),

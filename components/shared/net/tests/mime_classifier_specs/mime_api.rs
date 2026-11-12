@@ -11,8 +11,8 @@
 #[allow(dead_code)] // The error-expectation helpers are exercised in mime_parse.rs.
 mod common;
 
-// Native-valued parsing in spec mode. These check the existing contract and
-// autospec binding; external-library correspondence remains a trusted boundary.
+// Native-valued parsing from character sequences in spec mode. These check the
+// existing contract; external-library correspondence remains a trusted boundary.
 
 test_verify_one_file! {
     #[test] from_str_spec_matches_native_result verus_code! {
@@ -22,11 +22,11 @@ test_verify_one_file! {
 
         broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
 
-        fn test(input: &str)
+        fn test(input: String)
             requires <mime::Mime as FromStrSpec>::from_str_requires(input@),
         {
-            let actual = mime::Mime::from_str(input);
-            let ghost modeled = mime::Mime::from_str(input);
+            let actual = mime::Mime::from_str(&input);
+            let ghost modeled = mime::Mime::from_str_spec(input@);
             assert(match (actual, modeled) {
                 (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
                 (Err(_), Err(_)) => true,
@@ -37,20 +37,20 @@ test_verify_one_file! {
 }
 
 test_verify_one_file! {
-    #[test] from_str_spec_equal_text_slices verus_code! {
+    #[test] from_str_spec_equal_character_sequences verus_code! {
         use std::str::FromStr;
         use vstd::prelude::*;
         use crate::mime_api::{FromStrSpec, view};
 
         broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
 
-        fn test(input: &str, same_text: &str)
+        fn test(input: String, same_text: String)
             requires
                 input@ == same_text@,
                 <mime::Mime as FromStrSpec>::from_str_requires(input@),
         {
-            let actual = mime::Mime::from_str(input);
-            let ghost modeled = mime::Mime::from_str(same_text);
+            let actual = mime::Mime::from_str(&input);
+            let ghost modeled = mime::Mime::from_str_spec(same_text@);
             assert(match (actual, modeled) {
                 (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
                 (Err(_), Err(_)) => true,
@@ -62,7 +62,6 @@ test_verify_one_file! {
 
 test_verify_one_file! {
     #[test] from_str_spec_css_without_exec_parse verus_code! {
-        use std::str::FromStr;
         use vstd::prelude::*;
         use crate::mime_api::{FromStrSpec, essence_str};
 
@@ -74,7 +73,7 @@ test_verify_one_file! {
         fn test() {
             let witness = mime::TEXT_CSS;
             assert(<mime::Mime as FromStrSpec>::from_str_ensures("text/css"@, Ok(witness)));
-            let ghost parsed = mime::Mime::from_str("text/css");
+            let ghost parsed = mime::Mime::from_str_spec("text/css"@);
             assert(parsed is Ok);
             assert(essence_str(&parsed->Ok_0) == "text/css"@);
         }
@@ -82,7 +81,7 @@ test_verify_one_file! {
 }
 
 // Negative control: the original contract identifies parsed views, not opaque
-// Mime values or error payloads. Autospec must not strengthen that contract.
+// Mime values or error payloads. The spec parser must not strengthen that contract.
 test_verify_one_file! {
     #[test] from_str_spec_does_not_assume_raw_equality verus_code! {
         use std::str::FromStr;
@@ -91,11 +90,11 @@ test_verify_one_file! {
 
         broadcast use crate::mime_api::lemma_spec_from_str_matches_result;
 
-        fn test(input: &str)
+        fn test(input: String)
             requires <mime::Mime as FromStrSpec>::from_str_requires(input@),
         {
-            let actual = mime::Mime::from_str(input);
-            let ghost modeled = mime::Mime::from_str(input);
+            let actual = mime::Mime::from_str(&input);
+            let ghost modeled = mime::Mime::from_str_spec(input@);
             assert(match (actual, modeled) {
                 (Ok(native), Ok(modeled_value)) => view(&native) == view(&modeled_value),
                 (Err(_), Err(_)) => true,
