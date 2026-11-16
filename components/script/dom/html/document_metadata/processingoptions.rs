@@ -29,6 +29,8 @@ use vstd::prelude::*;
 use super::processingoptions_specs as Spec;
 #[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
+#[cfg(verus_only)]
+use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
 
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
@@ -47,7 +49,11 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
 verus! {
 
-broadcast use net_traits::mime_classifier_specs::mime_api::lemma_spec_from_str_matches_result;
+broadcast use {
+    SpecMime::lemma_spec_from_str_matches_result,
+    SpecMime::mime_essence_str_lemmas,
+    SpecMimePredicates::mime_essence_parts_str_lemmas,
+};
 
 // Setup-only: external items are excluded from verification. Enable individual
 // functions and introduce their type models and contracts in subsequent steps.
@@ -283,6 +289,12 @@ impl LinkProcessingOptions {
             // Step 4. If mimeTypeRecord is failure, then return false.
             return false;
         };
+        proof {
+            if destination == Destination::Style
+                && SpecMime::essence_str(&mime_type_record) == "text/css"@ {
+                assert(SpecMime::view(&mime_type_record).params =~= Seq::empty());
+            }
+        }
         // Step 5. If mimeTypeRecord is not supported by the user agent, then return false.
         //
         // We currently don't check if we actually support the mime type. Only if we can classify

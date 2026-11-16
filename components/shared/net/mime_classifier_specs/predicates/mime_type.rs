@@ -9,55 +9,56 @@ verus! {
 /// Characterize the type, base subtype, and optional structured suffix using
 /// their positions in the full essence. The component string is arbitrary;
 /// no MIME table or fixed offset is needed to instantiate this lemma.
-pub(crate) broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: &str)
+pub broadcast proof fn lemma_mime_essence_parts_str(mt: &Mime, part: Seq<char>)
     ensures
-        #![trigger essence_str(mt), part@]
+        #![trigger essence_str(mt), vstd::pervasive::trigger(part)]
         essence_str(mt).len() == view(mt).type_.len() + 1 + view(mt).subtype.len()
             + match view(mt).suffix {
                 Some(suffix) => 1 + suffix.len(),
                 None => 0,
             },
         essence_str(mt)[view(mt).type_.len() as int] == '/',
-        (view(mt).type_.len() == part@.len()
-            && (forall|i: int| 0 <= i < part@.len() ==>
-                #[trigger] part@[i] == essence_str(mt)[i])) ==> view(mt).type_ == part@,
-        (view(mt).subtype.len() == part@.len()
-            && (forall|i: int| 0 <= i < part@.len() ==>
-                #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]))
-            ==> view(mt).subtype == part@,
+        (view(mt).type_.len() == part.len()
+            && (forall|i: int| 0 <= i < part.len() ==>
+                #[trigger] part[i] == essence_str(mt)[i])) ==> view(mt).type_ == part,
+        (view(mt).subtype.len() == part.len()
+            && (forall|i: int| 0 <= i < part.len() ==>
+                #[trigger] part[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]))
+            ==> view(mt).subtype == part,
         match view(mt).suffix {
             Some(suffix) => {
                 &&& essence_str(mt)[(view(mt).type_.len() + 1 + view(mt).subtype.len()) as int] == '+'
-                &&& (suffix.len() == part@.len()
-                    && (forall|i: int| 0 <= i < part@.len() ==>
-                        #[trigger] part@[i] == essence_str(mt)[
+                &&& (suffix.len() == part.len()
+                    && (forall|i: int| 0 <= i < part.len() ==>
+                        #[trigger] part[i] == essence_str(mt)[
                             view(mt).type_.len() + 2 + view(mt).subtype.len() + i]))
-                    ==> suffix == part@
+                    ==> suffix == part
             },
             None => true,
         },
 {
-    if view(mt).type_.len() == part@.len()
-        && (forall|i: int| 0 <= i < part@.len() ==>
-            #[trigger] part@[i] == essence_str(mt)[i]) {
-        assert_seqs_equal!(view(mt).type_ == part@);
+    if view(mt).type_.len() == part.len()
+        && (forall|i: int| 0 <= i < part.len() ==>
+            #[trigger] part[i] == essence_str(mt)[i]) {
+        assert_seqs_equal!(view(mt).type_ == part);
     }
-    if view(mt).subtype.len() == part@.len()
-        && (forall|i: int| 0 <= i < part@.len() ==>
-            #[trigger] part@[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]) {
-        assert_seqs_equal!(view(mt).subtype == part@);
+    if view(mt).subtype.len() == part.len()
+        && (forall|i: int| 0 <= i < part.len() ==>
+            #[trigger] part[i] == essence_str(mt)[view(mt).type_.len() + 1 + i]) {
+        assert_seqs_equal!(view(mt).subtype == part);
     }
     if let Some(suffix) = view(mt).suffix {
-        if suffix.len() == part@.len()
-            && (forall|i: int| 0 <= i < part@.len() ==>
-                #[trigger] part@[i] == essence_str(mt)[
+        if suffix.len() == part.len()
+            && (forall|i: int| 0 <= i < part.len() ==>
+                #[trigger] part[i] == essence_str(mt)[
                     view(mt).type_.len() + 2 + view(mt).subtype.len() + i]) {
-            assert_seqs_equal!(suffix == part@);
+            assert_seqs_equal!(suffix == part);
         }
     }
 }
 
-pub(crate) broadcast group mime_essence_parts_str_lemmas {
+pub broadcast group mime_essence_parts_str_lemmas {
+    lemma_essence_view_trigger,
     lemma_mime_essence_parts_str,
 }
 

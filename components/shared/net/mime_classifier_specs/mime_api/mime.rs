@@ -264,15 +264,27 @@ pub assume_specification<F: FromStr>[ str::parse::<F> ](s: &str) -> (
 
 // Proof lemmas over the abstract view.
 
+/// Activate sequence-based essence lemmas for existing character-sequence views.
+/// Matching View terms preserves the old string-view trigger behavior without
+/// instantiating the lemmas for every intermediate sequence length or index.
+pub broadcast proof fn lemma_essence_view_trigger<T: View<V = Seq<char>> + ?Sized>(
+    mt: &Mime,
+    text: &T,
+)
+    ensures
+        #![trigger essence_str(mt), text@]
+        vstd::pervasive::trigger(text@),
+{}
+
 /// Reconstruct the full essence from the type, base subtype, and optional suffix.
-pub(crate) broadcast proof fn lemma_essence_str(mt: &Mime, expected: &str)
+pub broadcast proof fn lemma_essence_str(mt: &Mime, expected: Seq<char>)
     requires
-        expected@.len() == view(mt).type_.len() + 1 + view(mt).subtype.len()
+        expected.len() == view(mt).type_.len() + 1 + view(mt).subtype.len()
             + match view(mt).suffix {
                 Some(suffix) => 1 + suffix.len(),
                 None => 0,
             },
-        forall|i: int| 0 <= i < expected@.len() ==> #[trigger] expected@[i] ==
+        forall|i: int| 0 <= i < expected.len() ==> #[trigger] expected[i] ==
             if i < view(mt).type_.len() {
                 view(mt).type_[i]
             } else if i == view(mt).type_.len() {
@@ -285,13 +297,14 @@ pub(crate) broadcast proof fn lemma_essence_str(mt: &Mime, expected: &str)
                 view(mt).suffix->Some_0[i - view(mt).type_.len() - 2 - view(mt).subtype.len()]
             },
     ensures
-        #![trigger essence_str(mt), expected@]
-        essence_str(mt) =~= expected@,
+        #![trigger essence_str(mt), vstd::pervasive::trigger(expected)]
+        essence_str(mt) =~= expected,
 {
-    assert(essence_str(mt) =~= expected@);
+    assert(essence_str(mt) =~= expected);
 }
 
-pub(crate) broadcast group mime_essence_str_lemmas {
+pub broadcast group mime_essence_str_lemmas {
+    lemma_essence_view_trigger,
     lemma_essence_str,
 }
 
