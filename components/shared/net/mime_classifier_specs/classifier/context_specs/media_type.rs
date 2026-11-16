@@ -43,27 +43,28 @@ use crate::mime_classifier_specs::classifier::context_specs::others::{
 
 verus! {
 
-pub open spec fn get_media_type_spec(
-    mime: &Mime, result: Option<MediaType>
-) -> bool {
-    &&& (result == Some(MediaType::Xml)) == is_xml(mime)
-    &&& (result == Some(MediaType::Html)) == (!is_xml(mime) && is_html(mime))
-    &&& (result == Some(MediaType::Image)) == (!is_xml(mime) && !is_html(mime) && is_image(mime))
-    &&& (result == Some(MediaType::AudioVideo)) == (!is_xml(mime) && !is_html(mime) 
-                                                    && !is_image(mime) && is_audio_video(mime))
-    &&& (result == Some(MediaType::JavaScript)) == (!is_xml(mime) && !is_html(mime) 
-                    && !is_image(mime) && !is_audio_video(mime) && is_javascript(mime))
-    &&& (result == Some(MediaType::Font)) == (!is_xml(mime) && !is_html(mime) 
-                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && is_font(mime))
-    &&& (result == Some(MediaType::Json)) == (!is_xml(mime) && !is_html(mime) 
-                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
-                    && is_json(mime))
-    &&& (result == Some(MediaType::Text)) == (!is_xml(mime) && !is_html(mime) 
-                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
-                    && !is_json(mime) && is_text(mime))
-    &&& (result == Some(MediaType::Css)) == (!is_xml(mime) && !is_html(mime) 
-                    && !is_image(mime) && !is_audio_video(mime) && !is_javascript(mime) && !is_font(mime) 
-                    && !is_json(mime) && !is_text(mime) && is_css(mime))
+pub open spec fn get_media_type_spec(mime: &Mime) -> Option<MediaType> {
+    if is_xml(mime) {
+        Some(MediaType::Xml)
+    } else if is_html(mime) {
+        Some(MediaType::Html)
+    } else if is_image(mime) {
+        Some(MediaType::Image)
+    } else if is_audio_video(mime) {
+        Some(MediaType::AudioVideo)
+    } else if is_javascript(mime) {
+        Some(MediaType::JavaScript)
+    } else if is_font(mime) {
+        Some(MediaType::Font)
+    } else if is_json(mime) {
+        Some(MediaType::Json)
+    } else if is_text(mime) {
+        Some(MediaType::Text)
+    } else if is_css(mime) {
+        Some(MediaType::Css)
+    } else {
+        None
+    }
 }
 
 // ------------------------------------

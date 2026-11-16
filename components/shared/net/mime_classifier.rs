@@ -698,7 +698,7 @@ impl MimeClassifier {
         requires
             SpecRequires::get_media_type_requires(mime),
         ensures
-            SpecClassifier::get_media_type_spec(mime, result),
+            result == SpecClassifier::get_media_type_spec(mime),
     {
         if MimeClassifier::is_xml(mime) {
             Some(MediaType::Xml)
@@ -728,7 +728,7 @@ impl MimeClassifier {
             SpecRequires::maybe_get_media_type_requires(supplied_type),
         ensures
             match supplied_type {
-                Some(mt) => SpecClassifier::get_media_type_spec(mt, result),
+                Some(mt) => result == SpecClassifier::get_media_type_spec(mt),
                 None => result == None,
             },
     {
