@@ -7,128 +7,13 @@
 
 #![verifier::auto_reveal_strlit]
 
-use content_security_policy::{PolicyDisposition, PolicySource};
 use net_traits::ReferrerPolicy;
-use net_traits::request::Destination;
+use servo_base::id::WebViewId;
 use vstd::prelude::*;
 
+use super::super::csp_api::CspListView;
+
 verus! {
-
-// =========================
-//      Destination
-// =========================
-
-/// Specification-level conversions for Servo's existing Fetch destination.
-/// https://fetch.spec.whatwg.org/#destination-type
-/// Destination::None denotes the empty destination; "fetch" is a potential
-/// destination translated by the preload algorithm, not a value of the enum.
-pub(crate) trait DestinationSpec: Sized {
-    spec fn from_str(value: Seq<char>) -> Option<Self>;
-    spec fn to_str(&self) -> Seq<char>;
-}
-
-impl DestinationSpec for Destination {
-    open spec fn to_str(&self) -> Seq<char> {
-        match *self {
-            Destination::None => ""@,
-            Destination::Audio => "audio"@,
-            Destination::AudioWorklet => "audioworklet"@,
-            Destination::Document => "document"@,
-            Destination::Embed => "embed"@,
-            Destination::Font => "font"@,
-            Destination::Frame => "frame"@,
-            Destination::IFrame => "iframe"@,
-            Destination::Image => "image"@,
-            Destination::Json => "json"@,
-            Destination::Manifest => "manifest"@,
-            Destination::Object => "object"@,
-            Destination::PaintWorklet => "paintworklet"@,
-            Destination::Report => "report"@,
-            Destination::Script => "script"@,
-            Destination::ServiceWorker => "serviceworker"@,
-            Destination::SharedWorker => "sharedworker"@,
-            Destination::Style => "style"@,
-            Destination::Text => "text"@,
-            Destination::Track => "track"@,
-            Destination::Video => "video"@,
-            Destination::WebIdentity => "webidentity"@,
-            Destination::Worker => "worker"@,
-            Destination::Xslt => "xslt"@,
-        }
-    }
-
-    /// Representation lookup, not a second definition of Fetch translation.
-    /// Every standard destination name maps to the existing native enum variant.
-    open spec fn from_str(value: Seq<char>) -> Option<Self> {
-        if value == ""@ { Some(Destination::None) }
-            else if value == "audio"@ { Some(Destination::Audio) }
-            else if value == "audioworklet"@ { Some(Destination::AudioWorklet) }
-            else if value == "document"@ { Some(Destination::Document) }
-            else if value == "embed"@ { Some(Destination::Embed) }
-            else if value == "font"@ { Some(Destination::Font) }
-            else if value == "frame"@ { Some(Destination::Frame) }
-            else if value == "iframe"@ { Some(Destination::IFrame) }
-            else if value == "image"@ { Some(Destination::Image) }
-            else if value == "json"@ { Some(Destination::Json) }
-            else if value == "manifest"@ { Some(Destination::Manifest) }
-            else if value == "object"@ { Some(Destination::Object) }
-            else if value == "paintworklet"@ { Some(Destination::PaintWorklet) }
-            else if value == "report"@ { Some(Destination::Report) }
-            else if value == "script"@ { Some(Destination::Script) }
-            else if value == "serviceworker"@ { Some(Destination::ServiceWorker) }
-            else if value == "sharedworker"@ { Some(Destination::SharedWorker) }
-            else if value == "style"@ { Some(Destination::Style) }
-            else if value == "text"@ { Some(Destination::Text) }
-            else if value == "track"@ { Some(Destination::Track) }
-            else if value == "video"@ { Some(Destination::Video) }
-            else if value == "webidentity"@ { Some(Destination::WebIdentity) }
-            else if value == "worker"@ { Some(Destination::Worker) }
-            else if value == "xslt"@ { Some(Destination::Xslt) }
-            else { None }
-    }
-}
-
-// https://fetch.spec.whatwg.org/#destination-type
-// A destination type is one of: the empty string, "audio", "audioworklet", "document", "embed", "font", "frame", "iframe", "image", "json", "manifest", "object", "paintworklet", "report", "script", "serviceworker", "sharedworker", "style", "text", "track", "video", "webidentity", "worker", or "xslt". 
-pub open spec fn destination_types() -> Set<Seq<char>> {
-    set![
-        ""@,
-        "audio"@,
-        "audioworklet"@,
-        "document"@,
-        "embed"@,
-        "font"@,
-        "frame"@,
-        "iframe"@,
-        "image"@,
-        "json"@,
-        "manifest"@,
-        "object"@,
-        "paintworklet"@,
-        "report"@,
-        "script"@,
-        "serviceworker"@,
-        "sharedworker"@,
-        "style"@,
-        "text"@,
-        "track"@,
-        "video"@,
-        "webidentity"@,
-        "worker"@,
-        "xslt"@,
-    ]
-}
-
-/// Also establishes the domain for arbitrary spec-mode values.
-/// TODO: Useful?
-pub(crate) broadcast proof fn lemma_destination_name_valid(d: Destination)
-    ensures
-        destination_types().contains(#[trigger] d.to_str()),
-{}
-
-pub(crate) proof fn destination_from_name_roundtrip(destination: Destination)
-    ensures Destination::from_str(destination.to_str()) == Some(destination),
-{}
 
 // =========================
 //      LinkFetchPriority
@@ -371,27 +256,15 @@ pub(crate) enum IntegritySource { Inline }
 // A destination is a destination type. The possible values for it are "script" and "style".
 pub(crate) enum IntegrityDestination { Script, Style }
 
-// https://w3c.github.io/webappsec-csp/#csp-list
-// Editor's Draft 2026-10-27; inspected 2026-10-30.
-// A CSP list is a struct consisting of policies (a list of policies) and a self-origin (an origin which is used when matching the 'self' keyword).
-pub(crate) struct CspListView {
-    pub policies: Seq<CspPolicyView>,
-    pub self_origin: Origin,
-}
+// =========================
+//      Window
+// =========================
 
-// https://w3c.github.io/webappsec-csp/#content-security-policy-object
-pub(crate) struct CspPolicyView {
-    // Each policy has an associated directive set, which is an ordered set of directives that define the policy’s implications when applied.
-    pub directive_set: Seq<CspDirectiveView>,
-    // Each policy has an associated disposition, which is either "enforce" or "report".
-    pub disposition: PolicyDisposition,
-    // Each policy has an associated source, which is either "header" or "meta".
-    pub source: PolicySource,
+/// Stable window metadata needed by link processing.
+/// The identifier is Servo's existing WebViewId, as returned by Window::webview_id.
+pub(crate) struct WindowView {
+    pub webview_id: WebViewId,
 }
-
-// https://w3c.github.io/webappsec-csp/#directives
-// Each directive is a name / value pair. The name is a non-empty string, and the value is a set of non-empty strings. The value MAY be empty.
-pub(crate) struct CspDirectiveView { pub name: Seq<char>, pub value: Seq<Seq<char>> }
 
 // =========================
 //      Document
@@ -401,6 +274,7 @@ pub(crate) struct CspDirectiveView { pub name: Seq<char>, pub value: Seq<Seq<cha
 // as it is not included in servo implementation, leave the related parts as uninterp
 pub(crate) struct DocumentView {
     pub id: int,
+    pub window: WindowView,
 }
 
 // =========================

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use mime::{FromStrError, Mime};
-use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
+use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime, predicates as SpecMimePredicates};
 use SpecMime::FromStrSpec;
 use net_traits::request::Destination;
 use script_bindings::refcounted::Trusted;
@@ -15,11 +15,6 @@ use crate::dom::types::HTMLLinkElement;
 use super::super::processingoptions::LinkProcessingOptions;
 
 verus! {
-
-// UA support depends on MIME contents, including parameters, so representatives
-// with equal MimeView values have the same support answer.
-// TRUSTED(scope): not verified yet; remove when user-agent decoder support correspondence is verified
-pub(crate) uninterp spec fn is_supported_by_user_agent(mt: &SpecMime::MimeView) -> bool;
 
 // <https://html.spec.whatwg.org/multipage/#match-preload-type>
 // For the purposes of this section, a string type matches a preload destination destination if the following algorithm returns true:
@@ -43,7 +38,8 @@ pub(crate) open spec fn type_matches_destination_ok(
                 Err(_) => false,
                 Ok(mtr) => {
                     // 5. If mimeTypeRecord is not supported by the user agent, then return false. TODO:
-                    if !is_supported_by_user_agent(&SpecMime::view(&mtr)) {
+                    // Model actual decoder support; Servo currently approximates it with MIME classification.
+                    if SpecClassifier::get_media_type_spec(&mtr) is None {
                         false
                     } else {
                         // 6. If any of the following are true:
@@ -58,6 +54,14 @@ pub(crate) open spec fn type_matches_destination_ok(
                             || (destination == Destination::Style && SpecMime::essence_str(&mtr) == "text/css"@)
                             // 6.5 estination is "track" and mimeTypeRecord's essence is text/vtt,
                             || (destination == Destination::Track && SpecMime::essence_str(&mtr) == "text/vtt"@)
+                            // The following features are included additionally in Servo
+                            // destination is "audio" or "video", and mimeTypeRecord is an audio or video MIME type;
+                            || ((destination == Destination::Audio || destination == Destination::Video)
+                                && SpecMimePredicates::is_audio_video(&mtr))
+                            // destination is a script-like destination and mimeTypeRecord is a JavaScript MIME type;
+                            || (destination.is_script_like() && SpecMimePredicates::is_javascript(&mtr))
+                            // destination is "json" and mimeTypeRecord is a JSON MIME type;
+                            || (destination == Destination::Json && SpecMimePredicates::is_json(&mtr))
                         {
                             // 6. then return true
                             true
@@ -81,6 +85,17 @@ pub(crate) uninterp spec fn preload_ensures(
     options: &LinkProcessingOptions,
     webview_id: WebViewId,
     link: &Option<Trusted<HTMLLinkElement>>,
+    document: &Document,
+) -> bool;
+
+/// Unfinished postcondition boundary for processing one link header.
+/// This input-only marker observes no document snapshot or dispatch trace.
+/// Replace it with an invocation-bound state/effect relation when the document
+/// model is added; it currently establishes no behavior property.
+// TRUSTED(scope): not verified yet; remove when process_link_header's document-state/effect correspondence is verified
+pub(crate) uninterp spec fn process_link_header_ensures(
+    options: &LinkProcessingOptions,
+    rel: Seq<char>,
     document: &Document,
 ) -> bool;
 

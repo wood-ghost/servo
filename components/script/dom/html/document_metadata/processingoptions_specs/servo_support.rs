@@ -9,11 +9,10 @@
 //! Replace these declarations as their owning modules gain Verus support.
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
-use content_security_policy::{PolicyDisposition, PolicySource};
 use js::gc::Traceable;
 use net_traits::ReferrerPolicy;
 use net_traits::policy_container::PolicyContainer;
-use net_traits::request::{CorsSettings, Destination, Referrer, RequestClient};
+use net_traits::request::{CorsSettings, Referrer, RequestClient};
 use script_bindings::refcounted::Trusted;
 use script_bindings::reflector::DomObject;
 use servo_base::id::WebViewId;
@@ -23,47 +22,11 @@ use vstd::prelude::*;
 use crate::dom::document::Document;
 use crate::dom::srcset::SourceSet;
 use crate::dom::types::HTMLLinkElement;
+use crate::dom::window::Window;
+
+use super::processing::types::{DocumentView, WindowView};
 
 verus! {
-
-// Destination is transparent so the type-matching body can name its variants.
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-#[verifier::external_type_specification]
-pub struct ExDestination(Destination);
-
-pub open spec fn destination_is_script_like(destination: Destination) -> bool {
-    matches!(
-        destination,
-        Destination::AudioWorklet
-            | Destination::PaintWorklet
-            | Destination::Script
-            | Destination::ServiceWorker
-            | Destination::SharedWorker
-            | Destination::Worker
-            | Destination::Xslt
-    )
-}
-
-// TODO: Remove this local assumption when a verified or shared contract for
-// Destination::is_script_like is supplied by its owning dependency or net_traits.
-// Verifying net_traits alone does not verify this content-security-policy method.
-// Matches the implementation in content-security-policy 0.9.0, src/lib.rs:1025-1031.
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-pub assume_specification[Destination::is_script_like](
-    destination: Destination,
-) -> (result: bool)
-    ensures
-        result == destination_is_script_like(destination),
-;
-
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-pub assume_specification[ <Destination as PartialEq<Destination>>::eq ](
-    left: &Destination,
-    right: &Destination,
-) -> (result: bool)
-    ensures
-        result == (*left == *right),
-;
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::CorsSettings is verified
 #[verifier::external_type_specification]
@@ -72,14 +35,6 @@ pub struct ExCorsSettings(CorsSettings);
 // TRUSTED(scope): not verified yet; remove when net_traits::ReferrerPolicy is verified
 #[verifier::external_type_specification]
 pub struct ExReferrerPolicy(ReferrerPolicy);
-
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-#[verifier::external_type_specification]
-pub struct ExPolicyDisposition(PolicyDisposition);
-
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-#[verifier::external_type_specification]
-pub struct ExPolicySource(PolicySource);
 
 // TRUSTED(scope): not verified yet; remove when net_traits::policy_container is verified
 #[verifier::external_type_specification]
@@ -154,5 +109,52 @@ pub struct ExHTMLLinkElement(HTMLLinkElement);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExDocument(Document);
+
+// TRUSTED(scope): not verified yet; remove when dom::window is verified
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExWindow(Window);
+
+// These projections expose stable identity metadata. Mutable document/window
+// contents need separate invocation snapshots and are not included here.
+impl View for Document {
+    type V = DocumentView;
+
+    // TRUSTED(scope): not verified yet; remove when Document's view correspondence is verified
+    uninterp spec fn view(&self) -> DocumentView;
+}
+
+impl View for Window {
+    type V = WindowView;
+
+    // TRUSTED(scope): not verified yet; remove when Window's view correspondence is verified
+    uninterp spec fn view(&self) -> WindowView;
+}
+
+// Document::window returns &self.window; preserve its native borrow lifetime.
+// TRUSTED(scope): not verified yet; remove when Document::window is verified
+pub(crate) assume_specification<'a>[Document::window](
+    document: &'a Document,
+) -> (result: &'a Window)
+    ensures
+        result@ == document@.window,
+;
+
+// Window::webview_id reads the immutable id in its shared WebViewState.
+// TRUSTED(scope): not verified yet; remove when Window::webview_id is verified
+pub(crate) assume_specification[Window::webview_id](
+    window: &Window,
+) -> (result: WebViewId)
+    ensures
+        result == window@.webview_id,
+;
+
+/// Verification client for composing the two trusted accessor contracts.
+fn document_window_webview_id_contract(document: &Document) -> (result: WebViewId)
+    ensures
+        result == document@.window.webview_id,
+{
+    document.window().webview_id()
+}
 
 } // verus!

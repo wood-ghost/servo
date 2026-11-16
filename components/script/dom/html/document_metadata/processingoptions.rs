@@ -76,7 +76,7 @@ pub(crate) enum LinkProcessingPhase {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#link-processing-options>
-// Field types needed by the contracts are declared in processingoptions_specs::servo_support.
+// Field types needed by the contracts are declared in processingoptions_specs::{servo_support, csp_api}.
 #[derive(Debug)]
 pub(crate) struct LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#link-options-href>
@@ -168,8 +168,15 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
     // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::process_link_header is verified
-    #[verifier::external]
-    fn process_link_header(self, rel: &str, document: &Document) {
+    #[verifier::external_body]
+    fn process_link_header(self, rel: &str, document: &Document)
+        requires
+            // INHERITED from the type check and the guarded preload call.
+            SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
+        ensures
+            // Setup-only placeholder; invocation-state and dispatch effects are pending.
+            Spec::process_link_header_ensures(&self, rel@, document),
+    {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
             // The process a link header step for this type of link given a link processing options options
@@ -251,7 +258,7 @@ impl LinkProcessingOptions {
     #[verifier::auto_reveal_strlit]
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
-            // INHERITED from Mime::from_str and MimeClassifier::get_media_type.
+            // INHERITED MIME call requirements and IMPLICIT CSS compatibility; see requires.rs.
             SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
         ensures
             result == Spec::type_matches_destination_ok(self.link_type@, self.destination),
@@ -318,10 +325,8 @@ impl LinkProcessingOptions {
         document: &Document,
     )
         requires
-            // INHERITED from type_matches_destination.
-            SpecRequires::type_matches_destination_requires(self.link_type@, self.destination),
-            // IMPLICIT: native preload asserts a match instead of returning; witness: type="text/plain", destination=Style.
-            Spec::type_matches_destination_ok(self.link_type@, self.destination),
+            // IMPLICIT/INHERITED requirements are documented in preload_requires.
+            SpecRequires::preload_requires(self.link_type@, self.destination),
         ensures
             // Setup-only placeholder; document-state and fetch-effect guarantees are pending.
             Spec::preload_ensures(&self, webview_id, &link, document),
