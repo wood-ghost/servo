@@ -5,6 +5,7 @@
 use mime::Mime;
 use net_traits::mime_classifier_specs::{
     mime_api::{self as SpecMime, FromStrSpec},
+    predicates as SpecMimePredicates,
     requires as MimeRequires,
 };
 use net_traits::request::Destination;
@@ -14,10 +15,12 @@ use super::postconditions::type_matches_destination_ok;
 
 verus! {
 
-/// Inherit MIME requirements along the calls made by type_matches_destination.
+/// MIME call requirements and compatibility restrictions for type matching.
 /// Empty types and fetch destinations skip parsing. A parse failure imposes no
 /// classifier requirement; every allowed successful result must satisfy the
 /// existing classifier requirement, without copying its suffix restrictions.
+/// Audio/video and font matches must not be shadowed by XML. JSON matches must
+/// not be shadowed by image, audio/video, or font classification.
 /// Style inputs matching the CSS essence additionally require empty parameters
 /// and no structured suffix for compatibility with the native CSS comparison.
 pub(crate) open spec fn type_matches_destination_requires(
@@ -32,6 +35,24 @@ pub(crate) open spec fn type_matches_destination_requires(
             #[trigger] <Mime as FromStrSpec>::from_str_ensures(link_type, Ok(mt))
                 ==> {
                     &&& MimeRequires::get_media_type_requires(&mt)
+                    // IMPLICIT: Servo selects XML before AudioVideo; excluded witnesses:
+                    // type="audio/foo+xml", destination=Audio;
+                    // type="video/foo+xml", destination=Video.
+                    &&& (((destination == Destination::Audio || destination == Destination::Video)
+                        && SpecMimePredicates::is_audio_video(&mt))
+                        ==> !SpecMimePredicates::is_xml(&mt))
+                    // IMPLICIT: Servo selects XML before Font; excluded witness:
+                    // type="font/foo+xml", destination=Font.
+                    &&& ((destination == Destination::Font && SpecMimePredicates::is_font(&mt))
+                        ==> !SpecMimePredicates::is_xml(&mt))
+                    // IMPLICIT: Servo selects Image, AudioVideo, and Font before Json.
+                    // Excluded witnesses for destination=Json: type="image/foo+json",
+                    // type="audio/foo+json", and type="font/foo+json".
+                    &&& ((destination == Destination::Json && SpecMimePredicates::is_json(&mt)) ==> {
+                        &&& !SpecMimePredicates::is_image(&mt)
+                        &&& !SpecMimePredicates::is_audio_video(&mt)
+                        &&& !SpecMimePredicates::is_font(&mt)
+                    })
                     &&& ((destination == Destination::Style
                         && SpecMime::essence_str(&mt) == "text/css"@) ==> {
                         // IMPLICIT: Servo compares the full CSS record; excluded witness:

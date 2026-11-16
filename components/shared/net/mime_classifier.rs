@@ -56,6 +56,7 @@ pub struct MimeClassifier {
 }
 
 #[derive(PartialEq)]
+#[cfg_attr(verus_only, derive(Structural))]
 pub enum MediaType {
     Xml,
     Html,

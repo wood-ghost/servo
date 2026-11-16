@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use mime::{FromStrError, Mime};
-use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime, predicates as SpecMimePredicates};
+use net_traits::mime_classifier::MediaType;
+use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
 use SpecMime::FromStrSpec;
 use net_traits::request::Destination;
 use script_bindings::refcounted::Trusted;
@@ -39,36 +40,38 @@ pub(crate) open spec fn type_matches_destination_ok(
                 Ok(mtr) => {
                     // 5. If mimeTypeRecord is not supported by the user agent, then return false. TODO:
                     // Model actual decoder support; Servo currently approximates it with MIME classification.
-                    if SpecClassifier::get_media_type_spec(&mtr) is None {
-                        false
-                    } else {
-                        // 6. If any of the following are true:
-                        if
-                            // 6.1 destination is "script" and mimeTypeRecord is a JavaScript MIME type;
-                            (destination == Destination::Script && SpecMimePredicates::is_javascript(&mtr))
-                            // 6.2 destination is "image" and mimeTypeRecord is an image MIME type;
-                            || (destination == Destination::Image && SpecMimePredicates::is_image(&mtr))
-                            // 6.3 destination is "font" and mimeTypeRecord is a font MIME type;
-                            || (destination == Destination::Font && SpecMimePredicates::is_font(&mtr))
-                            // 6.4 destination is "style" and mimeTypeRecord's essence is text/css; or
-                            || (destination == Destination::Style && SpecMime::essence_str(&mtr) == "text/css"@)
-                            // 6.5 estination is "track" and mimeTypeRecord's essence is text/vtt,
-                            || (destination == Destination::Track && SpecMime::essence_str(&mtr) == "text/vtt"@)
-                            // The following features are included additionally in Servo
-                            // destination is "audio" or "video", and mimeTypeRecord is an audio or video MIME type;
-                            || ((destination == Destination::Audio || destination == Destination::Video)
-                                && SpecMimePredicates::is_audio_video(&mtr))
-                            // destination is a script-like destination and mimeTypeRecord is a JavaScript MIME type;
-                            || (destination.is_script_like() && SpecMimePredicates::is_javascript(&mtr))
-                            // destination is "json" and mimeTypeRecord is a JSON MIME type;
-                            || (destination == Destination::Json && SpecMimePredicates::is_json(&mtr))
-                        {
-                            // 6. then return true
-                            true
-                        } else {
-                            // 7. Return false.
-                            false
-                        }
+                    match SpecClassifier::get_media_type_spec(&mtr) {
+                        None => false,
+                        Some(mt) => {
+                            // Destination-specific preconditions exclude known MIME-group priority conflicts.
+                            // 6. If any of the following are true:
+                            if
+                                // 6.1 destination is "script" and mimeTypeRecord is a JavaScript MIME type;
+                                (destination == Destination::Script && mt == MediaType::JavaScript)
+                                // 6.2 destination is "image" and mimeTypeRecord is an image MIME type;
+                                || (destination == Destination::Image && mt == MediaType::Image)
+                                // 6.3 destination is "font" and mimeTypeRecord is a font MIME type;
+                                || (destination == Destination::Font && mt == MediaType::Font)
+                                // 6.4 destination is "style" and mimeTypeRecord's essence is text/css; or
+                                || (destination == Destination::Style && SpecMime::essence_str(&mtr) == "text/css"@)
+                                // 6.5 destination is "track" and mimeTypeRecord's essence is text/vtt,
+                                || (destination == Destination::Track && SpecMime::essence_str(&mtr) == "text/vtt"@)
+                                // The following features are included additionally in Servo
+                                // destination is "audio" or "video", and mimeTypeRecord is an audio or video MIME type;
+                                || ((destination == Destination::Audio || destination == Destination::Video)
+                                    && mt == MediaType::AudioVideo)
+                                // destination is a script-like destination and mimeTypeRecord is a JavaScript MIME type;
+                                || (destination.is_script_like() && mt == MediaType::JavaScript)
+                                // destination is "json" and mimeTypeRecord is a JSON MIME type;
+                                || (destination == Destination::Json && mt == MediaType::Json)
+                            {
+                                // 6. then return true
+                                true
+                            } else {
+                                // 7. Return false.
+                                false
+                            }
+                        },
                     }
                 },
             }
