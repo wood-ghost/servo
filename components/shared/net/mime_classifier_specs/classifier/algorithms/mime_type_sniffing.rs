@@ -385,4 +385,370 @@ pub(crate) open spec fn mime_type_sniffing_result<C: MimeClassifierModel>(
         && trace.last().computed_mime_type == Some(result)
 }
 
+// Execution through the generated state-machine relations, following mime_parse_automaton.
+
+pub open spec fn mime_type_sniffing_final_state<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: Option<Mime>,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    data: Seq<u8>,
+) -> mime_classifier_automaton::State<C> {
+    let initial = choose|state: mime_classifier_automaton::State<C>|
+        mime_classifier_automaton::State::<C>::initialize(
+            state, classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        );
+    mime_type_sniffing_run(initial)
+}
+
+pub open spec fn mime_type_sniffing_terminal(state: MimeTypeSniffState) -> bool {
+    state == MimeTypeSniffState::Final
+}
+
+// Select a successor without duplicating the DSL's field updates. Progress is
+// proved for invariant-valid states; terminal states are left unchanged.
+pub open spec fn mime_type_sniffing_step<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+) -> mime_classifier_automaton::State<C> {
+    if mime_type_sniffing_terminal(pre.state) {
+        pre
+    } else {
+        choose|post: mime_classifier_automaton::State<C>|
+            mime_classifier_automaton::State::<C>::next(pre, post)
+    }
+}
+
+// Every transition advances a phase or finishes; no input-dependent fuel is needed.
+pub open spec fn mime_type_sniffing_phase_rank(state: MimeTypeSniffState) -> nat {
+    match state {
+        MimeTypeSniffState::Init => 9,
+        MimeTypeSniffState::State1 => 8,
+        MimeTypeSniffState::State2 => 7,
+        MimeTypeSniffState::State3 => 6,
+        MimeTypeSniffState::State4 => 5,
+        MimeTypeSniffState::State5 => 4,
+        MimeTypeSniffState::State6 => 3,
+        MimeTypeSniffState::State7 => 2,
+        MimeTypeSniffState::State8 => 1,
+        MimeTypeSniffState::Final => 0,
+    }
+}
+
+pub proof fn mime_type_sniffing_next_exists<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+) -> (post: mime_classifier_automaton::State<C>)
+    requires pre.invariant(), !mime_type_sniffing_terminal(pre.state),
+    ensures
+        mime_classifier_automaton::State::<C>::next(pre, post),
+        post.invariant(),
+{
+    match pre.state {
+        MimeTypeSniffState::Init => {
+            let post = mime_classifier_automaton::take_step::step1(pre);
+            mime_classifier_automaton::show::step1(pre, post);
+            post
+        },
+        MimeTypeSniffState::State1 => {
+            let post = mime_classifier_automaton::take_step::step2(pre);
+            mime_classifier_automaton::show::step2(pre, post);
+            post
+        },
+        MimeTypeSniffState::State2 => {
+            let post = mime_classifier_automaton::take_step::step3(pre);
+            mime_classifier_automaton::show::step3(pre, post);
+            post
+        },
+        MimeTypeSniffState::State3 => {
+            let post = mime_classifier_automaton::take_step::step4(pre);
+            mime_classifier_automaton::show::step4(pre, post);
+            post
+        },
+        MimeTypeSniffState::State4 => {
+            let post = mime_classifier_automaton::take_step::step5(pre);
+            mime_classifier_automaton::show::step5(pre, post);
+            post
+        },
+        MimeTypeSniffState::State5 => {
+            let post = mime_classifier_automaton::take_step::step6(pre);
+            mime_classifier_automaton::show::step6(pre, post);
+            post
+        },
+        MimeTypeSniffState::State6 => {
+            let post = mime_classifier_automaton::take_step::step7(pre);
+            mime_classifier_automaton::show::step7(pre, post);
+            post
+        },
+        MimeTypeSniffState::State7 => {
+            let post = mime_classifier_automaton::take_step::step8(pre);
+            mime_classifier_automaton::show::step8(pre, post);
+            post
+        },
+        MimeTypeSniffState::State8 => {
+            let post = mime_classifier_automaton::take_step::step9(pre);
+            mime_classifier_automaton::show::step9(pre, post);
+            post
+        },
+        MimeTypeSniffState::Final => pre,
+    }
+}
+
+// Invariant preservation and strict rank decrease come from the actual transitions.
+pub proof fn mime_type_sniffing_next_properties<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+    post: mime_classifier_automaton::State<C>,
+)
+    requires pre.invariant(), mime_classifier_automaton::State::<C>::next(pre, post),
+    ensures
+        post.invariant(),
+        !mime_type_sniffing_terminal(pre.state),
+        mime_type_sniffing_phase_rank(post.state) < mime_type_sniffing_phase_rank(pre.state),
+{
+    case_on_next! { pre, post, mime_classifier_automaton::<C> => {
+        step1() => {}
+        step2() => {}
+        step3() => {}
+        step4() => {}
+        step5() => {}
+        step6() => {}
+        step7() => {}
+        step8() => {}
+        step9() => {}
+    }}
+}
+
+// Determinism is independent of invariant validity, the runner, and termination.
+pub proof fn mime_type_sniffing_next_is_deterministic<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+    left: mime_classifier_automaton::State<C>,
+    right: mime_classifier_automaton::State<C>,
+)
+    requires
+        mime_classifier_automaton::State::<C>::next(pre, left),
+        mime_classifier_automaton::State::<C>::next(pre, right),
+    ensures left == right,
+{
+    reveal(mime_classifier_automaton::State::next);
+    reveal(mime_classifier_automaton::State::next_by);
+}
+
+pub broadcast proof fn mime_type_sniffing_step_correct<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+)
+    requires pre.invariant(), !mime_type_sniffing_terminal(pre.state),
+    ensures
+        mime_classifier_automaton::State::<C>::next(pre, #[trigger] mime_type_sniffing_step(pre)),
+        mime_type_sniffing_step(pre).invariant(),
+        mime_type_sniffing_phase_rank(mime_type_sniffing_step(pre).state)
+            < mime_type_sniffing_phase_rank(pre.state),
+{
+    mime_type_sniffing_next_exists(pre);
+    mime_type_sniffing_next_properties(pre, mime_type_sniffing_step(pre));
+}
+
+pub open spec fn mime_type_sniffing_run<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+) -> mime_classifier_automaton::State<C>
+    decreases mime_type_sniffing_phase_rank(pre.state),
+{
+    decreases_by(mime_type_sniffing_run_decreases::<C>);
+    // Totalize on malformed internal states. Initialized runs satisfy the
+    // invariant, and step_correct preserves it, so they never use that fallback.
+    if !pre.invariant() || mime_type_sniffing_terminal(pre.state) {
+        pre
+    } else {
+        mime_type_sniffing_run(mime_type_sniffing_step(pre))
+    }
+}
+
+#[verifier::decreases_by]
+proof fn mime_type_sniffing_run_decreases<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+) {
+    if pre.invariant() && !mime_type_sniffing_terminal(pre.state) {
+        mime_type_sniffing_step_correct(pre);
+    }
+}
+
+pub open spec fn mime_type_sniffing_steps<C: MimeClassifierModel>(
+    trace: Seq<mime_classifier_automaton::State<C>>,
+) -> bool {
+    forall|i: int| 0 <= i && i + 1 < trace.len() ==>
+        #[trigger] mime_classifier_automaton::State::<C>::next(trace[i], trace[i + 1])
+}
+
+pub proof fn mime_type_sniffing_step_at<C: MimeClassifierModel>(
+    trace: Seq<mime_classifier_automaton::State<C>>,
+    i: int,
+)
+    requires mime_type_sniffing_steps(trace), 0 <= i, i + 1 < trace.len(),
+    ensures mime_classifier_automaton::State::<C>::next(trace[i], trace[i + 1]),
+{
+    reveal(mime_type_sniffing_steps);
+}
+
+// Termination supplies a completed trace for every invariant-valid starting state.
+// This construction does not depend on the determinism theorem.
+pub proof fn mime_type_sniffing_run_trace<C: MimeClassifierModel>(
+    pre: mime_classifier_automaton::State<C>,
+) -> (trace: Seq<mime_classifier_automaton::State<C>>)
+    requires pre.invariant(),
+    ensures
+        trace.len() > 0,
+        trace.first() == pre,
+        mime_type_sniffing_steps(trace),
+        trace.last() == mime_type_sniffing_run(pre),
+        trace.last().invariant(),
+        mime_type_sniffing_terminal(trace.last().state),
+    decreases mime_type_sniffing_phase_rank(pre.state),
+{
+    if mime_type_sniffing_terminal(pre.state) {
+        seq![pre]
+    } else {
+        mime_type_sniffing_step_correct(pre);
+        let post = mime_type_sniffing_step(pre);
+        let rest = mime_type_sniffing_run_trace(post);
+        let trace = seq![pre] + rest;
+        assert forall|i: int| 0 <= i && i + 1 < trace.len() implies
+            #[trigger] mime_classifier_automaton::State::<C>::next(trace[i], trace[i + 1]) by {
+            if i > 0 {
+                mime_type_sniffing_step_at(rest, i - 1);
+            }
+        }
+        trace
+    }
+}
+
+pub(crate) proof fn mime_type_sniffing_final_state_properties<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: Option<Mime>,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    data: Seq<u8>,
+)
+    ensures
+        mime_type_sniffing_final_state(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        ).invariant(),
+        mime_type_sniffing_terminal(mime_type_sniffing_final_state(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        ).state),
+        mime_type_sniffing_final_state(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        ).computed_mime_type is Some,
+        exists|trace: Seq<mime_classifier_automaton::State<C>>|
+            #[trigger] mime_type_sniffing_trace(
+                classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, trace,
+            ) && trace.last() == mime_type_sniffing_final_state(
+                classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+            ),
+{
+    let initial = mime_classifier_automaton::take_step::initialize(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+    );
+    let trace = mime_type_sniffing_run_trace(initial);
+    assert(mime_type_sniffing_trace(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, trace,
+    ));
+}
+
+// Determinism makes every completed sequence of transitions agree with the runner.
+// The sequence may start at any invariant-valid state, including a terminal state.
+pub proof fn mime_type_sniffing_steps_run<C: MimeClassifierModel>(
+    trace: Seq<mime_classifier_automaton::State<C>>,
+)
+    requires
+        trace.len() > 0,
+        trace.first().invariant(),
+        mime_type_sniffing_steps(trace),
+        mime_type_sniffing_terminal(trace.last().state),
+    ensures
+        trace.last() == mime_type_sniffing_run(trace.first()),
+        trace.last().invariant(),
+    decreases trace.len(),
+{
+    if trace.len() > 1 {
+        mime_type_sniffing_step_at(trace, 0);
+        mime_type_sniffing_next_properties(trace[0], trace[1]);
+        mime_type_sniffing_step_correct(trace[0]);
+        mime_type_sniffing_next_is_deterministic(
+            trace[0], trace[1], mime_type_sniffing_step(trace[0]),
+        );
+        let rest = trace.subrange(1, trace.len() as int);
+        assert forall|i: int| 0 <= i && i + 1 < rest.len() implies
+            #[trigger] mime_classifier_automaton::State::<C>::next(rest[i], rest[i + 1]) by {
+            mime_type_sniffing_step_at(trace, i + 1);
+        }
+        mime_type_sniffing_steps_run(rest);
+    }
+}
+
+// Connect the existing existential result relation to the terminating runner.
+// Forward: determinism identifies the given trace's endpoint.
+// Reverse: termination supplies a trace witnessing the runner's result.
+pub(crate) proof fn mime_type_sniffing_result_iff_run<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: Option<Mime>,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    data: Seq<u8>,
+    result: MimeView,
+)
+    ensures
+        mime_type_sniffing_result(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, result,
+        ) <==> mime_type_sniffing_final_state(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        ).computed_mime_type == Some(result),
+{
+    if mime_type_sniffing_result(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, result,
+    ) {
+        let trace = choose|trace: Seq<mime_classifier_automaton::State<C>>|
+            #[trigger] mime_type_sniffing_trace(
+                classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, trace,
+            ) && trace.last().computed_mime_type == Some(result);
+        mime_type_sniffing_steps_run(trace);
+    }
+    if mime_type_sniffing_final_state(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+    ).computed_mime_type == Some(result) {
+        mime_type_sniffing_final_state_properties(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+        );
+        let trace = choose|trace: Seq<mime_classifier_automaton::State<C>>|
+            #[trigger] mime_type_sniffing_trace(
+                classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, trace,
+            ) && trace.last() == mime_type_sniffing_final_state(
+                classifier, supplied_type, no_sniff_flag, apache_bug_flag, data,
+            );
+        assert(trace.last().computed_mime_type == Some(result));
+    }
+}
+
+pub(crate) proof fn mime_type_sniffing_result_unique<C: MimeClassifierModel>(
+    classifier: C,
+    supplied_type: Option<Mime>,
+    no_sniff_flag: NoSniffFlag,
+    apache_bug_flag: ApacheBugFlag,
+    data: Seq<u8>,
+    left: MimeView,
+    right: MimeView,
+)
+    requires
+        mime_type_sniffing_result(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, left,
+        ),
+        mime_type_sniffing_result(
+            classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, right,
+        ),
+    ensures left == right,
+{
+    mime_type_sniffing_result_iff_run(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, left,
+    );
+    mime_type_sniffing_result_iff_run(
+        classifier, supplied_type, no_sniff_flag, apache_bug_flag, data, right,
+    );
+}
+
 } // verus!
