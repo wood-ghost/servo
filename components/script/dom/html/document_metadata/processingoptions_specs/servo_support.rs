@@ -10,6 +10,7 @@
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
 use js::gc::Traceable;
+use nom_rfc8288::complete::LinkParamOwned;
 use net_traits::ReferrerPolicy;
 use net_traits::policy_container::PolicyContainer;
 use net_traits::request::{CorsSettings, Referrer, RequestClient};
@@ -24,9 +25,39 @@ use crate::dom::srcset::SourceSet;
 use crate::dom::types::HTMLLinkElement;
 use crate::dom::window::Window;
 
+use super::super::processingoptions::LinkHeader;
 use super::processing::types::{DocumentView, WindowView};
 
 verus! {
+
+// TRUSTED(external-lib): nom-rfc8288 0.4.0; expose LinkDataOwned's actual public fields.
+#[verifier::external_type_specification]
+pub struct ExLinkHeader(LinkHeader);
+
+// TRUSTED(external-lib): nom-rfc8288 0.4.0; expose LinkParamOwned's key and optional value.
+#[verifier::external_type_specification]
+pub struct ExLinkParamOwned(LinkParamOwned);
+
+// TRUSTED(std): Rust 1.99.1 alloc::string::impl_eq! compares the two string slices.
+// vstd specifies String == String, but not this String == &str implementation.
+// The impl lifetime and the method's elided input lifetimes must match std's signature.
+pub assume_specification<'a>[<String as PartialEq<&'a str>>::eq](
+    value: &String,
+    key: &&str,
+) -> (r: bool)
+    ensures r == (value@ == (*key)@),
+;
+
+// TRUSTED(std): Rust 1.99.1 Option::as_deref is self.as_ref().map(Deref::deref).
+// vstd has no as_deref contract. Preserve presence and the wrapped Deref contract;
+// vstd's existing String::deref specification then supplies the string contents.
+pub assume_specification<T: std::ops::Deref>[Option::<T>::as_deref](
+    value: &Option<T>,
+) -> (r: Option<&T::Target>)
+    ensures
+        r is Some <==> value is Some,
+        r is Some ==> call_ensures(T::deref, (&value->0,), r->0),
+;
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::CorsSettings is verified
 #[verifier::external_type_specification]

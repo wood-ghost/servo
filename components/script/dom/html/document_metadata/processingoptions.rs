@@ -47,30 +47,52 @@ use crate::fetch::network_listener::{
 };
 use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 
+#[cfg(verus_only)]
+use super::processingoptions_specs::processing::types::{
+    self as link_header_specs, LinkHeaderViewSpec, link_header_has_key, link_header_value_for_key,
+};
+
 verus! {
 
 broadcast use {
     SpecMime::lemma_spec_from_str_matches_result,
     SpecMime::mime_essence_str_lemmas,
     SpecMimePredicates::mime_essence_parts_str_lemmas,
+    link_header_specs::link_header_lemmas,
+    net_traits::mime_classifier_specs::iter::iterator_bridges,
 };
 
 // Setup-only: external items are excluded from verification. Enable individual
 // functions and introduce their type models and contracts in subsequent steps.
 
+#[cfg(not(verus_only))]
 trait ValueForKeyInLinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool;
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str>;
 }
 
-// TRUSTED(scope): not verified yet; remove when ValueForKeyInLinkHeader's implementation is verified
-#[verifier::external]
+#[cfg(verus_only)]
+trait ValueForKeyInLinkHeader: LinkHeaderViewSpec {
+    fn has_key_in_link_header(&self, key: &str) -> (r: bool)
+        ensures r == link_header_has_key(self@, key@);
+
+    fn value_for_key_in_link_header(&self, key: &str) -> (r: Option<&str>)
+        ensures
+            r is Some <==> link_header_value_for_key(self@, key@) is Some, // TODO: necessary?
+            r is Some ==> r->0@ == link_header_value_for_key(self@, key@)->0;
+}
+
 impl ValueForKeyInLinkHeader for LinkHeader {
     fn has_key_in_link_header(&self, key: &str) -> bool {
-        self.params.iter().any(|p| p.key == key)
+        proof { link_header_specs::link_header_has_key_properties(*self, key@); }
+        self.params.iter().any(|p| -> (r: bool)
+            ensures r == (p.key@ == key@),
+        { p.key == key })
     }
     fn value_for_key_in_link_header(&self, key: &str) -> Option<&str> {
-        let param = self.params.iter().find(|p| p.key == key)?;
+        let param = self.params.iter().find(|p| -> (r: bool)
+            ensures r == (p.key@ == key@),
+        { p.key == key })?;
         param.val.as_deref()
     }
 }
@@ -173,15 +195,14 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
-    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::process_link_header is verified
-    // #[verifier::external_body]
+    #[verifier::external_body]
     fn process_link_header(self, rel: &str, document: &Document)
         requires
             // INHERITED from the type check and the guarded preload call.
             SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
         ensures
             // Setup-only placeholder; invocation-state and dispatch effects are pending.
-            // Spec::process_link_header_ensures(&self, rel@, document),
+            Spec::process_link_header_ensures(&self, rel@, document),
     {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -436,12 +457,17 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // TRUSTED(scope): not verified yet; remove when process_link_headers is verified
-#[verifier::external]
+// #[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
     phase: LinkProcessingPhase,
-) {
+)
+    requires
+        SpecRequires::process_link_headers_requires(link_headers@, document, phase),
+    ensures
+        Spec::process_link_headers_ensures(link_headers@, document, phase),
+{
     let global = document.owner_global();
     // Step 1. Let links be the result of extracting links from response's header list.
     //

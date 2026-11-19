@@ -13,7 +13,7 @@ use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use crate::dom::types::HTMLLinkElement;
-use super::super::processingoptions::LinkProcessingOptions;
+use super::super::processingoptions::{LinkHeader, LinkProcessingOptions, LinkProcessingPhase};
 
 verus! {
 
@@ -101,5 +101,15 @@ pub(crate) uninterp spec fn process_link_header_ensures(
     rel: Seq<char>,
     document: &Document,
 ) -> bool;
+
+// <https://html.spec.whatwg.org/multipage/#process-link-headers>
+// To process link headers given a Document doc, a response response, and a "pre-media" or "media" phase:
+pub(crate) open spec fn process_link_headers_ensures(
+    link_headers: Seq<LinkHeader>,
+    document: &Document,
+    phase: LinkProcessingPhase,
+) -> bool {
+    // 2. For each linkObject in links:
+}
 
 } // verus!

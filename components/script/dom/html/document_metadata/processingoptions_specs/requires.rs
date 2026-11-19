@@ -11,6 +11,8 @@ use net_traits::mime_classifier_specs::{
 use net_traits::request::Destination;
 use vstd::prelude::*;
 
+use crate::dom::document::Document;
+use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
 use super::postconditions::type_matches_destination_ok;
 
 verus! {
@@ -91,6 +93,18 @@ pub(crate) open spec fn process_link_header_requires(
         &&& (type_matches_destination_ok(link_type, destination)
             ==> preload_requires(link_type, destination))
     }
+}
+
+// <https://html.spec.whatwg.org/multipage/#process-link-headers>
+// To process link headers given a Document doc, a response response, and a "pre-media" or "media" phase:
+pub(crate) open spec fn process_link_headers_requires(
+    link_headers: Seq<LinkHeader>,
+    document: &Document,
+    phase: LinkProcessingPhase,
+) -> bool {
+    phase == LinkProcessingPhase::Media || phase == LinkProcessingPhase::PreMedia
+    // 1. Let links be the result of extracting links from response's header list.
+}
 }
 
 } // verus!

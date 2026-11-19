@@ -8,12 +8,146 @@
 #![verifier::auto_reveal_strlit]
 
 use net_traits::ReferrerPolicy;
+use nom_rfc8288::complete::LinkParamOwned;
 use servo_base::id::WebViewId;
 use vstd::prelude::*;
 
+use super::super::super::processingoptions::LinkHeader;
 use super::super::csp_api::CspListView;
 
 verus! {
+
+// =========================
+//      LinkHeader
+// =========================
+
+/// Preserve parser order and duplicates: lookup stops at the first matching key.
+pub(crate) struct LinkHeaderView {
+    pub url: Seq<char>,
+    pub params: Seq<(Seq<char>, Option<Seq<char>>)>,
+}
+
+// A local extension trait supplies `header@`: Rust's orphan rule prevents
+// implementing the external vstd::View trait for the external LinkHeader type.
+pub trait LinkHeaderViewSpec {
+    spec fn view(&self) -> LinkHeaderView;
+}
+
+impl LinkHeaderViewSpec for LinkHeader {
+    open spec fn view(&self) -> LinkHeaderView {
+        LinkHeaderView {
+            url: self.url@,
+            params: self.params@.map_values(|param: LinkParamOwned| (
+                param.key@,
+                match param.val {
+                    Some(value) => Some(value@),
+                    None => None,
+                },
+            )),
+        }
+    }
+}
+
+pub open spec fn link_header_has_key(h: LinkHeaderView, key: Seq<char>) -> bool {
+    exists|i: int| 0 <= i < h.params.len() && (#[trigger] h.params[i]).0 == key
+}
+
+pub open spec fn link_header_value_for_key(h: LinkHeaderView, key: Seq<char>) -> Option<Seq<char>> {
+    let keys = h.params.map_values(|param: (Seq<char>, Option<Seq<char>>)| param.0);
+    match keys.index_of_first(key) {
+        // A missing value at the first matching key does not fall through to later keys.
+        Some(index) => h.params[index].1,
+        None => None,
+    }
+}
+
+pub broadcast proof fn link_header_lookup_properties(h: LinkHeaderView, key: Seq<char>)
+    ensures
+        #![trigger link_header_has_key(h, key)]
+        #![trigger link_header_value_for_key(h, key)]
+        {
+            let keys = h.params.map_values(|param: (Seq<char>, Option<Seq<char>>)| param.0);
+            match keys.index_of_first(key) {
+                Some(index) => {
+                    &&& link_header_has_key(h, key)
+                    &&& 0 <= index < h.params.len()
+                    &&& h.params[index].0 == key
+                    &&& forall|i: int| 0 <= i < index ==> (#[trigger] h.params[i]).0 != key
+                    &&& link_header_value_for_key(h, key) == h.params[index].1
+                },
+                None => {
+                    &&& !link_header_has_key(h, key)
+                    &&& link_header_value_for_key(h, key) is None
+                },
+            }
+        },
+{
+    let keys = h.params.map_values(|param: (Seq<char>, Option<Seq<char>>)| param.0);
+    keys.index_of_first_ensures(key);
+    if let Some(index) = keys.index_of_first(key) {
+        assert forall|i: int| 0 <= i < index implies (#[trigger] h.params[i]).0 != key by {
+            assert(keys[i] != key);
+        }
+    } else {
+        assert forall|i: int| 0 <= i < h.params.len() implies (#[trigger] h.params[i]).0 != key by {
+            assert(keys[i] != key);
+        }
+    }
+}
+
+pub broadcast proof fn link_header_param_view(header: LinkHeader, i: int)
+    requires 0 <= i < header.params@.len(),
+    ensures
+        #![trigger header@.params, header.params@[i]]
+        header@.params[i].0 == header.params@[i].key@,
+        header@.params[i].1 == match header.params@[i].val {
+            Some(value) => Some(value@),
+            None => None,
+        },
+{}
+
+pub broadcast proof fn link_header_first_value(h: LinkHeaderView, key: Seq<char>, index: int)
+    requires
+        0 <= index < h.params.len(),
+        h.params[index].0 == key,
+        forall|i: int| 0 <= i < index ==> (#[trigger] h.params[i]).0 != key,
+    ensures
+        #![trigger link_header_value_for_key(h, key), h.params[index]]
+        link_header_value_for_key(h, key) == h.params[index].1,
+{
+    link_header_lookup_properties(h, key);
+    let keys = h.params.map_values(|param: (Seq<char>, Option<Seq<char>>)| param.0);
+    assert(link_header_has_key(h, key));
+    let first = keys.index_of_first(key)->0;
+    if first < index {
+        assert(h.params[first].0 != key);
+    } else if index < first {
+        assert(h.params[index].0 != key);
+    }
+}
+
+pub proof fn link_header_has_key_properties(header: LinkHeader, key: Seq<char>)
+    ensures
+        link_header_has_key(header@, key) == (exists|i: int| 0 <= i < header.params@.len()
+            && (#[trigger] header.params@[i]).key@ == key),
+{
+    if link_header_has_key(header@, key) {
+        let i = choose|i: int| 0 <= i < header@.params.len()
+            && (#[trigger] header@.params[i]).0 == key;
+        assert(header.params@[i].key@ == key);
+    }
+    if exists|i: int| 0 <= i < header.params@.len() && (#[trigger] header.params@[i]).key@ == key {
+        let i = choose|i: int| 0 <= i < header.params@.len()
+            && (#[trigger] header.params@[i]).key@ == key;
+        assert(header@.params[i].0 == key);
+    }
+}
+
+pub broadcast group link_header_lemmas {
+    link_header_lookup_properties,
+    link_header_param_view,
+    link_header_first_value,
+}
 
 // =========================
 //      LinkFetchPriority
