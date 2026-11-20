@@ -22,12 +22,12 @@ use vstd::prelude::*;
 use super::process_link_headers::LinkObject;
 use super::types::LinkHeaderView;
 
-// Representation | RFC B.3 step 9; B.2 step 17.1 | ASCII name/relation case normalization.
+// ASCII lowercase, reused from mime_api.
 pub(crate) use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
 
 verus! {
 
-// Representation | RFC B.2 steps 13-14; B.3 steps 8.1, 9-10 | Parameters -> ordered string attributes.
+// Representation | RFC B.2 steps 13-14; B.3 steps 8.1, 9-10 | ASCII name case normalization -> ordered string attributes.
 // Exclude rel/anchor after lowercasing names; a valueless parameter becomes "".
 // Keep order and duplicates. RFC B.2 step 14.2's first-occurrence rule for
 // media/title/title*/type is not applied: link_object_attribs_get already takes
@@ -54,11 +54,20 @@ pub(crate) open spec fn attributes_of(
     }
 }
 
-// Representation | RFC B.2 steps 9-10, 17; B.3 steps 8.1, 9 | First normalized rel -> optional link (R1).
-// Missing or empty relations yield no link. For an absent or valueless lowercase
-// rel, None matches Servo's continue when value_for_key("rel") is None: that
-// placement of the skip is a representation difference. An explicit empty value
-// (Some("")) or differently cased key need not agree with Servo; do not assume it.
+// Representation | RFC B.2 step 10 | A relation type exists only if rel contains a non-RWS character.
+// RWS characters are exactly SP and HTAB, not CR/LF or other Unicode whitespace.
+pub(crate) open spec fn contains_non_rws_char(s: Seq<char>) -> bool {
+    exists|i: int| 0 <= i < s.len() && (#[trigger] s[i]) != ' ' && s[i] != '\t'
+}
+
+// Representation | RFC B.2 steps 9-10, 17.1; B.3 steps 8.1, 9 | ASCII key/relation case normalization -> optional link (R1).
+// RFC B.2 step 10 yields no relation types for an empty or SP/HTAB-only rel.
+// Under R1, a multi-token rel (e.g. "preload prefetch") stays one relation_type
+// string, lowercased without trimming or splitting. Missing rel also yields None.
+// For an absent or valueless lowercase rel, None matches Servo's continue when
+// value_for_key("rel") is None: that placement of the skip is a representation
+// difference. An explicit empty or RWS-only value, or differently cased key,
+// need not agree with Servo; do not assume it.
 pub(crate) open spec fn link_object_of(h: LinkHeaderView) -> Option<LinkObject> {
     let names = h.params.map_values(|param: (Seq<char>, Option<Seq<char>>)|
         ascii_lowercase(param.0));
@@ -69,7 +78,7 @@ pub(crate) open spec fn link_object_of(h: LinkHeaderView) -> Option<LinkObject> 
                 Some(value) => value,
                 None => Seq::empty(),
             };
-            if rel.len() == 0 {
+            if !contains_non_rws_char(rel) {
                 None
             } else {
                 Some(LinkObject {

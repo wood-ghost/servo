@@ -22,6 +22,7 @@ verus! {
 // =========================
 
 /// Preserve parser order and duplicates: lookup stops at the first matching key.
+// Required by the public, open <LinkHeader as LinkHeaderViewSpec>::view, which constructs this record.
 pub struct LinkHeaderView {
     pub url: Seq<char>,
     pub params: Seq<(Seq<char>, Option<Seq<char>>)>,
