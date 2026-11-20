@@ -22,7 +22,7 @@ verus! {
 // =========================
 
 /// Preserve parser order and duplicates: lookup stops at the first matching key.
-pub(crate) struct LinkHeaderView {
+pub struct LinkHeaderView {
     pub url: Seq<char>,
     pub params: Seq<(Seq<char>, Option<Seq<char>>)>,
 }

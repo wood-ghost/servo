@@ -457,7 +457,7 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // TRUSTED(scope): not verified yet; remove when process_link_headers is verified
-// #[verifier::external]
+#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
