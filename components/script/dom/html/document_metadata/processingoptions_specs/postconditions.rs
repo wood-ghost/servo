@@ -109,7 +109,30 @@ pub(crate) open spec fn process_link_headers_ensures(
     document: &Document,
     phase: LinkProcessingPhase,
 ) -> bool {
+    // 1. Let links be the result of extracting links from response's header list.
+    let links = link_headers.params;
     // 2. For each linkObject in links:
+    for link_object in links {
+        // 2.1 Let rel be linkObject["relation_type"].
+        let rel = links.get("relation_type"); 
+        // 2.2 Let attribs be linkObject["target_attributes"].
+        let attribs = links.get("target_attributes");
+        // 2.3 Let expectedPhase be "media" if either "srcset", "imagesrcset", or "media" exist in attribs; otherwise "pre-media".
+        let expected_phase = match attribs {
+            Some(attrs) => if attrs.contains("media"@) || ... {
+                LinkProcessingPhase::Media
+            } else {
+                "pre-media"@
+            },
+            None => "pre-media"@
+        };
+        // 2.4 If expectedPhase is not phase, then continue.
+        if expected_phase 
+
+    }
+
 }
+
+// https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
 
 } // verus!

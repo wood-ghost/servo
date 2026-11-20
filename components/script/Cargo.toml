@@ -164,6 +164,7 @@ unicode-script = { workspace = true }
 url = { workspace = true }
 urlpattern = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
+verus_state_machines_macros = "=0.0.0-2026-06-14-0213"
 vstd = "=0.0.0-2026-10-25-0158"
 web_atoms = { workspace = true }
 webdriver = { workspace = true }
