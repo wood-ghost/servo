@@ -106,6 +106,6 @@ pub(crate) open spec fn process_link_headers_requires(
     // 1. Let links be the result of extracting links from response's header list.
     // TODO: ensure that link_headers is the result of ...
 }
-}
+/* } */
 
 } // verus!

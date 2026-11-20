@@ -109,6 +109,7 @@ pub(crate) open spec fn process_link_headers_ensures(
     document: &Document,
     phase: LinkProcessingPhase,
 ) -> bool {
+    /* WIP draft, preserved until its contract model is ready.
     // 1. Let links be the result of extracting links from response's header list.
     let links = link_headers.params;
     // 2. For each linkObject in links:
@@ -131,6 +132,7 @@ pub(crate) open spec fn process_link_headers_ensures(
 
     }
 
+    */
 }
 
 // https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
