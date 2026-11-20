@@ -133,6 +133,8 @@ pub(crate) open spec fn process_link_headers_ensures(
     }
 
     */
+    // TODO: contract via whatwg_process_link_headers
+    true
 }
 
 // https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
