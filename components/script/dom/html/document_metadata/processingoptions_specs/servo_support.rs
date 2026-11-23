@@ -26,7 +26,7 @@ use crate::dom::types::HTMLLinkElement;
 use crate::dom::window::Window;
 
 use super::super::processingoptions::LinkHeader;
-use super::processing::types::{DocumentView, WindowView};
+use super::processing::types::{DocumentView, SourceSetView, WindowView};
 
 verus! {
 
@@ -76,6 +76,28 @@ pub struct ExPolicyContainer(PolicyContainer);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExSourceSet(SourceSet);
+
+// TODO: Define how parsing, default-source insertion, and density normalization
+// determine the returned source set.
+pub uninterp spec fn create_source_set(
+    default_source: Seq<char>,
+    srcset: Seq<char>,
+    sizes: Seq<char>,
+    document: DocumentView,
+) -> SourceSet;
+
+// TODO: Relate the native candidates and document-dependent source size to their WHATWG view.
+pub uninterp spec fn source_set_view(source_set: &SourceSet, document: DocumentView) -> SourceSetView;
+
+// TRUSTED(scope): remove when the native SourceSet::create_source_set body is verified.
+pub(crate) assume_specification[SourceSet::create_source_set](
+    default_source: &str,
+    srcset: &str,
+    sizes: &str,
+    document: &Document,
+) -> (source_set: SourceSet)
+    ensures source_set == create_source_set(default_source@, srcset@, sizes@, document@),
+;
 
 // TRUSTED(scope): not verified yet; remove when servo_url::ServoUrl is verified
 #[verifier::external_type_specification]
@@ -146,8 +168,9 @@ pub struct ExDocument(Document);
 #[verifier::external_body]
 pub struct ExWindow(Window);
 
-// These projections expose stable identity metadata. Mutable document/window
-// contents need separate invocation snapshots and are not included here.
+// DocumentView includes the fields needed for a link-processing snapshot.
+// Their correspondence to native document contents remains unverified.
+// WindowView exposes stable window identity metadata.
 impl View for Document {
     type V = DocumentView;
 

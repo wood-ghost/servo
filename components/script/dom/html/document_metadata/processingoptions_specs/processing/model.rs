@@ -15,7 +15,8 @@ verus! {
 // LinkProcessingOptions does not yet represent: initiator, document,
 // https://html.spec.whatwg.org/multipage/semantics.html#link-processing-options
 // A link processing options is a struct. It has the following items:
-pub(crate) struct LinkProcessingOptionsView {
+// Public because process_link_headers_automaton::State::create_new_option constructs this record.
+pub struct LinkProcessingOptionsView {
     // href (default the empty string)
     pub href: Seq<char>,
     // initiator (default "link")

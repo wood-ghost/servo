@@ -5,6 +5,7 @@
 //! Standard-facing link-processing view and its nested type definitions.
 
 pub(crate) mod model;
+pub(crate) mod process_link_headers;
 pub(crate) mod types;
 
 pub(crate) use self::model::*;

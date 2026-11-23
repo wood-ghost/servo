@@ -11,6 +11,7 @@ pub(crate) mod requires;
 mod servo_support;
 
 pub(crate) use self::postconditions::{
-    preload_ensures, process_link_header_ensures, process_link_headers_ensures,
+    preload_ensures, process_link_header_ensures,
     type_matches_destination_ok,
 };
+pub(crate) use self::processing::process_link_headers::process_link_headers_ensures;

@@ -7,6 +7,7 @@
 
 #![verifier::auto_reveal_strlit]
 
+use std::sync::Arc;
 use net_traits::ReferrerPolicy;
 use nom_rfc8288::complete::LinkParamOwned;
 use servo_base::id::WebViewId;
@@ -156,7 +157,8 @@ pub broadcast group link_header_lemmas {
 /// HTML's fetch-priority states. Servo's link options currently lack this field.
 /// https://html.spec.whatwg.org/multipage/urls-and-fetching.html#fetch-priority-attribute
 /// A fetch priority attribute is an enumerated attribute with the following keywords and states:
-pub(crate) enum LinkFetchPriority {
+// Public because process_link_headers_automaton::State::create_new_option constructs Auto.
+pub enum LinkFetchPriority {
     Auto,
     High,
     Low,
@@ -165,6 +167,9 @@ pub(crate) enum LinkFetchPriority {
 // =========================
 //      SourceSet
 // =========================
+
+/// Placeholder identity for the optional image element in source-set creation.
+pub struct ElementView { pub identity: int }
 
 // https://html.spec.whatwg.org/multipage/images.html#source-set
 // Snapshot/inspection 2026-10-30.
@@ -405,10 +410,15 @@ pub(crate) struct WindowView {
 // =========================
 
 // https://html.spec.whatwg.org/multipage/dom.html#document
-// as it is not included in servo implementation, leave the related parts as uninterp
-pub(crate) struct DocumentView {
+// Snapshot of the document properties read by link processing.
+// Public because process_link_headers_automaton::State::create_new_option reads these fields.
+pub struct DocumentView {
     pub id: int,
     pub window: WindowView,
+    pub base_url: ServoUrlView,
+    pub origin: Origin,
+    pub environment: EnvironmentView,
+    pub policy_container: Arc<PolicyContainerView>,
 }
 
 // =========================
