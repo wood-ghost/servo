@@ -50,6 +50,7 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 #[cfg(verus_only)]
 use super::processingoptions_specs::processing::types::{
     self as link_header_specs, LinkHeaderViewSpec, link_header_has_key, link_header_value_for_key,
+    options_view_of,
 };
 
 verus! {
@@ -201,8 +202,7 @@ impl LinkProcessingOptions {
             // INHERITED from the type check and the guarded preload call.
             SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
         ensures
-            // Setup-only placeholder; invocation-state and dispatch effects are pending.
-            Spec::process_link_header_ensures(&self, rel@, document),
+            Spec::process_link_header_ensures(rel@, options_view_of(self), document@),
     {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -457,7 +457,7 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // TRUSTED(scope): not verified yet; remove when process_link_headers is verified
-// #[verifier::external]
+#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,

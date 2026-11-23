@@ -14,6 +14,7 @@ use vstd::prelude::*;
 use crate::dom::document::Document;
 use crate::dom::types::HTMLLinkElement;
 use super::super::processingoptions::LinkProcessingOptions;
+use super::processing::{DocumentView, LinkProcessingOptionsView};
 
 verus! {
 
@@ -91,15 +92,14 @@ pub(crate) uninterp spec fn preload_ensures(
     document: &Document,
 ) -> bool;
 
-/// Unfinished postcondition boundary for processing one link header.
-/// This input-only marker observes no document snapshot or dispatch trace.
-/// Replace it with an invocation-bound state/effect relation when the document
-/// model is added; it currently establishes no behavior property.
+/// Step 2.9 effect: the 'process a link header' steps ran with these arguments,
+/// starting from this document snapshot. Effects of several calls (fetches, the
+/// map of preloaded resources) are not composed here.
 // TRUSTED(scope): not verified yet; remove when process_link_header's document-state/effect correspondence is verified
-pub(crate) uninterp spec fn process_link_header_ensures(
-    options: &LinkProcessingOptions,
+pub uninterp spec fn process_link_header_ensures(
     rel: Seq<char>,
-    document: &Document,
+    options: LinkProcessingOptionsView,
+    doc: DocumentView,
 ) -> bool;
 
 } // verus!

@@ -2,19 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-//! Nested type declarations for the standard's link-processing-options record.
+//! Link-processing views, native projections, and request and preload records.
 //! The standard excerpts retain the backup's inspection dates.
 
 #![verifier::auto_reveal_strlit]
 
 use std::sync::Arc;
 use net_traits::ReferrerPolicy;
+use net_traits::policy_container::PolicyContainer;
+use net_traits::request::{CredentialsMode, Destination, RequestClient};
 use nom_rfc8288::complete::LinkParamOwned;
 use servo_base::id::WebViewId;
+use servo_url::{ImmutableOrigin, ServoUrl};
 use vstd::prelude::*;
 
-use super::super::super::processingoptions::LinkHeader;
+use crate::dom::srcset::SourceSet;
+use super::super::super::processingoptions::{LinkHeader, LinkProcessingOptions};
 use super::super::csp_api::CspListView;
+use super::model::LinkProcessingOptionsView;
 
 verus! {
 
@@ -23,7 +28,8 @@ verus! {
 // =========================
 
 /// Preserve parser order and duplicates: lookup stops at the first matching key.
-pub(crate) struct LinkHeaderView {
+// Required by the public, open <LinkHeader as LinkHeaderViewSpec>::view, which constructs this record.
+pub struct LinkHeaderView {
     pub url: Seq<char>,
     pub params: Seq<(Seq<char>, Option<Seq<char>>)>,
 }
@@ -431,6 +437,141 @@ pub struct DocumentView {
 /// TODO: I'm not really sure how it works, so leave it empty
 pub(crate) struct DocsAlgoView {
     pub id: int,
+}
+
+// Structural projection of the native link processor's options argument.
+
+// TRUSTED(scope): correspondence of the opaque native URL to a URL record is unverified.
+pub(crate) uninterp spec fn url_view(url: &ServoUrl) -> ServoUrlView;
+
+// TRUSTED(scope): correspondence of native immutable origins to origin records is unverified.
+pub(crate) uninterp spec fn origin_view(origin: &ImmutableOrigin) -> Origin;
+
+// TRUSTED(scope): the native policy container does not implement all WHATWG policy fields.
+pub(crate) uninterp spec fn policy_container_view(container: &Arc<PolicyContainer>) -> Arc<PolicyContainerView>;
+
+// TRUSTED(scope): RequestClient only partially represents the relevant settings object.
+pub(crate) uninterp spec fn environment_view(client: &RequestClient) -> EnvironmentView;
+
+impl View for SourceSet {
+    type V = SourceSetView;
+
+    // TRUSTED(scope): structural correspondence of the native candidates and source size is unverified.
+    // No equality with the document-dependent source_set_view is assumed.
+    uninterp spec fn view(&self) -> SourceSetView;
+}
+
+// The fields of the native options record are visible within this crate.
+pub open(crate) spec fn options_view_of(o: LinkProcessingOptions) -> LinkProcessingOptionsView {
+    // Not represented: referrer and request_client as native fields. In particular, the
+    // client's preloaded_resources, is_nested_browsing_context, insecure_requests_policy,
+    // and has_trustworthy_ancestor_origin are not separate link-processing options.
+    LinkProcessingOptionsView {
+        href: o.href@, // href: native string contents
+        initiator: "link"@, // [default] Servo has no initiator field
+        integrity: o.integrity@, // integrity: native string contents
+        type_: o.link_type@, // type: native link_type string contents
+        cryptographic_nonce_metadata: o.cryptographic_nonce_metadata@, // nonce: native string contents
+        destination: o.destination, // destination: same enum
+        crossorigin: o.cross_origin, // crossorigin: same optional enum
+        referrer_policy: o.referrer_policy, // referrer policy: same enum
+        source_set: match o.source_set { // source set: preserve presence and project its value
+            Some(s) => Some(s@),
+            None => None,
+        },
+        base_url: url_view(&o.base_url), // base URL: project the stored URL
+        origin: origin_view(&o.origin), // origin: project the stored immutable origin
+        environment: environment_view(&o.request_client), // [default] derive from the native request client
+        policy_container: policy_container_view(&o.policy_container), // policy container: project the stored container
+        document: None, // [default] Servo does not implement options' document
+        on_document_ready: None, // [default] Servo has no on-document-ready callback field
+        fetch_priority: LinkFetchPriority::Auto, // [default] Servo has no fetch-priority field
+    }
+}
+
+/// The three Fetch modes allowed in an HTML preload key.
+/// <https://html.spec.whatwg.org/multipage/links.html#preload-mode>
+pub(crate) enum PreloadRequestMode { SameOrigin, Cors, NoCors }
+
+/// Expose Servo's three Fetch credentials modes (omit, same-origin, include) to Verus.
+/// <https://fetch.spec.whatwg.org/#concept-request-credentials-mode>
+#[verifier::external_type_specification]
+pub struct ExCredentialsMode(CredentialsMode);
+
+/// Projection of a Fetch request as created for a link and passed to fetch by preload.
+/// <https://fetch.spec.whatwg.org/#concept-request>
+/// <https://html.spec.whatwg.org/multipage/semantics.html#create-a-link-request>
+/// <https://html.spec.whatwg.org/multipage/urls-and-fetching.html#create-a-potential-cors-request>
+/// <https://html.spec.whatwg.org/multipage/links.html#preload>
+///
+/// Omitted Fetch request fields (neither set by these algorithms nor read for the key):
+/// - HTTP/cache/CORS: method, header list, body, local-URLs-only flag, unsafe-request flag,
+///   use-CORS-preflight flag, cache mode, prevent no-cache cache-control header modification flag.
+/// - Context/policy: reserved client, replaces client id, traversable for user prompts,
+///   origin, top-level navigation initiator origin, referrer, initiator, parser metadata,
+///   service-workers mode. CORS settings are an input used to derive mode and credentials mode.
+/// - Navigation/scheduling: keepalive, internal priority, reload-navigation flag,
+///   history-navigation flag, user-activation, WebDriver navigation id, render-blocking.
+/// - Transport/Fetch bookkeeping: WebTransport-hash list, redirect mode, URL list, current URL,
+///   redirect count, response tainting, done flag, timing allow failed flag, navigation timing
+///   allow values list, WebDriver id. The key uses the request URL, not the current redirect URL.
+pub(crate) struct RequestView {
+    pub url: ServoUrlView,
+    pub destination: Destination,
+    pub mode: PreloadRequestMode,
+    pub credentials_mode: CredentialsMode,
+    pub use_url_credentials: bool,
+    pub integrity_metadata: Seq<char>,
+    pub cryptographic_nonce_metadata: Seq<char>,
+    pub referrer_policy: ReferrerPolicy,
+    // Both are assigned from the options before create-a-link-request returns.
+    pub policy_container: Arc<PolicyContainerView>,
+    pub client: EnvironmentView,
+    pub priority: LinkFetchPriority,
+    // Fetch's nullable initiator type (preload can set it for early hints).
+    pub initiator_type: Option<Seq<char>>,
+}
+
+/// HTML preload keys use itemwise equality on these four fields.
+/// <https://html.spec.whatwg.org/multipage/links.html#preload-key>
+pub(crate) struct PreloadKeyView {
+    pub url: ServoUrlView,
+    pub destination: Destination,
+    pub mode: PreloadRequestMode,
+    pub credentials_mode: CredentialsMode,
+}
+
+/// <https://html.spec.whatwg.org/multipage/links.html#create-a-preload-key>
+pub(crate) open spec fn preload_key_of(r: RequestView) -> PreloadKeyView {
+    PreloadKeyView {
+        url: r.url,
+        destination: r.destination,
+        mode: r.mode,
+        credentials_mode: r.credentials_mode,
+    }
+}
+
+/// Response identity only; response contents and processing are not modelled.
+/// <https://fetch.spec.whatwg.org/#concept-response>
+pub(crate) struct ResponseView { pub id: int }
+
+/// Identity of an algorithm accepting a response or null; its behavior is not modelled.
+/// <https://html.spec.whatwg.org/multipage/links.html#preload-on-response-available>
+pub(crate) struct OnResponseAvailableView { pub id: int }
+
+/// <https://html.spec.whatwg.org/multipage/links.html#preload-entry>
+pub(crate) struct PreloadEntryView {
+    pub integrity_metadata: Seq<char>,
+    pub response: Option<ResponseView>,
+    pub on_response_available: Option<OnResponseAvailableView>,
+}
+
+/// Observations for one handler invocation: the resulting map and just this call's fetches.
+/// <https://html.spec.whatwg.org/multipage/links.html#map-of-preloaded-resources>
+/// <https://html.spec.whatwg.org/multipage/links.html#preload>
+pub(crate) struct ProcessLinkHeaderOutput {
+    pub preloaded: Map<PreloadKeyView, PreloadEntryView>,
+    pub fetches: Seq<RequestView>,
 }
 
 } // verus!

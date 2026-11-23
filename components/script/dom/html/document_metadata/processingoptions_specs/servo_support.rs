@@ -90,7 +90,7 @@ pub uninterp spec fn create_source_set(
 pub uninterp spec fn source_set_view(source_set: &SourceSet, document: DocumentView) -> SourceSetView;
 
 // TRUSTED(scope): remove when the native SourceSet::create_source_set body is verified.
-pub(crate) assume_specification[SourceSet::create_source_set](
+pub assume_specification[SourceSet::create_source_set](
     default_source: &str,
     srcset: &str,
     sizes: &str,

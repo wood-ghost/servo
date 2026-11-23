@@ -24,6 +24,7 @@ use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use super::super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
+use super::super::postconditions::process_link_header_ensures;
 use super::model::LinkProcessingOptionsView;
 use super::types::{
     DocumentView, ElementView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec, SourceSetView,
@@ -46,6 +47,7 @@ pub(crate) open spec fn process_link_headers_ensures(
     let links = to_link_objects(link_headers.map_values(|header: LinkHeader| header@));
     // 2. For each linkObject in links:
     // TODO: run the state machine from init to final state. then says that the changing data fits the property described in final state. if fits, return true; if not return false
+    true
 }
 
 pub struct LinkObject {
@@ -114,20 +116,6 @@ pub uninterp spec fn whatwg_create_source_set(
     doc: DocumentView,
 ) -> SourceSetView;
 
-// One observed fetch start: the serialized request URL and its fetch destination.
-pub struct FetchStart {
-    pub url: Seq<char>,
-    pub destination: Destination,
-}
-
-// Step 2.9: fetches started by this invocation, in order. An empty result means no fetch started.
-pub uninterp spec fn whatwg_process_link_header(
-    rel: Seq<char>,
-    options: LinkProcessingOptionsView,
-    doc: DocumentView,
-    fetch_trace: Seq<FetchStart>,
-) -> Seq<FetchStart>;
-
 // Loop head and Steps 2.1-2.9.
 // https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers
 state_machine! {
@@ -147,9 +135,12 @@ state_machine! {
             pub expected_phase: Option<LinkHeadersPhase>,
             pub options: Option<LinkProcessingOptionsView>,
 
-            // Handler invocations and fetches started during this run, in order.
+            // Instrumentation (not in WHATWG): records each Step 2.9 invocation (rel, options)
+            // in order, for comparison with Servo's calls to process_link_header.
             pub calls: Seq<(Seq<char>, LinkProcessingOptionsView)>,
-            pub fetch_trace: Seq<FetchStart>,
+            // Instrumentation (not in WHATWG): every Step 2.9 invocation of
+            // this run has had its effect.
+            pub effects: bool,
         }
 
         // Begin with the extracted links, without restricting their attributes.
@@ -170,7 +161,7 @@ state_machine! {
                 init expected_phase = None;
                 init options = None;
                 init calls = Seq::empty();
-                init fetch_trace = Seq::empty();
+                init effects = true;
             }
         }
 
@@ -335,13 +326,13 @@ state_machine! {
         }
 
         // 2.9 Run the process a link header steps for rel given options.
+        // Record each invocation and its abstract postcondition at the starting document snapshot.
         transition! {
             process_link_header() {
                 require(pre.state == ProcessLinkHeadersState::SourceSetChecked);
                 let rel = pre.rel->Some_0;
                 let options = pre.options->Some_0;
-                let started = whatwg_process_link_header(rel, options, pre.doc, pre.fetch_trace);
-                update fetch_trace = pre.fetch_trace + started;
+                update effects = pre.effects && process_link_header_ensures(rel, options, pre.doc);
                 update calls = pre.calls.push((rel, options));
                 update i = pre.i + 1;
                 if pre.i + 1 < pre.links.len() {
@@ -387,6 +378,14 @@ state_machine! {
             }
         }
 
+        #[invariant]
+        pub fn effects_agree_with_calls(&self) -> bool {
+            self.effects == (forall|i: int| 0 <= i < self.calls.len() ==> {
+                let (rel, options) = #[trigger] self.calls[i];
+                process_link_header_ensures(rel, options, self.doc)
+            })
+        }
+
         #[inductive(initialize)]
         fn initialize_inductive(
             post: Self,
@@ -403,7 +402,128 @@ state_machine! {
 
         #[inductive(get_attribs)]
         fn get_attribs_inductive(pre: Self, post: Self) {}
+
+        #[inductive(get_exspecterd_phase)]
+        fn get_exspecterd_phase_inductive(pre: Self, post: Self) {}
+
+        #[inductive(check_phase)]
+        fn check_phase_inductive(pre: Self, post: Self) {}
+
+        #[inductive(check_media)]
+        fn check_media_inductive(pre: Self, post: Self) {}
+
+        #[inductive(create_new_option)]
+        fn create_new_option_inductive(pre: Self, post: Self) {}
+
+        #[inductive(apply_link_options)]
+        fn apply_link_options_inductive(pre: Self, post: Self) {}
+
+        #[inductive(set_option_source_set)]
+        fn set_option_source_set_inductive(pre: Self, post: Self) {}
+
+        #[inductive(process_link_header)]
+        fn process_link_header_inductive(pre: Self, post: Self) {
+            let n = pre.calls.len() as int;
+            assert(pre.effects_agree_with_calls());
+            assert(post.calls[n] == (pre.rel->Some_0, pre.options->Some_0));
+            if post.effects {
+                assert forall|i: int| 0 <= i < post.calls.len() implies
+                    process_link_header_ensures((#[trigger] post.calls[i]).0, post.calls[i].1, post.doc) by {
+                    if i < n {
+                        assert(post.calls[i] == pre.calls[i]);
+                    }
+                }
+            } else if !pre.effects {
+                // A previous failed conjunct is still in the prefix.
+                let i = choose|i: int| 0 <= i < n && !process_link_header_ensures(
+                    (#[trigger] pre.calls[i]).0, pre.calls[i].1, pre.doc,
+                );
+                assert(post.calls[i] == pre.calls[i]);
+                assert(!process_link_header_ensures(post.calls[i].0, post.calls[i].1, post.doc));
+            } else {
+                // The newly appended invocation is the failed conjunct.
+                assert(!process_link_header_ensures(post.calls[n].0, post.calls[n].1, post.doc));
+            }
+            assert(post.effects_agree_with_calls());
+        }
     }
+}
+
+// Every invariant-valid, nonfinal state has a successor, even when effects is false.
+pub(crate) proof fn process_link_headers_next_exists(
+    pre: process_link_headers_automaton::State,
+) -> (post: process_link_headers_automaton::State)
+    requires pre.invariant(), pre.state != ProcessLinkHeadersState::Final,
+    ensures process_link_headers_automaton::State::next(pre, post), post.invariant(),
+{
+    use process_link_headers_automaton::{show, take_step};
+    match pre.state {
+        ProcessLinkHeadersState::Init => {
+            let post = take_step::init_loop_head(pre);
+            show::init_loop_head(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::LoopHead => {
+            let post = take_step::get_rel(pre);
+            show::get_rel(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::RelRead => {
+            let post = take_step::get_attribs(pre);
+            show::get_attribs(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::AttribsRead => {
+            let post = take_step::get_exspecterd_phase(pre);
+            show::get_exspecterd_phase(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::ExpectedPhaseRead => {
+            let post = take_step::check_phase(pre);
+            show::check_phase(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::PhaseChecked => {
+            let post = take_step::check_media(pre);
+            show::check_media(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::MediaChecked => {
+            let post = take_step::create_new_option(pre);
+            show::create_new_option(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::OptionsCreated => {
+            let post = take_step::apply_link_options(pre);
+            show::apply_link_options(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::OptionsApplied => {
+            let post = take_step::set_option_source_set(pre);
+            show::set_option_source_set(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::SourceSetChecked => {
+            let post = take_step::process_link_header(pre);
+            show::process_link_header(pre, post);
+            post
+        },
+        ProcessLinkHeadersState::Final => pre,
+    }
+}
+
+pub(crate) proof fn process_link_headers_next_is_deterministic(
+    pre: process_link_headers_automaton::State,
+    left: process_link_headers_automaton::State,
+    right: process_link_headers_automaton::State,
+)
+    requires
+        process_link_headers_automaton::State::next(pre, left),
+        process_link_headers_automaton::State::next(pre, right),
+    ensures left == right,
+{
+    reveal(process_link_headers_automaton::State::next);
+    reveal(process_link_headers_automaton::State::next_by);
 }
 
 // Representation | RFC B.2 steps 13-14; B.3 steps 8.1, 9-10 | ASCII name case normalization -> ordered string attributes.

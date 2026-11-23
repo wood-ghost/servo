@@ -105,6 +105,5 @@ pub(crate) open spec fn process_link_headers_requires(
     phase == LinkProcessingPhase::Media || phase == LinkProcessingPhase::PreMedia
     // 1. Let links be the result of extracting links from response's header list.
 }
-}
 
 } // verus!
