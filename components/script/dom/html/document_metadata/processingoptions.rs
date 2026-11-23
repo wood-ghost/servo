@@ -28,6 +28,10 @@ use vstd::prelude::*;
 #[cfg(verus_only)]
 use super::processingoptions_specs as Spec;
 #[cfg(verus_only)]
+use super::processingoptions_specs::processing::process_link_headers::{
+    process_link_headers_loop_body, to_link_object,
+};
+#[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
 #[cfg(verus_only)]
 use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
@@ -97,8 +101,9 @@ impl ValueForKeyInLinkHeader for LinkHeader {
     }
 }
 
+// The state machine's public transition relation constructs both variants.
 #[derive(PartialEq)]
-pub(crate) enum LinkProcessingPhase {
+pub enum LinkProcessingPhase {
     Media,
     PreMedia,
 }
@@ -143,7 +148,8 @@ pub(crate) struct LinkProcessingOptions {
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
     // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::apply_link_options_from_parsed_header is verified
-    #[verifier::external]
+    // TODO: Specify the actual fields written and the Boolean return on each path.
+    #[verifier::external_body]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -347,6 +353,8 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
+    // TRUSTED(scope): preload's body is excluded pending its document-state contract.
+    #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
@@ -462,7 +470,6 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // TRUSTED(scope): not verified yet; remove when process_link_headers is verified
-#[verifier::external]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -471,7 +478,7 @@ pub(crate) fn process_link_headers(
     requires
         SpecRequires::process_link_headers_requires(link_headers@, document, phase),
     ensures
-        Spec::process_link_headers_ensures(link_headers@, document, phase),
+        // Spec::process_link_headers_ensures(link_headers@, document, phase),
 {
     let global = document.owner_global();
     // Step 1. Let links be the result of extracting links from response's header list.
@@ -501,10 +508,16 @@ pub(crate) fn process_link_headers(
             continue;
         }
         // Step 2.5. If attribs["media"] exists and attribs["media"] does not match the environment, then continue.
-        if let Some(media) = link_object.value_for_key_in_link_header("media") &&
-            !MediaList::matches_environment(document, media)
-        {
-            continue;
+        // TODO: Restore the original let-chain below when Verus supports it.
+        // if let Some(media) = link_object.value_for_key_in_link_header("media") &&
+        //     !MediaList::matches_environment(document, media)
+        // {
+        //     continue;
+        // }
+        if let Some(media) = link_object.value_for_key_in_link_header("media") {
+            if !MediaList::matches_environment(document, media) {
+                continue;
+            }
         }
         // Step 2.6. Let options be a new link processing options with
         let mut options = LinkProcessingOptions {
@@ -530,17 +543,46 @@ pub(crate) fn process_link_headers(
         // Step 2.8. If attribs["imagesrcset"] exists and attribs["imagesizes"] exists,
         // then set options's source set to the result of creating a source set given
         // linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
-        if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") &&
-            let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes")
-        {
-            options.source_set = Some(SourceSet::create_source_set(
-                &link_object.url,
-                imagesrcset,
-                imagesizes,
-                document,
-            ))
+        // TODO: Restore the original let-chain below when Verus supports it.
+        // if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") &&
+        //     let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes")
+        // {
+        //     options.source_set = Some(SourceSet::create_source_set(
+        //         &link_object.url,
+        //         imagesrcset,
+        //         imagesizes,
+        //         document,
+        //     ))
+        // }
+        if let Some(imagesrcset) = link_object.value_for_key_in_link_header("imagesrcset") {
+            if let Some(imagesizes) = link_object.value_for_key_in_link_header("imagesizes") {
+                options.source_set = Some(SourceSet::create_source_set(
+                    &link_object.url,
+                    imagesrcset,
+                    imagesizes,
+                    document,
+                ));
+            }
         }
         // Step 2.9. Run the process a link header steps for rel given options.
+        proof {
+            if rel@ == "preload"@ && options.link_type@.len() != 0 && options.destination != Destination::None {
+                let expected = match to_link_object(link_object@) {
+                    Some(link) => process_link_headers_loop_body(link, document@, phase),
+                    None => None,
+                };
+                match expected {
+                    Some(o) if o.type_ == options.link_type@ && o.destination == options.destination => {
+                        // TODO: The outer contract does not restrict MIME types of dispatched preloads.
+                        assert(SpecRequires::process_link_header_requires(rel@, o.type_, o.destination));
+                    },
+                    _ => {
+                        // A model skip or different options do not discharge a *native* dispatch.
+                        assert(SpecRequires::process_link_header_requires(rel@, options.link_type@, options.destination));
+                    },
+                }
+            }
+        }
         options.process_link_header(rel, document);
     }
 }

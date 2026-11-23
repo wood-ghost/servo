@@ -9,9 +9,13 @@
 //! Replace these declarations as their owning modules gain Verus support.
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
+use std::cell::Ref;
+use std::sync::Arc;
+
 use bytes::BytesMut;
 use http::{HeaderMap, HeaderValue, Method};
 use js::gc::Traceable;
+use js::context::NoGC;
 use nom_rfc8288::complete::LinkParamOwned;
 use net_traits::ReferrerPolicy;
 use net_traits::blob_url_store::UrlWithBlobClaim;
@@ -28,11 +32,12 @@ use script_bindings::reflector::DomObject;
 use script_bindings::root::{Dom, DomRoot, Root, StableTraceObject};
 use script_bindings::str::USVString;
 use servo_base::id::{NamespaceIndex, PipelineIndex, WebViewId};
-use servo_url::{ImmutableOrigin, ServoUrl};
+use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
 use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use crate::dom::globalscope::GlobalScope;
+use crate::dom::medialist::MediaList;
 use crate::dom::node::{Node, NodeTraits};
 use crate::dom::srcset::SourceSet;
 use crate::dom::types::HTMLLinkElement;
@@ -128,6 +133,34 @@ pub struct ExUrlParseError(url::ParseError);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExImmutableOrigin(ImmutableOrigin);
+
+// TRUSTED(scope): expose the native types returned or borrowed while building link options.
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExMutableOrigin(MutableOrigin);
+
+// TRUSTED(external-lib): Rust's Ref guard; borrow tracking is not modelled.
+#[verifier::external_type_specification] #[verifier::external_body]
+#[verifier::reject_recursive_types(T)]
+pub struct ExRef<'a, T: ?Sized>(Ref<'a, T>);
+
+// TRUSTED(external-lib): mozjs token in the request_client signature.
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExNoGC(NoGC);
+
+// TRUSTED(scope): TODO: relate media evaluation to the current document snapshot.
+pub(crate) assume_specification[MediaList::matches_environment](document: &Document, media_query: &str) -> bool;
+
+// TRUSTED(scope): TODO: relate each document/global accessor to the native snapshot.
+pub(crate) assume_specification<'a>[Document::policy_container](document: &'a Document) -> Ref<'a, Arc<PolicyContainer>>;
+pub(crate) assume_specification<'a>[Document::origin](document: &'a Document) -> Ref<'a, MutableOrigin>;
+pub assume_specification<'a>[MutableOrigin::immutable](origin: &'a MutableOrigin) -> &'a ImmutableOrigin;
+pub(crate) assume_specification[Document::base_url](document: &Document) -> ServoUrl;
+pub(crate) assume_specification[GlobalScope::request_client](global: &GlobalScope, no_gc: Option<&NoGC>) -> RequestClient;
+pub(crate) assume_specification[GlobalScope::get_referrer](global: &GlobalScope) -> Referrer;
+
+// TRUSTED(external-lib): signature of the blanket Clone-based ToOwned implementation.
+// TODO: specify the result in terms of Clone's contract.
+pub assume_specification<T: Clone>[<T as ToOwned>::to_owned](value: &T) -> T;
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::Referrer is verified
 #[verifier::external_type_specification]
