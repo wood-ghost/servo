@@ -9,21 +9,35 @@
 //! Replace these declarations as their owning modules gain Verus support.
 //! Method contracts assume dependency behavior rather than verifying its implementation.
 
+use bytes::BytesMut;
+use http::{HeaderMap, HeaderValue, Method};
 use js::gc::Traceable;
 use nom_rfc8288::complete::LinkParamOwned;
 use net_traits::ReferrerPolicy;
-use net_traits::policy_container::PolicyContainer;
-use net_traits::request::{CorsSettings, Referrer, RequestClient};
+use net_traits::blob_url_store::UrlWithBlobClaim;
+use net_traits::policy_container::{PolicyContainer, RequestPolicyContainer};
+use net_traits::request::{
+    CacheMode, CorsSettings, Initiator, InternalRequest, Origin, ParserMetadata, PreloadId,
+    PreloadKey, RedirectMode, Referrer, RequestBody, RequestBuilder, RequestClient, RequestId,
+    RequestMode, ResponseTainting, ServiceWorkersMode,
+};
+use script_bindings::conversions::{DerivedFrom, IDLInterface};
+use script_bindings::inheritance::Castable;
 use script_bindings::refcounted::Trusted;
 use script_bindings::reflector::DomObject;
-use servo_base::id::WebViewId;
+use script_bindings::root::{Dom, DomRoot, Root, StableTraceObject};
+use script_bindings::str::USVString;
+use servo_base::id::{NamespaceIndex, PipelineIndex, WebViewId};
 use servo_url::{ImmutableOrigin, ServoUrl};
 use vstd::prelude::*;
 
 use crate::dom::document::Document;
+use crate::dom::globalscope::GlobalScope;
+use crate::dom::node::{Node, NodeTraits};
 use crate::dom::srcset::SourceSet;
 use crate::dom::types::HTMLLinkElement;
 use crate::dom::window::Window;
+use crate::fetch::network_listener::FetchResponseListener;
 
 use super::super::processingoptions::LinkHeader;
 use super::processing::types::{DocumentView, SourceSetView, WindowView};
@@ -202,6 +216,168 @@ pub(crate) assume_specification[Window::webview_id](
     ensures
         result == window@.webview_id,
 ;
+
+// Preload callees. The signatures below give callers no guarantees about the
+// selected URL, generated identifiers, preload map, or network effects.
+
+// TRUSTED(scope): DOM and GC identities used by NodeTraits::owner_global.
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExGlobalScope(GlobalScope);
+
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExNode(Node);
+
+#[verifier::external_type_specification]
+#[verifier::external_body]
+#[verifier::reject_recursive_types(T)]
+pub struct ExDom<T>(Dom<T>);
+
+#[verifier::external_type_specification]
+#[verifier::external_body]
+#[verifier::reject_recursive_types(T)]
+pub struct ExRoot<T: StableTraceObject>(Root<T>);
+
+// TRUSTED(scope): bound-only specifications for the native node blanket implementation.
+#[verifier::external_trait_specification]
+pub trait ExIDLInterface {
+    type ExternalTraitSpecificationFor: IDLInterface;
+}
+
+#[verifier::external_trait_specification]
+pub trait ExCastable: IDLInterface + DomObject + Sized {
+    type ExternalTraitSpecificationFor: Castable;
+}
+
+#[verifier::external_trait_specification]
+pub trait ExDerivedFrom<T: Castable>: Castable {
+    type ExternalTraitSpecificationFor: DerivedFrom<T>;
+}
+
+// TRUSTED(scope): NodeTraits::owner_global.
+// TODO: ensures the result roots this node's owning global.
+pub(crate) assume_specification<T: DerivedFrom<Node> + DomObject>[<T as NodeTraits>::owner_global](
+    node: &T,
+) -> DomRoot<GlobalScope>;
+
+// TRUSTED(scope): script_bindings::str::USVString.
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExUSVString(USVString);
+
+// TRUSTED(scope): SourceSet::select_image_source_from_source_set.
+// TODO: ensures the selected URL and density for this document snapshot.
+pub assume_specification[SourceSet::select_image_source_from_source_set](
+    source_set: &SourceSet, document: &Document,
+) -> Option<(USVString, f64)>;
+
+// TRUSTED(scope): USVString's derived Default implementation.
+// TODO: ensures the default string is empty.
+pub assume_specification[<USVString as Default>::default]() -> USVString;
+
+// TRUSTED(scope): USVString's conversion into String.
+// TODO: ensures the returned String has the input's contents.
+pub assume_specification[<String as From<USVString>>::from](value: USVString) -> String;
+
+// TRUSTED(scope): opaque preload identifiers and keys.
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExPreloadId(PreloadId);
+
+#[verifier::external_type_specification]
+#[verifier::external_body]
+pub struct ExPreloadKey(PreloadKey);
+
+// TRUSTED(scope): PreloadId::default.
+// TODO: ensures the returned preload identifier is fresh.
+pub assume_specification[<PreloadId as Default>::default]() -> PreloadId;
+
+// TRUSTED(scope): PreloadId::clone.
+// TODO: ensures the returned identifier denotes the same preload.
+pub assume_specification[<PreloadId as Clone>::clone](id: &PreloadId) -> PreloadId;
+
+// TRUSTED(scope): RequestBuilder::preload_id.
+// TODO: ensures only the builder's preload ID is replaced.
+pub assume_specification[RequestBuilder::preload_id](request: RequestBuilder, preload_id: PreloadId) -> RequestBuilder;
+
+// TRUSTED(scope): PreloadKey::new.
+// TODO: ensures the key projects URL, destination, mode and credentials mode.
+pub assume_specification[PreloadKey::new](request: &RequestBuilder) -> PreloadKey;
+
+// TRUSTED(scope): UrlWithBlobClaim::url.
+// TODO: ensures the result is the wrapped URL.
+pub assume_specification[UrlWithBlobClaim::url](url: &UrlWithBlobClaim) -> ServoUrl;
+
+// TRUSTED(scope): RequestBuilder must be transparent for preload's direct request.url read.
+#[verifier::external_type_specification]
+pub struct ExRequestBuilder(RequestBuilder);
+
+// TRUSTED(scope): type identities of RequestBuilder's project-owned fields.
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRequestId(RequestId);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExUrlWithBlobClaim(UrlWithBlobClaim);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRequestBody(RequestBody);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExServiceWorkersMode(ServiceWorkersMode);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRequestMode(RequestMode);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExCacheMode(CacheMode);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRequestOrigin(Origin);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRequestPolicyContainer(RequestPolicyContainer);
+#[verifier::external_type_specification] #[verifier::external_body]
+#[verifier::reject_recursive_types(T)]
+pub struct ExNamespaceIndex<T>(NamespaceIndex<T>);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExPipelineIndex(PipelineIndex);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExRedirectMode(RedirectMode);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExParserMetadata(ParserMetadata);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExInitiator(Initiator);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExResponseTainting(ResponseTainting);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExInternalRequest(InternalRequest);
+
+// TRUSTED(external-lib): opaque http field types and bytes response buffer.
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExHttpMethod(Method);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExHeaderValue(HeaderValue);
+#[verifier::external_type_specification] #[verifier::external_body]
+#[verifier::reject_recursive_types(V)]
+pub struct ExHeaderMap<V>(HeaderMap<V>);
+#[verifier::external_type_specification] #[verifier::external_body]
+pub struct ExBytesMut(BytesMut);
+
+// TRUSTED(external-lib): bytes::BytesMut::new.
+// TODO: ensures the buffer is initially empty.
+pub assume_specification[BytesMut::new]() -> BytesMut;
+
+// TRUSTED(scope): only the listener bound is exposed; callbacks are not specified.
+#[verifier::external_trait_specification]
+pub(crate) trait ExFetchResponseListener: Send + 'static {
+    type ExternalTraitSpecificationFor: FetchResponseListener;
+}
+
+// TRUSTED(scope): Document::insert_preloaded_resource.
+// TODO: ensures the document maps the supplied key to the supplied preload ID.
+pub(crate) assume_specification[Document::insert_preloaded_resource](
+    document: &Document, key: PreloadKey, preload_id: PreloadId,
+);
+
+// TRUSTED(scope): Document::fetch_background.
+// TODO: ensures dispatch of the request with the supplied listener.
+pub(crate) assume_specification<Listener: FetchResponseListener>[Document::fetch_background::<Listener>](
+    document: &Document, request_builder: RequestBuilder, listener: Listener,
+);
 
 /// Verification client for composing the two trusted accessor contracts.
 fn document_window_webview_id_contract(document: &Document) -> (result: WebViewId)

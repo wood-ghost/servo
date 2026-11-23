@@ -566,6 +566,15 @@ pub(crate) struct PreloadEntryView {
     pub on_response_available: Option<OnResponseAvailableView>,
 }
 
+/// Snapshot for reasoning across link-header calls on one document.
+/// <https://html.spec.whatwg.org/multipage/links.html#map-of-preloaded-resources>
+pub(crate) ghost struct DocumentLinkState {
+    pub document: DocumentView,
+    pub preloaded: Map<PreloadKeyView, PreloadEntryView>,
+    // Cumulative fetch observations for this document, in dispatch order.
+    pub fetches: Seq<RequestView>,
+}
+
 /// Observations for one handler invocation: the resulting map and just this call's fetches.
 /// <https://html.spec.whatwg.org/multipage/links.html#map-of-preloaded-resources>
 /// <https://html.spec.whatwg.org/multipage/links.html#preload>

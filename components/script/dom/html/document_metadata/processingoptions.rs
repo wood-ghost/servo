@@ -50,7 +50,6 @@ use crate::url::ensure_blob_referenced_by_url_is_kept_alive;
 #[cfg(verus_only)]
 use super::processingoptions_specs::processing::types::{
     self as link_header_specs, LinkHeaderViewSpec, link_header_has_key, link_header_value_for_key,
-    options_view_of,
 };
 
 verus! {
@@ -196,13 +195,11 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#process-a-link-header>
-    #[verifier::external_body]
     fn process_link_header(self, rel: &str, document: &Document)
         requires
             // INHERITED from the type check and the guarded preload call.
             SpecRequires::process_link_header_requires(rel@, self.link_type@, self.destination),
-        ensures
-            Spec::process_link_header_ensures(rel@, options_view_of(self), document@),
+        // TODO: ensures via ghost DocumentLinkState and whatwg_process_link_header
     {
         if rel == "preload" {
             // https://html.spec.whatwg.org/multipage/#link-type-preload:process-a-link-header
@@ -237,7 +234,8 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-link-request>
     // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::create_link_request is verified
-    #[verifier::external]
+    // TODO: ensures relating the result to whatwg_create_link_request(options_view_of(self), …)
+    #[verifier::external_body]
     pub(crate) fn create_link_request(
         self,
         webview_id: WebViewId,
@@ -349,8 +347,6 @@ impl LinkProcessingOptions {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#preload>
-    // TRUSTED(scope): not verified yet; remove when LinkProcessingOptions::preload is verified
-    #[verifier::external_body]
     pub(crate) fn preload(
         mut self,
         webview_id: WebViewId,
@@ -360,9 +356,7 @@ impl LinkProcessingOptions {
         requires
             // IMPLICIT/INHERITED requirements are documented in preload_requires.
             SpecRequires::preload_requires(self.link_type@, self.destination),
-        ensures
-            // Setup-only placeholder; document-state and fetch-effect guarantees are pending.
-            Spec::preload_ensures(&self, webview_id, &link, document),
+        // TODO: ensures via ghost DocumentLinkState and whatwg_preload
     {
         // Step 1. If options's type doesn't match options's destination, then return.
         //
@@ -370,15 +364,26 @@ impl LinkProcessingOptions {
         assert!(self.type_matches_destination());
         // Step 2. If options's destination is "image" and options's source set is not null,
         // then set options's href to the result of selecting an image source from options's source set.
-        if self.destination == Destination::Image &&
-            let Some(srcset) = &mut self.source_set
-        {
-            self.href = String::from(
-                srcset
-                    .select_image_source_from_source_set(document)
-                    .unwrap_or_default()
-                    .0,
-            );
+        // TODO: Restore the original let-chain below when Verus supports it.
+        // if self.destination == Destination::Image &&
+        //     let Some(srcset) = &mut self.source_set
+        // {
+        //     self.href = String::from(
+        //         srcset
+        //             .select_image_source_from_source_set(document)
+        //             .unwrap_or_default()
+        //             .0,
+        //     );
+        // }
+        if self.destination == Destination::Image {
+            if let Some(srcset) = &mut self.source_set {
+                self.href = String::from(
+                    srcset
+                        .select_image_source_from_source_set(document)
+                        .unwrap_or_default()
+                        .0,
+                );
+            }
         }
         // Step 3. Let request be the result of creating a link request given options.
         let Some(request) = self.create_link_request(webview_id, &document.owner_global()) else {
@@ -388,14 +393,14 @@ impl LinkProcessingOptions {
         let preload_id = PreloadId::default();
         let request = request.preload_id(preload_id.clone());
         // Step 5. Let unsafeEndTime be 0.
-        // TODO
+        // TODO: implement unsafeEndTime.
         // Step 6. Let entry be a new preload entry whose integrity metadata is options's integrity.
         //
         // This is performed in `CoreResourceManager::fetch`
         // Step 7. Let key be the result of creating a preload key given request.
         let key = PreloadKey::new(&request);
         // Step 8. If options's document is "pending", then set request's initiator type to "early hint".
-        // TODO
+        // TODO: handle the early-hint initiator type.
         // Step 9. Let controller be null.
         // Step 10. Let reportTiming given a Document document be to report timing for controller
         // given document's relevant global object.
@@ -540,8 +545,6 @@ pub(crate) fn process_link_headers(
     }
 }
 
-// TRUSTED(scope): not verified yet; remove when LinkFetchContextType is verified
-#[verifier::external]
 #[derive(Clone, IntoStaticStr)]
 #[strum(serialize_all = "lowercase")]
 pub(crate) enum LinkFetchContextType {
@@ -558,8 +561,6 @@ impl From<LinkFetchContextType> for InitiatorType {
     }
 }
 
-// TRUSTED(scope): not verified yet; remove when LinkFetchContext is verified
-#[verifier::external]
 pub(crate) struct LinkFetchContext {
     /// The `<link>` element (if any) that caused this fetch
     pub(crate) link: Option<Trusted<HTMLLinkElement>>,
