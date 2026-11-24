@@ -90,20 +90,11 @@ pub open spec fn link_object_attribs_get(
     }
 }
 
+// Step 2.5: CSS media-query-list parsing and evaluation against the user's environment.
 // https://drafts.csswg.org/cssom/#parse-a-media-query-list
-// Each entry represents one parsed query by its CSS text. Parsing includes recovery
-// at top-level commas: an invalid member is represented by "not all", not dropped.
-pub uninterp spec fn parse_media_query_list(media: Seq<char>) -> Seq<Seq<char>>;
-
-// TODO: Evaluate one parsed CSS media query against the user's environment.
-pub uninterp spec fn media_query_matches_environment(query: Seq<char>, doc: DocumentView) -> bool;
-
-// Step 2.5: atomic in this model; TODO: own model.
-// TODO: Model CSS media-query-list parsing and evaluation against the user's environment.
 // https://drafts.csswg.org/mediaqueries/#mq-list
 pub open spec fn media_query_list_matches_environment(media: Seq<char>, doc: DocumentView) -> bool {
-    let queries = parse_media_query_list(media);
-    queries.len() == 0 || queries.any(|query: Seq<char>| media_query_matches_environment(query, doc))
+    super::media_query::matches(media, doc.media_device)
 }
 
 // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#matches-the-environment

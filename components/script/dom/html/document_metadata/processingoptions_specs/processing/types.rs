@@ -420,6 +420,8 @@ pub(crate) struct WindowView {
 // Public because process_link_headers_automaton::State::create_new_option reads these fields.
 pub struct DocumentView {
     pub id: int,
+    // Device snapshot used by CSS Media Queries; the native Document view is still trusted.
+    pub media_device: super::media_query::MediaDeviceView,
     pub window: WindowView,
     pub base_url: ServoUrlView,
     pub origin: Origin,
