@@ -90,16 +90,6 @@ impl DestinationSpec for Destination {
     }
 }
 
-/// <https://html.spec.whatwg.org/multipage/links.html#preload-destination>
-pub(crate) open spec fn is_preload_destination(value: Seq<char>) -> bool {
-    ||| value == "fetch"@
-    ||| value == "font"@
-    ||| value == "image"@
-    ||| value == "script"@
-    ||| value == "style"@
-    ||| value == "track"@
-}
-
 /// <https://fetch.spec.whatwg.org/#concept-potential-destination-translate>
 pub(crate) open spec fn translate_a_potential_destination(value: Seq<char>) -> Seq<char>
     // 2. Assert: potentialDestination is a destination.

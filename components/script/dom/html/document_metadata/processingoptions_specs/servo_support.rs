@@ -19,6 +19,7 @@ use js::context::NoGC;
 use nom_rfc8288::complete::LinkParamOwned;
 use net_traits::ReferrerPolicy;
 use net_traits::blob_url_store::UrlWithBlobClaim;
+use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
 use net_traits::policy_container::{PolicyContainer, RequestPolicyContainer};
 use net_traits::request::{
     CacheMode, CorsSettings, Initiator, InternalRequest, Origin, ParserMetadata, PreloadId,
@@ -65,6 +66,12 @@ pub assume_specification<'a>[<String as PartialEq<&'a str>>::eq](
     key: &&str,
 ) -> (r: bool)
     ensures r == (value@ == (*key)@),
+;
+
+// TRUSTED(std): str::eq_ignore_ascii_case compares with ASCII case folding on both sides.
+// Non-ASCII characters are unchanged.
+pub assume_specification[str::eq_ignore_ascii_case](left: &str, right: &str) -> (result: bool)
+    ensures result == (ascii_lowercase(left@) == ascii_lowercase(right@)),
 ;
 
 // TRUSTED(std): Rust 1.99.1 Option::as_deref is self.as_ref().map(Deref::deref).

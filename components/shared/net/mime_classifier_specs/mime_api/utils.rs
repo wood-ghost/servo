@@ -111,4 +111,12 @@ pub open spec fn ascii_lowercase(input: Seq<char>) -> Seq<char> {
     )
 }
 
+/// ASCII lowercasing leaves a string unchanged if it contains no ASCII uppercase letter.
+pub broadcast proof fn lemma_ascii_lowercase_identity(input: Seq<char>)
+    requires input.all(|c: char| !('A' <= c && c <= 'Z')),
+    ensures #[trigger] ascii_lowercase(input) == input,
+{
+    assert(ascii_lowercase(input) =~= input);
+}
+
 } // verus!

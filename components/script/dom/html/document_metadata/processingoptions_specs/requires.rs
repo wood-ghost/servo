@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use mime::Mime;
+use net_traits::ReferrerPolicy;
 use net_traits::mime_classifier_specs::{
     mime_api::{self as SpecMime, FromStrSpec},
     predicates as SpecMimePredicates,
@@ -13,9 +14,48 @@ use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
-use super::postconditions::type_matches_destination_ok;
+use super::postconditions::{cors_settings_for_token, type_matches_destination_ok};
+use super::processing::{LinkHeaderView, LinkProcessingOptionsView, link_header_has_key, link_header_value_for_key};
+use super::processing::process_link_headers::{
+    get_attributes, link_object_attribs_get, referrer_policy_for_token,
+};
 
 verus! {
+
+// Servo looks up each lowercase key case-sensitively. Check every name before normalization.
+pub(crate) open spec fn link_header_key_is_lowercase(header: LinkHeaderView, key: Seq<char>) -> bool {
+    forall|i: int| 0 <= i < header.params.len() ==>
+        (SpecMime::ascii_lowercase((#[trigger] header.params[i]).0) == key ==> header.params[i].0 == key)
+}
+
+// An absent key is fine. If present, its first occurrence must carry a value, which may be empty.
+pub(crate) open spec fn link_header_key_has_value_if_present(header: LinkHeaderView, key: Seq<char>) -> bool {
+    link_header_has_key(header, key) ==> link_header_value_for_key(header, key) is Some
+}
+
+pub(crate) open spec fn apply_link_options_from_parsed_header_requires(
+    before: LinkProcessingOptionsView,
+    header: LinkHeaderView,
+) -> bool {
+    let cors = link_header_value_for_key(header, "crossorigin"@);
+    let policy = link_header_value_for_key(header, "referrerpolicy"@);
+    // Servo does not implement step 7. Exclude fetchpriority from the normalized attributes.
+    &&& link_object_attribs_get(get_attributes(header.params), "fetchpriority"@) is None
+    &&& link_header_key_is_lowercase(header, "as"@)
+    &&& link_header_key_is_lowercase(header, "crossorigin"@)
+    &&& link_header_key_is_lowercase(header, "integrity"@)
+    &&& link_header_key_is_lowercase(header, "referrerpolicy"@)
+    &&& link_header_key_is_lowercase(header, "nonce"@)
+    &&& link_header_key_is_lowercase(header, "type"@)
+    &&& link_header_key_has_value_if_present(header, "integrity"@)
+    &&& link_header_key_has_value_if_present(header, "referrerpolicy"@)
+    &&& link_header_key_has_value_if_present(header, "nonce"@)
+    &&& link_header_key_has_value_if_present(header, "type"@)
+    // On an unrecognized token Servo writes the default, while the spec preserves the old field.
+    &&& ((cors is Some && cors_settings_for_token(cors->Some_0) is None) ==> before.crossorigin is None)
+    &&& ((policy is Some && referrer_policy_for_token(policy->Some_0) is None)
+        ==> before.referrer_policy == ReferrerPolicy::EmptyString)
+}
 
 /// MIME call requirements and compatibility restrictions for type matching.
 /// Empty types and fetch destinations skip parsing. A parse failure imposes no

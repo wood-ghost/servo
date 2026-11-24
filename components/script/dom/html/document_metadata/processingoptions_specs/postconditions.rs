@@ -6,15 +6,133 @@ use mime::{FromStrError, Mime};
 use net_traits::mime_classifier::MediaType;
 use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
 use SpecMime::FromStrSpec;
-use net_traits::request::Destination;
+use net_traits::request::{CorsSettings, Destination};
 use vstd::prelude::*;
 
+use super::csp_api::{DestinationSpec, translate_a_potential_destination};
 use super::processing::{
     DocumentView, LinkProcessingOptionsView, OnResponseAvailableView, PixelDensity, PreloadEntryView,
     PreloadKeyView, RequestView, SourceSetView, preload_key_of,
 };
+use super::processing::process_link_headers::{
+    fetch_priority_for_token, link_object_attribs_get,
+    referrer_policy_for_token,
+};
 
 verus! {
+
+/// <https://html.spec.whatwg.org/multipage/links.html#preload-destination>
+pub(crate) open spec fn is_preload_destination(value: Seq<char>) -> bool {
+    ||| value == "fetch"@
+    ||| value == "font"@
+    ||| value == "image"@
+    ||| value == "script"@
+    ||| value == "style"@
+    ||| value == "track"@
+}
+
+/// <https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination>
+pub(crate) open spec fn translate_a_preload_destination(destination: Seq<char>) -> Option<Destination> {
+    // 1. If destination is not a preload destination, then return null.
+    if !is_preload_destination(destination) {
+        None
+    } else {
+        // 2. Return the result of translating destination.
+        <Destination as DestinationSpec>::from_str(translate_a_potential_destination(destination))
+    }
+}
+
+// https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute
+pub(crate) open spec fn cors_settings_for_token(value: Seq<char>) -> Option<CorsSettings> {
+    let keyword = SpecMime::ascii_lowercase(value);
+    if keyword == "anonymous"@ { Some(CorsSettings::Anonymous) }
+    else if keyword == "use-credentials"@ { Some(CorsSettings::UseCredentials) }
+    else { None }
+}
+
+// None represents failure; Some carries the updated options on success.
+// https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
+pub open(crate) spec fn apply_header_attributes(
+    options: LinkProcessingOptionsView,
+    attribs: Seq<(Seq<char>, Seq<char>)>,
+    rel: Seq<char>,
+) -> Option<LinkProcessingOptionsView> {
+    // 1. If rel is "preload":
+    let after_step_1 = if rel == "preload"@ {
+        match link_object_attribs_get(attribs, "as"@) {
+            // 1.1 If attribs["as"] does not exist, then return false.
+            None => None,
+            // 1.2 Let destination be the result of translating attribs["as"].
+            Some(value) => match translate_a_preload_destination(value) {
+                // 1.3 If destination is null, then return false.
+                None => None,
+                // 1.4 Set options's destination to destination.
+                Some(destination) => Some(LinkProcessingOptionsView { destination, ..options }),
+            },
+        }
+    } else {
+        Some(options)
+    };
+    match after_step_1 {
+        None => None, // step 1 return
+        Some(options) => {
+            // 2. If attribs["crossorigin"] exists and is an ASCII case-insensitive match for one of the CORS settings attribute keywords, then set options's crossorigin to the CORS settings attribute state corresponding to that keyword.
+            let options = match link_object_attribs_get(attribs, "crossorigin"@) {
+                Some(value) => match cors_settings_for_token(value) {
+                    Some(cors) => LinkProcessingOptionsView { crossorigin: Some(cors), ..options },
+                    None => options,
+                },
+                None => options,
+            };
+            // 3. If attribs["integrity"] exists, then set options's integrity to attribs["integrity"].
+            let options = match link_object_attribs_get(attribs, "integrity"@) {
+                Some(integrity) => LinkProcessingOptionsView { integrity, ..options },
+                None => options,
+            };
+            // 4. If attribs["referrerpolicy"] exists and is an ASCII case-insensitive match for some referrer policy, then set options's referrer policy to that referrer policy.
+            let options = match link_object_attribs_get(attribs, "referrerpolicy"@) {
+                Some(value) => match referrer_policy_for_token(value) {
+                    Some(referrer_policy) => LinkProcessingOptionsView { referrer_policy, ..options },
+                    None => options,
+                },
+                None => options,
+            };
+            // 5. If attribs["nonce"] exists, then set options's nonce to attribs["nonce"].
+            let options = match link_object_attribs_get(attribs, "nonce"@) {
+                Some(nonce) => LinkProcessingOptionsView { cryptographic_nonce_metadata: nonce, ..options },
+                None => options,
+            };
+            // 6. If attribs["type"] exists, then set options's type to attribs["type"].
+            let options = match link_object_attribs_get(attribs, "type"@) {
+                Some(type_) => LinkProcessingOptionsView { type_, ..options },
+                None => options,
+            };
+            // 7. If attribs["fetchpriority"] exists and is an ASCII case-insensitive match for a fetch priority attribute keyword, then set options's fetch priority to that fetch priority attribute keyword.
+            let options = match link_object_attribs_get(attribs, "fetchpriority"@) {
+                Some(value) => match fetch_priority_for_token(value) {
+                    Some(fetch_priority) => LinkProcessingOptionsView { fetch_priority, ..options },
+                    None => options,
+                },
+                None => options,
+            };
+            // 8. Return true.
+            Some(options)
+        }
+    }
+}
+
+pub(crate) open spec fn apply_link_options_from_parsed_header(
+    before: LinkProcessingOptionsView,
+    after: LinkProcessingOptionsView,
+    attribs: Seq<(Seq<char>, Seq<char>)>,
+    rel: Seq<char>,
+    result: bool,
+) -> bool {
+    match apply_header_attributes(before, attribs, rel) {
+        Some(expected) => result && after == expected,
+        None => !result && after == before,
+    }
+}
 
 // <https://html.spec.whatwg.org/multipage/#match-preload-type>
 // For the purposes of this section, a string type matches a preload destination destination if the following algorithm returns true:

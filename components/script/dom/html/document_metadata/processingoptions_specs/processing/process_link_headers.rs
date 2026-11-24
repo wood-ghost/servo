@@ -19,12 +19,12 @@
 
 use net_traits::ReferrerPolicy;
 use net_traits::mime_classifier_specs::mime_api::is_http_whitespace;
-use net_traits::request::{CorsSettings, Destination};
+use net_traits::request::Destination;
 use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use super::super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
-use super::super::csp_api::{DestinationSpec, is_preload_destination, translate_a_potential_destination};
+use super::super::postconditions::apply_header_attributes;
 use super::super::servo_support::create_source_set;
 use super::model::LinkProcessingOptionsView;
 use super::types::{DocumentView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec};
@@ -91,25 +91,6 @@ pub open spec fn whatwg_matches_environment(
     ||| media_query_list_matches_environment(media, doc)
 }
 
-/// <https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination>
-pub(crate) open spec fn translate_a_preload_destination(destination: Seq<char>) -> Option<Destination> {
-    // 1. If destination is not a preload destination, then return null.
-    if !is_preload_destination(destination) {
-        None
-    } else {
-        // 2. Return the result of translating destination.
-        <Destination as DestinationSpec>::from_str(translate_a_potential_destination(destination))
-    }
-}
-
-// https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute
-pub(crate) open spec fn cors_settings_for_token(value: Seq<char>) -> Option<CorsSettings> {
-    let keyword = ascii_lowercase(value);
-    if keyword == "anonymous"@ { Some(CorsSettings::Anonymous) }
-    else if keyword == "use-credentials"@ { Some(CorsSettings::UseCredentials) }
-    else { None }
-}
-
 // https://w3c.github.io/webappsec-referrer-policy/#referrer-policy
 // A referrer policy is the empty string, "no-referrer", "no-referrer-when-downgrade", "same-origin", "origin", "strict-origin", "origin-when-cross-origin", "strict-origin-when-cross-origin", or "unsafe-url".
 pub(crate) open spec fn referrer_policy_for_token(value: Seq<char>) -> Option<ReferrerPolicy> {
@@ -133,77 +114,6 @@ pub(crate) open spec fn fetch_priority_for_token(value: Seq<char>) -> Option<Lin
     else if keyword == "low"@ { Some(LinkFetchPriority::Low) }
     else if keyword == "auto"@ { Some(LinkFetchPriority::Auto) }
     else { None }
-}
-
-// None represents failure; Some carries the updated options on success.
-// https://html.spec.whatwg.org/multipage/semantics.html#apply-link-options-from-parsed-header-attributes
-pub open(crate) spec fn apply_header_attributes(
-    options: LinkProcessingOptionsView,
-    attribs: Seq<(Seq<char>, Seq<char>)>,
-    rel: Seq<char>,
-) -> Option<LinkProcessingOptionsView> {
-    // 1. If rel is "preload":
-    let after_step_1 = if rel == "preload"@ {
-        match link_object_attribs_get(attribs, "as"@) {
-            // 1.1 If attribs["as"] does not exist, then return false.
-            None => None,
-            // 1.2 Let destination be the result of translating attribs["as"].
-            Some(value) => match translate_a_preload_destination(value) {
-                // 1.3 If destination is null, then return false.
-                None => None,
-                // 1.4 Set options's destination to destination.
-                Some(destination) => Some(LinkProcessingOptionsView { destination, ..options }),
-            },
-        }
-    } else {
-        Some(options)
-    };
-    match after_step_1 {
-        None => None, // step 1 return
-        Some(options) => {
-            // 2. If attribs["crossorigin"] exists and is an ASCII case-insensitive match for one of the CORS settings attribute keywords, then set options's crossorigin to the CORS settings attribute state corresponding to that keyword.
-            let options = match link_object_attribs_get(attribs, "crossorigin"@) {
-                Some(value) => match cors_settings_for_token(value) {
-                    Some(cors) => LinkProcessingOptionsView { crossorigin: Some(cors), ..options },
-                    None => options,
-                },
-                None => options,
-            };
-            // 3. If attribs["integrity"] exists, then set options's integrity to attribs["integrity"].
-            let options = match link_object_attribs_get(attribs, "integrity"@) {
-                Some(integrity) => LinkProcessingOptionsView { integrity, ..options },
-                None => options,
-            };
-            // 4. If attribs["referrerpolicy"] exists and is an ASCII case-insensitive match for some referrer policy, then set options's referrer policy to that referrer policy.
-            let options = match link_object_attribs_get(attribs, "referrerpolicy"@) {
-                Some(value) => match referrer_policy_for_token(value) {
-                    Some(referrer_policy) => LinkProcessingOptionsView { referrer_policy, ..options },
-                    None => options,
-                },
-                None => options,
-            };
-            // 5. If attribs["nonce"] exists, then set options's nonce to attribs["nonce"].
-            let options = match link_object_attribs_get(attribs, "nonce"@) {
-                Some(nonce) => LinkProcessingOptionsView { cryptographic_nonce_metadata: nonce, ..options },
-                None => options,
-            };
-            // 6. If attribs["type"] exists, then set options's type to attribs["type"].
-            let options = match link_object_attribs_get(attribs, "type"@) {
-                Some(type_) => LinkProcessingOptionsView { type_, ..options },
-                None => options,
-            };
-            // 7. If attribs["fetchpriority"] exists and is an ASCII case-insensitive match for a fetch priority attribute keyword, then set options's fetch priority to that fetch priority attribute keyword.
-            let options = match link_object_attribs_get(attribs, "fetchpriority"@) {
-                Some(value) => match fetch_priority_for_token(value) {
-                    Some(fetch_priority) => LinkProcessingOptionsView { fetch_priority, ..options },
-                    None => options,
-                },
-                None => options,
-            };
-            // 8. Return true.
-            Some(options)
-        }
-    }
 }
 
 /// One iteration of <https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers>.
@@ -296,6 +206,70 @@ pub(crate) open spec fn get_attributes(
                 Some(value) => value,
                 None => Seq::empty(),
             }))
+        }
+    }
+}
+
+proof fn first_index_after_push(keys: Seq<Seq<char>>, last: Seq<char>, key: Seq<char>)
+    ensures keys.push(last).index_of_first(key) == match keys.index_of_first(key) {
+        Some(i) => Some(i),
+        None if last == key => Some(keys.len() as int),
+        None => None,
+    },
+{
+    let all = keys.push(last);
+    keys.index_of_first_ensures(key);
+    all.index_of_first_ensures(key);
+    if let Some(i) = keys.index_of_first(key) {
+        assert(all[i] == key);
+        let j = all.index_of_first(key)->Some_0;
+        if j < i { assert(keys[j] == all[j]); }
+        if i < j { assert(all[i] != key); }
+    } else if let Some(j) = all.index_of_first(key) {
+        if j < keys.len() { assert(keys[j] == key); }
+    } else if last == key {
+        assert(all[keys.len() as int] == key);
+    }
+}
+
+// get_attributes preserves the first matching parameter; only a missing value becomes "".
+pub(crate) proof fn first_normalized_attribute(header: LinkHeaderView, key: Seq<char>)
+    requires
+        super::super::requires::link_header_key_is_lowercase(header, key),
+        ascii_lowercase(key) == key, key != "rel"@, key != "anchor"@,
+    ensures
+        link_object_attribs_get(get_attributes(header.params), key) ==
+            (if super::types::link_header_has_key(header, key) {
+                Some(super::types::link_header_value_for_key(header, key).unwrap_or(Seq::empty()))
+            } else { None }),
+    decreases header.params.len(),
+{
+    let p = header.params;
+    let keys = p.map_values(|entry: (Seq<char>, Option<Seq<char>>)| entry.0);
+    super::types::link_header_lookup_properties(header, key);
+    if p.len() == 0 {
+        let names = get_attributes(p).map_values(|entry: (Seq<char>, Seq<char>)| entry.0);
+        names.index_of_first_ensures(key);
+    } else {
+        let prefix = LinkHeaderView { params: p.drop_last(), ..header };
+        let (name, value) = p.last();
+        let prior = prefix.params.map_values(|entry: (Seq<char>, Option<Seq<char>>)| entry.0);
+        assert(keys =~= prior.push(name));
+        first_index_after_push(prior, name, key);
+        super::types::link_header_lookup_properties(prefix, key);
+        assert forall|i: int| 0 <= i < prefix.params.len() implies
+            (ascii_lowercase((#[trigger] prefix.params[i]).0) == key ==> prefix.params[i].0 == key) by {
+            assert(prefix.params[i] == p[i]);
+        }
+        first_normalized_attribute(prefix, key);
+        assert((ascii_lowercase(name) == key) == (name == key)) by { assert(name == p[p.len()-1].0); }
+        if ascii_lowercase(name) != "rel"@ && ascii_lowercase(name) != "anchor"@ {
+            let attrs = get_attributes(prefix.params);
+            let names = attrs.map_values(|entry: (Seq<char>, Seq<char>)| entry.0);
+            let all = get_attributes(p).map_values(|entry: (Seq<char>, Seq<char>)| entry.0);
+            assert(all =~= names.push(ascii_lowercase(name)));
+            first_index_after_push(names, ascii_lowercase(name), key);
+            names.index_of_first_ensures(key);
         }
     }
 }
