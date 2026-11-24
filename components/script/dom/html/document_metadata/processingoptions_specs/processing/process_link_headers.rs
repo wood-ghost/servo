@@ -27,10 +27,9 @@ use crate::dom::document::Document;
 use super::super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
 use super::super::csp_api::{DestinationSpec, is_preload_destination, translate_a_potential_destination};
 use super::super::postconditions::process_link_header_ensures;
+use super::super::servo_support::create_source_set;
 use super::model::LinkProcessingOptionsView;
-use super::types::{
-    DocumentView, ElementView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec, SourceSetView,
-};
+use super::types::{DocumentView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec};
 
 // ASCII lowercase, reused from mime_api.
 pub(crate) use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
@@ -226,13 +225,25 @@ pub open(crate) spec fn apply_header_attributes(
 }
 
 // Step 2.8: atomic in this model; TODO: own model.
-pub uninterp spec fn whatwg_create_source_set(
-    default_source: Seq<char>,
-    srcset: Seq<char>,
-    sizes: Seq<char>,
-    img: Option<ElementView>,
-    doc: DocumentView,
-) -> SourceSetView;
+// https://html.spec.whatwg.org/multipage/images.html#create-a-source-set
+// Both link-header specs use the SourceSet::create_source_set contract for the
+// null-img case. The WHATWG algorithm draft below describes the steps it abstracts.
+/*
+    // 1. Let source set be an empty source set.
+    // 2. If srcset is not an empty string, then set source set to the result of parsing srcset.
+    let source_set = if srcset == Seq::empty() {
+        Seq::empty()
+    } else {
+        parse(srcset)
+    }
+    // 3. Set source set's source size to the result of parsing sizes with img.
+    let source_size = parse_size(img);
+    let sourse_cet = (...)
+    // 4. If default source is not the empty string and source set does not contain an image source with a pixel density descriptor value of 1, and no image source with a width descriptor, append default source to source set.
+    if ...
+    // 5. Normalize the source densities of source set.
+    // 6. Return source set.
+*/
 
 // Loop head and Steps 2.1-2.9.
 // https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers
@@ -427,15 +438,14 @@ state_machine! {
                 let sizes = link_object_attribs_get(pre.attribs->Some_0, "imagesizes"@);
                 if srcset is Some && sizes is Some {
                     let options = pre.options->Some_0;
-                    let source_set = whatwg_create_source_set(
+                    let source_set = create_source_set(
                         (pre.link_object->Some_0).target_uri,
                         srcset->Some_0,
                         sizes->Some_0,
-                        None, // null img
                         pre.doc,
                     );
                     update options = Some(LinkProcessingOptionsView {
-                        source_set: Some(source_set),
+                        source_set: Some(source_set@),
                         ..options
                     });
                 }
@@ -621,7 +631,7 @@ pub(crate) open spec fn process_link_headers_loop_body(
                     // 8. If attribs["imagesrcset"] exists and attribs["imagesizes"] exists, then set options's source set to the result of creating a source set given linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
                     let options = match (link_object_attribs_get(attribs, "imagesrcset"@), link_object_attribs_get(attribs, "imagesizes"@)) {
                         (Some(srcset), Some(sizes)) => LinkProcessingOptionsView {
-                            source_set: Some(whatwg_create_source_set(link.target_uri, srcset, sizes, None, doc)),
+                            source_set: Some(create_source_set(link.target_uri, srcset, sizes, doc)@),
                             ..applied
                         },
                         _ => applied,
