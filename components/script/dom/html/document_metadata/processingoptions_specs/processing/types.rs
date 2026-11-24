@@ -163,7 +163,6 @@ pub broadcast group link_header_lemmas {
 /// HTML's fetch-priority states. Servo's link options currently lack this field.
 /// https://html.spec.whatwg.org/multipage/urls-and-fetching.html#fetch-priority-attribute
 /// A fetch priority attribute is an enumerated attribute with the following keywords and states:
-// Public because process_link_headers_automaton::State::create_new_option constructs Auto.
 pub enum LinkFetchPriority {
     Auto,
     High,
@@ -417,11 +416,8 @@ pub(crate) struct WindowView {
 
 // https://html.spec.whatwg.org/multipage/dom.html#document
 // Snapshot of the document properties read by link processing.
-// Public because process_link_headers_automaton::State::create_new_option reads these fields.
 pub struct DocumentView {
     pub id: int,
-    // Device snapshot used by CSS Media Queries; the native Document view is still trusted.
-    pub media_device: super::media_query::MediaDeviceView,
     pub window: WindowView,
     pub base_url: ServoUrlView,
     pub origin: Origin,

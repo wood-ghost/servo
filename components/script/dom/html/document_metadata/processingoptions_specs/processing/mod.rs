@@ -4,7 +4,6 @@
 
 //! Standard-facing link-processing view and its nested type definitions.
 
-pub(crate) mod media_query;
 pub(crate) mod model;
 pub(crate) mod process_link_headers;
 pub(crate) mod types;

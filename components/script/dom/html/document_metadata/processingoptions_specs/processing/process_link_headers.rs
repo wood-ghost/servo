@@ -20,17 +20,14 @@
 use net_traits::ReferrerPolicy;
 use net_traits::mime_classifier_specs::mime_api::is_http_whitespace;
 use net_traits::request::{CorsSettings, Destination};
-use verus_state_machines_macros::state_machine;
 use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use super::super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
 use super::super::csp_api::{DestinationSpec, is_preload_destination, translate_a_potential_destination};
-use super::super::postconditions::process_link_header_ensures;
+use super::super::servo_support::create_source_set;
 use super::model::LinkProcessingOptionsView;
-use super::types::{
-    DocumentView, ElementView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec, SourceSetView,
-};
+use super::types::{DocumentView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec};
 
 // ASCII lowercase, reused from mime_api.
 pub(crate) use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
@@ -48,7 +45,7 @@ pub(crate) open spec fn process_link_headers_ensures(
     // Here we translate link_headers into whatwg domain
     let links = to_link_objects(link_headers.map_values(|header: LinkHeader| header@));
     // 2. For each linkObject in links:
-    // TODO: run the state machine from init to final state. then says that the changing data fits the property described in final state. if fits, return true; if not return false
+    // TODO: Specify the effects of processing the extracted links in order.
     true
 }
 
@@ -59,21 +56,6 @@ pub struct LinkObject {
     // valueless parameter, and parser order and duplicates retained.
     // This is a representation convention, not an initialization precondition.
     pub target_attributes: Seq<(Seq<char>, Seq<char>)>,
-}
-
-pub enum ProcessLinkHeadersState {
-    Init,
-    // The current link is selected and the loop body is ready to begin.
-    LoopHead,
-    RelRead,
-    AttribsRead,
-    ExpectedPhaseRead,
-    PhaseChecked,
-    MediaChecked,
-    OptionsCreated,
-    OptionsApplied,
-    SourceSetChecked,
-    Final,
 }
 
 // Modelling choice: HTML indexes the RFC 8288 attribute list by key without
@@ -93,9 +75,8 @@ pub open spec fn link_object_attribs_get(
 // Step 2.5: CSS media-query-list parsing and evaluation against the user's environment.
 // https://drafts.csswg.org/cssom/#parse-a-media-query-list
 // https://drafts.csswg.org/mediaqueries/#mq-list
-pub open spec fn media_query_list_matches_environment(media: Seq<char>, doc: DocumentView) -> bool {
-    super::media_query::matches(media, doc.media_device)
-}
+// This guard controls dispatch; the fields passed to dispatch do not depend on its value.
+pub uninterp spec fn media_query_list_matches_environment(media: Seq<char>, doc: DocumentView) -> bool;
 
 // https://html.spec.whatwg.org/multipage/common-microsyntaxes.html#matches-the-environment
 pub open spec fn whatwg_matches_environment(
@@ -107,7 +88,7 @@ pub open spec fn whatwg_matches_environment(
     // a string consisting of only ASCII whitespace
     ||| media.all(|c: char| is_http_whitespace(c) || c == '\u{000C}') // TODO: use is_ascii_whitespace later
     // or is a media query list that matches the user's environment according to the definitions given in Media Queries. [MQ]
-    ||| media_query_list_matches_environment(media, doc) //TODO:
+    ||| media_query_list_matches_environment(media, doc)
 }
 
 /// <https://html.spec.whatwg.org/multipage/links.html#translate-a-preload-destination>
@@ -225,348 +206,6 @@ pub open(crate) spec fn apply_header_attributes(
     }
 }
 
-// Step 2.8: atomic in this model; TODO: own model.
-pub uninterp spec fn whatwg_create_source_set(
-    default_source: Seq<char>,
-    srcset: Seq<char>,
-    sizes: Seq<char>,
-    img: Option<ElementView>,
-    doc: DocumentView,
-) -> SourceSetView;
-
-// Loop head and Steps 2.1-2.9.
-// https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers
-state_machine! {
-    process_link_headers_automaton {
-        fields {
-            // Inputs after Step 1 has been performed by the caller.
-            pub links: Seq<LinkObject>,
-            pub doc: DocumentView,
-            pub phase: LinkProcessingPhase,
-
-            // i identifies the current link; continue and Step 2.9 advance it.
-            pub i: nat,
-            pub state: ProcessLinkHeadersState,
-            pub link_object: Option<LinkObject>,
-            pub rel: Option<Seq<char>>,
-            pub attribs: Option<Seq<(Seq<char>, Seq<char>)>>,
-            pub expected_phase: Option<LinkProcessingPhase>,
-            pub options: Option<LinkProcessingOptionsView>,
-
-            // Instrumentation (not in WHATWG): records each Step 2.9 invocation (rel, options)
-            // in order, for comparison with Servo's calls to process_link_header.
-            pub calls: Seq<(Seq<char>, LinkProcessingOptionsView)>,
-            // Instrumentation (not in WHATWG): every Step 2.9 invocation of
-            // this run has had its effect.
-            pub effects: bool,
-        }
-
-        // Begin with the extracted links, without restricting their attributes.
-        init! {
-            initialize(
-                links: Seq<LinkObject>,
-                doc: DocumentView,
-                phase: LinkProcessingPhase,
-            ) {
-                init links = links;
-                init doc = doc;
-                init phase = phase;
-                init i = 0;
-                init state = ProcessLinkHeadersState::Init;
-                init link_object = None;
-                init rel = None;
-                init attribs = None;
-                init expected_phase = None;
-                init options = None;
-                init calls = Seq::empty();
-                init effects = true;
-            }
-        }
-
-        // 2. For each linkObject in links:
-        transition! {
-            init_loop_head() {
-                require(pre.state == ProcessLinkHeadersState::Init);
-                if pre.i < pre.links.len() {
-                    update link_object = Some(pre.links[pre.i as int]);
-                    update state = ProcessLinkHeadersState::LoopHead;
-                } else {
-                    update link_object = None;
-                    update state = ProcessLinkHeadersState::Final;
-                }
-            }
-        }
-
-        // Each getter changes only its local and the control-state tag.
-        // 2.1 Let rel be linkObject["relation_type"].
-        transition! {
-            get_rel() {
-                require(pre.state == ProcessLinkHeadersState::LoopHead);
-                update rel = Some((pre.link_object->Some_0).relation_type);
-                update state = ProcessLinkHeadersState::RelRead;
-            }
-        }
-
-        // 2.2 Let attribs be linkObject["target_attributes"].
-        transition! {
-            get_attribs() {
-                require(pre.state == ProcessLinkHeadersState::RelRead);
-                update attribs = Some((pre.link_object->Some_0).target_attributes);
-                update state = ProcessLinkHeadersState::AttribsRead;
-            }
-        }
-
-        // 2.3 Let expectedPhase be "media" if either "srcset", "imagesrcset", or "media" exist in attribs; otherwise "pre-media".
-        transition! {
-            get_exspecterd_phase() {
-                require(pre.state == ProcessLinkHeadersState::AttribsRead);
-                let attribs = pre.attribs->Some_0;
-                update expected_phase = Some(
-                    if link_object_attribs_get(attribs, "srcset"@) is Some
-                        || link_object_attribs_get(attribs, "imagesrcset"@) is Some
-                        || link_object_attribs_get(attribs, "media"@) is Some {
-                        LinkProcessingPhase::Media
-                    } else {
-                        LinkProcessingPhase::PreMedia
-                    }
-                );
-                update state = ProcessLinkHeadersState::ExpectedPhaseRead;
-            }
-        }
-
-        // 2.4 If expectedPhase is not phase, then continue.
-        // Continue advances and selects the next link before entering LoopHead.
-        transition! {
-            check_phase() {
-                require(pre.state == ProcessLinkHeadersState::ExpectedPhaseRead);
-                if pre.expected_phase->Some_0 != pre.phase {
-                    update i = pre.i + 1;
-                    if pre.i + 1 < pre.links.len() {
-                        update link_object = Some(pre.links[(pre.i + 1) as int]);
-                        update state = ProcessLinkHeadersState::LoopHead;
-                    } else {
-                        update link_object = None;
-                        update state = ProcessLinkHeadersState::Final;
-                    }
-                } else {
-                    update state = ProcessLinkHeadersState::PhaseChecked;
-                }
-            }
-        }
-
-        // 2.5 If attribs["media"] exists and attribs["media"] does not match the environment, then continue.
-        transition! {
-            check_media() {
-                require(pre.state == ProcessLinkHeadersState::PhaseChecked);
-                let media = link_object_attribs_get(pre.attribs->Some_0, "media"@);
-                if media is Some && !whatwg_matches_environment(media->Some_0, pre.doc) {
-                    update i = pre.i + 1;
-                    if pre.i + 1 < pre.links.len() {
-                        update link_object = Some(pre.links[(pre.i + 1) as int]);
-                        update state = ProcessLinkHeadersState::LoopHead;
-                    } else {
-                        update link_object = None;
-                        update state = ProcessLinkHeadersState::Final;
-                    }
-                } else {
-                    update state = ProcessLinkHeadersState::MediaChecked;
-                }
-            }
-        }
-
-        // 2.6 Let options be a new link processing options with
-        transition! {
-            create_new_option() {
-                require(pre.state == ProcessLinkHeadersState::MediaChecked);
-                update options = Some(LinkProcessingOptionsView {
-                    href: (pre.link_object->Some_0).target_uri, // href: linkObject["target_uri"]
-                    base_url: pre.doc.base_url, // base URL: doc's document base URL
-                    origin: pre.doc.origin, // origin: doc's origin
-                    environment: pre.doc.environment, // environment: doc's relevant settings object
-                    policy_container: pre.doc.policy_container, // policy container: doc's policy container
-                    document: Some(pre.doc), // document: doc
-                    // Defaults for the remaining link-processing-options fields.
-                    initiator: "link"@,
-                    integrity: Seq::empty(),
-                    type_: Seq::empty(),
-                    cryptographic_nonce_metadata: Seq::empty(),
-                    destination: Destination::None,
-                    crossorigin: None,
-                    referrer_policy: ReferrerPolicy::EmptyString,
-                    source_set: None,
-                    on_document_ready: None,
-                    fetch_priority: LinkFetchPriority::Auto,
-                });
-                update state = ProcessLinkHeadersState::OptionsCreated;
-            }
-        }
-
-        // 2.7 Apply link options from parsed header attributes to options given attribs and rel. If that returned false, then return.
-        transition! {
-            apply_link_options() {
-                require(pre.state == ProcessLinkHeadersState::OptionsCreated);
-                match apply_header_attributes(
-                    pre.options->Some_0, pre.attribs->Some_0, pre.rel->Some_0,
-                ) {
-                    None => {
-                        update state = ProcessLinkHeadersState::Final;
-                    },
-                    Some(options) => {
-                        update options = Some(options);
-                        update state = ProcessLinkHeadersState::OptionsApplied;
-                    },
-                }
-            }
-        }
-
-        // 2.8 If attribs["imagesrcset"] exists and attribs["imagesizes"] exists, then set options's source set to the result of creating a source set given linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
-        transition! {
-            set_option_source_set() {
-                require(pre.state == ProcessLinkHeadersState::OptionsApplied);
-                let srcset = link_object_attribs_get(pre.attribs->Some_0, "imagesrcset"@);
-                let sizes = link_object_attribs_get(pre.attribs->Some_0, "imagesizes"@);
-                if srcset is Some && sizes is Some {
-                    let options = pre.options->Some_0;
-                    let source_set = whatwg_create_source_set(
-                        (pre.link_object->Some_0).target_uri,
-                        srcset->Some_0,
-                        sizes->Some_0,
-                        None, // null img
-                        pre.doc,
-                    );
-                    update options = Some(LinkProcessingOptionsView {
-                        source_set: Some(source_set),
-                        ..options
-                    });
-                }
-                update state = ProcessLinkHeadersState::SourceSetChecked;
-            }
-        }
-
-        // 2.9 Run the process a link header steps for rel given options.
-        // Record each invocation and its abstract postcondition at the starting document snapshot.
-        transition! {
-            process_link_header() {
-                require(pre.state == ProcessLinkHeadersState::SourceSetChecked);
-                let rel = pre.rel->Some_0;
-                let options = pre.options->Some_0;
-                update effects = pre.effects && process_link_header_ensures(rel, options, pre.doc);
-                update calls = pre.calls.push((rel, options));
-                update i = pre.i + 1;
-                if pre.i + 1 < pre.links.len() {
-                    update link_object = Some(pre.links[(pre.i + 1) as int]);
-                    update state = ProcessLinkHeadersState::LoopHead;
-                } else {
-                    update link_object = None;
-                    update state = ProcessLinkHeadersState::Final;
-                }
-            }
-        }
-
-        // Locals are required only after their assignment in the current iteration.
-        // Before then, old values are allowed and will be overwritten.
-        #[invariant]
-        pub fn locals_available(&self) -> bool {
-            match self.state {
-                ProcessLinkHeadersState::Init | ProcessLinkHeadersState::Final => true,
-                ProcessLinkHeadersState::LoopHead => self.link_object is Some,
-                ProcessLinkHeadersState::RelRead => {
-                    &&& self.link_object is Some
-                    &&& self.rel is Some
-                },
-                ProcessLinkHeadersState::AttribsRead | ProcessLinkHeadersState::PhaseChecked
-                    | ProcessLinkHeadersState::MediaChecked => {
-                    &&& self.link_object is Some
-                    &&& self.rel is Some
-                    &&& self.attribs is Some
-                },
-                ProcessLinkHeadersState::ExpectedPhaseRead => {
-                    &&& self.link_object is Some
-                    &&& self.rel is Some
-                    &&& self.attribs is Some
-                    &&& self.expected_phase is Some
-                },
-                ProcessLinkHeadersState::OptionsCreated | ProcessLinkHeadersState::OptionsApplied
-                    | ProcessLinkHeadersState::SourceSetChecked => {
-                    &&& self.link_object is Some
-                    &&& self.rel is Some
-                    &&& self.attribs is Some
-                    &&& self.options is Some
-                },
-            }
-        }
-
-        #[invariant]
-        pub fn effects_agree_with_calls(&self) -> bool {
-            self.effects == (forall|i: int| 0 <= i < self.calls.len() ==> {
-                let (rel, options) = #[trigger] self.calls[i];
-                process_link_header_ensures(rel, options, self.doc)
-            })
-        }
-
-        #[inductive(initialize)]
-        fn initialize_inductive(
-            post: Self,
-            links: Seq<LinkObject>,
-            doc: DocumentView,
-            phase: LinkProcessingPhase,
-        ) {}
-
-        #[inductive(init_loop_head)]
-        fn init_loop_head_inductive(pre: Self, post: Self) {}
-
-        #[inductive(get_rel)]
-        fn get_rel_inductive(pre: Self, post: Self) {}
-
-        #[inductive(get_attribs)]
-        fn get_attribs_inductive(pre: Self, post: Self) {}
-
-        #[inductive(get_exspecterd_phase)]
-        fn get_exspecterd_phase_inductive(pre: Self, post: Self) {}
-
-        #[inductive(check_phase)]
-        fn check_phase_inductive(pre: Self, post: Self) {}
-
-        #[inductive(check_media)]
-        fn check_media_inductive(pre: Self, post: Self) {}
-
-        #[inductive(create_new_option)]
-        fn create_new_option_inductive(pre: Self, post: Self) {}
-
-        #[inductive(apply_link_options)]
-        fn apply_link_options_inductive(pre: Self, post: Self) {}
-
-        #[inductive(set_option_source_set)]
-        fn set_option_source_set_inductive(pre: Self, post: Self) {}
-
-        #[inductive(process_link_header)]
-        fn process_link_header_inductive(pre: Self, post: Self) {
-            let n = pre.calls.len() as int;
-            assert(pre.effects_agree_with_calls());
-            assert(post.calls[n] == (pre.rel->Some_0, pre.options->Some_0));
-            if post.effects {
-                assert forall|i: int| 0 <= i < post.calls.len() implies
-                    process_link_header_ensures((#[trigger] post.calls[i]).0, post.calls[i].1, post.doc) by {
-                    if i < n {
-                        assert(post.calls[i] == pre.calls[i]);
-                    }
-                }
-            } else if !pre.effects {
-                // A previous failed conjunct is still in the prefix.
-                let i = choose|i: int| 0 <= i < n && !process_link_header_ensures(
-                    (#[trigger] pre.calls[i]).0, pre.calls[i].1, pre.doc,
-                );
-                assert(post.calls[i] == pre.calls[i]);
-                assert(!process_link_header_ensures(post.calls[i].0, post.calls[i].1, post.doc));
-            } else {
-                // The newly appended invocation is the failed conjunct.
-                assert(!process_link_header_ensures(post.calls[n].0, post.calls[n].1, post.doc));
-            }
-            assert(post.effects_agree_with_calls());
-        }
-    }
-}
-
 /// One iteration of <https://html.spec.whatwg.org/multipage/semantics.html#process-link-headers>.
 /// Returns the options passed at step 2.9. Both a skip and an early return yield None.
 pub(crate) open spec fn process_link_headers_loop_body(
@@ -621,7 +260,7 @@ pub(crate) open spec fn process_link_headers_loop_body(
                     // 8. If attribs["imagesrcset"] exists and attribs["imagesizes"] exists, then set options's source set to the result of creating a source set given linkObject["target_uri"], attribs["imagesrcset"], attribs["imagesizes"], and null.
                     let options = match (link_object_attribs_get(attribs, "imagesrcset"@), link_object_attribs_get(attribs, "imagesizes"@)) {
                         (Some(srcset), Some(sizes)) => LinkProcessingOptionsView {
-                            source_set: Some(whatwg_create_source_set(link.target_uri, srcset, sizes, None, doc)),
+                            source_set: Some(create_source_set(link.target_uri, srcset, sizes, doc)@),
                             ..applied
                         },
                         _ => applied,
@@ -632,83 +271,6 @@ pub(crate) open spec fn process_link_headers_loop_body(
             }
         }
     }
-}
-
-// Every invariant-valid, nonfinal state has a successor, even when effects is false.
-pub(crate) proof fn process_link_headers_next_exists(
-    pre: process_link_headers_automaton::State,
-) -> (post: process_link_headers_automaton::State)
-    requires pre.invariant(), pre.state != ProcessLinkHeadersState::Final,
-    ensures process_link_headers_automaton::State::next(pre, post), post.invariant(),
-{
-    use process_link_headers_automaton::{show, take_step};
-    match pre.state {
-        ProcessLinkHeadersState::Init => {
-            let post = take_step::init_loop_head(pre);
-            show::init_loop_head(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::LoopHead => {
-            let post = take_step::get_rel(pre);
-            show::get_rel(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::RelRead => {
-            let post = take_step::get_attribs(pre);
-            show::get_attribs(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::AttribsRead => {
-            let post = take_step::get_exspecterd_phase(pre);
-            show::get_exspecterd_phase(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::ExpectedPhaseRead => {
-            let post = take_step::check_phase(pre);
-            show::check_phase(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::PhaseChecked => {
-            let post = take_step::check_media(pre);
-            show::check_media(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::MediaChecked => {
-            let post = take_step::create_new_option(pre);
-            show::create_new_option(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::OptionsCreated => {
-            let post = take_step::apply_link_options(pre);
-            show::apply_link_options(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::OptionsApplied => {
-            let post = take_step::set_option_source_set(pre);
-            show::set_option_source_set(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::SourceSetChecked => {
-            let post = take_step::process_link_header(pre);
-            show::process_link_header(pre, post);
-            post
-        },
-        ProcessLinkHeadersState::Final => pre,
-    }
-}
-
-pub(crate) proof fn process_link_headers_next_is_deterministic(
-    pre: process_link_headers_automaton::State,
-    left: process_link_headers_automaton::State,
-    right: process_link_headers_automaton::State,
-)
-    requires
-        process_link_headers_automaton::State::next(pre, left),
-        process_link_headers_automaton::State::next(pre, right),
-    ensures left == right,
-{
-    reveal(process_link_headers_automaton::State::next);
-    reveal(process_link_headers_automaton::State::next_by);
 }
 
 // Representation | RFC B.2 steps 13-14; B.3 steps 8.1, 9-10 | ASCII name case normalization -> ordered string attributes.

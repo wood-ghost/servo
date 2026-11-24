@@ -101,7 +101,6 @@ impl ValueForKeyInLinkHeader for LinkHeader {
     }
 }
 
-// The state machine's public transition relation constructs both variants.
 #[derive(PartialEq)]
 pub enum LinkProcessingPhase {
     Media,
@@ -574,6 +573,8 @@ pub(crate) fn process_link_headers(
                 match expected {
                     Some(o) if o.type_ == options.link_type@ && o.destination == options.destination => {
                         // TODO: The outer contract does not restrict MIME types of dispatched preloads.
+                        // Even when the fields agree, as=style with type="text/css; charset=utf-8"
+                        // reaches dispatch without satisfying the CSS empty-parameters requirement.
                         assert(SpecRequires::process_link_header_requires(rel@, o.type_, o.destination));
                     },
                     _ => {
