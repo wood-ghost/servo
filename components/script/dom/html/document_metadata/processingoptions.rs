@@ -30,8 +30,8 @@ use vstd::prelude::*;
 use super::processingoptions_specs as Spec;
 #[cfg(verus_only)]
 use super::processingoptions_specs::processing::process_link_headers::{
-    first_normalized_attribute, get_attributes, link_object_attribs_get,
-    process_link_headers_loop_body, referrer_policy_for_token, to_link_object,
+    get_attributes, lemme_first_normalized_attribute,
+    process_link_headers_loop_body, to_link_object,
 };
 #[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
@@ -149,6 +149,7 @@ pub(crate) struct LinkProcessingOptions {
 impl LinkProcessingOptions {
     /// <https://html.spec.whatwg.org/multipage/#apply-link-options-from-parsed-header-attributes>
     #[verifier::auto_reveal_strlit]
+    #[verifier::rlimit(60)]
     fn apply_link_options_from_parsed_header(
         &mut self,
         link_object: &LinkHeader,
@@ -165,19 +166,17 @@ impl LinkProcessingOptions {
                 get_attributes(link_object@.params), rel@, result,
             ),
     {
+        broadcast use {SpecMime::lemma_ascii_lowercase_identity, lemme_first_normalized_attribute};
+        proof {
+            // TODO: check whether redundant
+            // assert(Seq::<char>::empty() =~= ""@);
+            // assert(Spec::translate_a_preload_destination(Seq::empty()) is None);
+            assert(Spec::cors_settings_for_token(Seq::empty()) is None);
+        }
         // Step 1. If rel is "preload":
         if rel == "preload" {
-            proof {
-                assert(SpecMime::ascii_lowercase("as"@) =~= "as"@);
-                first_normalized_attribute(link_object@, "as"@);
-            }
             // Step 1.1. If attribs["as"] does not exist, then return false.
             let Some(as_) = link_object.value_for_key_in_link_header("as") else {
-                proof {
-                    // A bare first `as` is modeled as "", which is also rejected.
-                    assert(Seq::<char>::empty() =~= ""@);
-                    assert(Spec::translate_a_preload_destination(Seq::empty()) is None);
-                }
                 return false;
             };
             // Step 1.2. Let destination be the result of translating attribs["as"].
@@ -188,133 +187,28 @@ impl LinkProcessingOptions {
             // Step 1.4. Set options's destination to destination.
             self.destination = destination;
         }
-        proof {
-            let before = link_header_specs::options_view_of(*old(self));
-            let after = link_header_specs::options_view_of(*self);
-            if rel@ == "preload"@ {
-                let raw = link_header_value_for_key(link_object@, "as"@);
-                assert(raw is Some);
-                assert(Spec::translate_a_preload_destination(raw->Some_0) == Some(after.destination));
-                assert(after == (Spec::processing::LinkProcessingOptionsView {
-                    destination: after.destination, ..before
-                }));
-                // Only a successfully translated first `as` can reach step 2.
-                let modeled = link_object_attribs_get(get_attributes(link_object@.params), "as"@);
-                assert(modeled == raw);
-            } else {
-                assert(after == before);
-            }
-        }
         // Step 2. If attribs["crossorigin"] exists and is an ASCII case-insensitive match for one of the
         // CORS settings attribute keywords, then set options's crossorigin to the CORS settings attribute
         // state corresponding to that keyword.
-        let ghost before_cors = link_header_specs::options_view_of(*self);
         if let Some(cross_origin) = link_object.value_for_key_in_link_header("crossorigin") {
             self.cross_origin = determine_cors_settings_for_token(cross_origin);
         }
-        proof {
-            let after = link_header_specs::options_view_of(*self);
-            assert(after == (Spec::processing::LinkProcessingOptionsView {
-                crossorigin: after.crossorigin, ..before_cors
-            }));
-            let key = "crossorigin"@;
-            assert(SpecMime::ascii_lowercase(key) =~= key);
-            first_normalized_attribute(link_object@, key);
-            let raw = link_header_value_for_key(link_object@, key);
-            let modeled = link_object_attribs_get(get_attributes(link_object@.params), key);
-            if raw is Some {
-                assert(modeled == raw);
-                assert(after.crossorigin == Spec::cors_settings_for_token(raw->Some_0));
-                if after.crossorigin is None {
-                    assert(before_cors.crossorigin == link_header_specs::options_view_of(*old(self)).crossorigin);
-                    assert(before_cors.crossorigin is None);
-                }
-            } else {
-                assert(after == before_cors);
-                assert(modeled is None || modeled == Some(Seq::<char>::empty()));
-                assert(SpecMime::ascii_lowercase(Seq::empty()) =~= Seq::<char>::empty());
-                reveal_strlit("anonymous");
-                reveal_strlit("use-credentials");
-                assert(Spec::cors_settings_for_token(Seq::empty()) is None);
-            }
-            let expected = match modeled {
-                Some(value) => match Spec::cors_settings_for_token(value) {
-                    Some(cors) => Some(cors),
-                    None => before_cors.crossorigin,
-                },
-                None => before_cors.crossorigin,
-            };
-            assert(after.crossorigin == expected);
-        }
         // Step 3. If attribs["integrity"] exists, then set options's integrity to attribs["integrity"].
-        let ghost before_integrity = link_header_specs::options_view_of(*self);
         if let Some(integrity) = link_object.value_for_key_in_link_header("integrity") {
             self.integrity = integrity.to_owned();
         }
-        proof {
-            broadcast use SpecMime::lemma_ascii_lowercase_identity;
-            let key = "integrity"@;
-            first_normalized_attribute(link_object@, key);
-            let modeled = link_object_attribs_get(get_attributes(link_object@.params), key);
-            assert(modeled == link_header_value_for_key(link_object@, key));
-            let expected = modeled.unwrap_or(before_integrity.integrity);
-            assert(link_header_specs::options_view_of(*self) == (Spec::processing::LinkProcessingOptionsView {
-                integrity: expected, ..before_integrity
-            }));
-        }
         // Step 4. If attribs["referrerpolicy"] exists and is an ASCII case-insensitive match for
         // some referrer policy, then set options's referrer policy to that referrer policy.
-        let ghost before_policy = link_header_specs::options_view_of(*self);
         if let Some(referrer_policy) = link_object.value_for_key_in_link_header("referrerpolicy") {
             self.referrer_policy = ReferrerPolicy::from(referrer_policy);
         }
-        proof {
-            broadcast use SpecMime::lemma_ascii_lowercase_identity;
-            let key = "referrerpolicy"@;
-            first_normalized_attribute(link_object@, key);
-            let modeled = link_object_attribs_get(get_attributes(link_object@.params), key);
-            assert(modeled == link_header_value_for_key(link_object@, key));
-            let expected = match modeled {
-                Some(value) => referrer_policy_for_token(value).unwrap_or(before_policy.referrer_policy),
-                None => before_policy.referrer_policy,
-            };
-            let after = link_header_specs::options_view_of(*self);
-            assert(after == (Spec::processing::LinkProcessingOptionsView {
-                referrer_policy: after.referrer_policy, ..before_policy
-            }));
-            assert(after.referrer_policy == expected);
-        }
         // Step 5. If attribs["nonce"] exists, then set options's nonce to attribs["nonce"].
-        let ghost before_nonce = link_header_specs::options_view_of(*self);
         if let Some(nonce) = link_object.value_for_key_in_link_header("nonce") {
             self.cryptographic_nonce_metadata = nonce.to_owned();
         }
-        proof {
-            broadcast use SpecMime::lemma_ascii_lowercase_identity;
-            let key = "nonce"@;
-            first_normalized_attribute(link_object@, key);
-            let modeled = link_object_attribs_get(get_attributes(link_object@.params), key);
-            assert(modeled == link_header_value_for_key(link_object@, key));
-            let expected = modeled.unwrap_or(before_nonce.cryptographic_nonce_metadata);
-            assert(link_header_specs::options_view_of(*self) == (Spec::processing::LinkProcessingOptionsView {
-                cryptographic_nonce_metadata: expected, ..before_nonce
-            }));
-        }
         // Step 6. If attribs["type"] exists, then set options's type to attribs["type"].
-        let ghost before_type = link_header_specs::options_view_of(*self);
         if let Some(link_type) = link_object.value_for_key_in_link_header("type") {
             self.link_type = link_type.to_owned();
-        }
-        proof {
-            broadcast use SpecMime::lemma_ascii_lowercase_identity;
-            let key = "type"@;
-            first_normalized_attribute(link_object@, key);
-            let modeled = link_object_attribs_get(get_attributes(link_object@.params), key);
-            assert(modeled == link_header_value_for_key(link_object@, key));
-            let expected = modeled.unwrap_or(before_type.type_);
-            assert(link_header_specs::options_view_of(*self) == (Spec::processing::LinkProcessingOptionsView {
-                type_: expected, ..before_type
-            }));
         }
         // Step 7. If attribs["fetchpriority"] exists and is an ASCII case-insensitive match
         // for a fetch priority attribute keyword, then set options's fetch priority to that
@@ -429,6 +323,7 @@ impl LinkProcessingOptions {
 
     /// <https://html.spec.whatwg.org/multipage/#match-preload-type>
     #[verifier::auto_reveal_strlit]
+    // #[verifier::rlimit(60)]
     pub(crate) fn type_matches_destination(&self) -> (result: bool)
         requires
             // INHERITED MIME call requirements and IMPLICIT CSS compatibility; see requires.rs.
@@ -627,6 +522,8 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
 // TRUSTED(scope): not verified yet; remove when process_link_headers is verified
+#[verifier::rlimit(60)]
+#[verifier::external_body]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,

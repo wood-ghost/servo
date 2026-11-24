@@ -93,6 +93,34 @@ pub struct ExCorsSettings(CorsSettings);
 #[verifier::external_type_specification]
 pub struct ExReferrerPolicy(ReferrerPolicy);
 
+// https://w3c.github.io/webappsec-referrer-policy/#referrer-policy
+// A referrer policy is the empty string, "no-referrer", "no-referrer-when-downgrade", "same-origin", "origin", "strict-origin", "origin-when-cross-origin", "strict-origin-when-cross-origin", or "unsafe-url".
+pub(crate) open spec fn referrer_policy_for_token(value: Seq<char>) -> Option<ReferrerPolicy> {
+    let keyword = ascii_lowercase(value);
+    if keyword == ""@ { Some(ReferrerPolicy::EmptyString) }
+    else if keyword == "no-referrer"@ { Some(ReferrerPolicy::NoReferrer) }
+    else if keyword == "no-referrer-when-downgrade"@ { Some(ReferrerPolicy::NoReferrerWhenDowngrade) }
+    else if keyword == "same-origin"@ { Some(ReferrerPolicy::SameOrigin) }
+    else if keyword == "origin"@ { Some(ReferrerPolicy::Origin) }
+    else if keyword == "strict-origin"@ { Some(ReferrerPolicy::StrictOrigin) }
+    else if keyword == "origin-when-cross-origin"@ { Some(ReferrerPolicy::OriginWhenCrossOrigin) }
+    else if keyword == "strict-origin-when-cross-origin"@ { Some(ReferrerPolicy::StrictOriginWhenCrossOrigin) }
+    else if keyword == "unsafe-url"@ { Some(ReferrerPolicy::UnsafeUrl) }
+    else { None }
+}
+
+// A public trait-method contract cannot directly name the crate-private token parser.
+pub open(crate) spec fn referrer_policy_from_str(value: Seq<char>) -> ReferrerPolicy {
+    referrer_policy_for_token(value).unwrap_or(ReferrerPolicy::EmptyString)
+}
+
+// TRUSTED(scope): net_traits ReferrerPolicy::from (components/shared/net/lib.rs):
+// ASCII case-insensitive match against the referrer-policy keywords; any other value
+// gives EmptyString.
+pub assume_specification<'a>[<ReferrerPolicy as From<&'a str>>::from](value: &str) -> (r: ReferrerPolicy)
+    ensures r == referrer_policy_from_str(value@),
+;
+
 // TRUSTED(scope): not verified yet; remove when net_traits::policy_container is verified
 #[verifier::external_type_specification]
 #[verifier::external_body]

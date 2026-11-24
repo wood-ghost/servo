@@ -14,10 +14,8 @@ use super::processing::{
     DocumentView, LinkProcessingOptionsView, OnResponseAvailableView, PixelDensity, PreloadEntryView,
     PreloadKeyView, RequestView, SourceSetView, preload_key_of,
 };
-use super::processing::process_link_headers::{
-    fetch_priority_for_token, link_object_attribs_get,
-    referrer_policy_for_token,
-};
+use super::processing::process_link_headers::{fetch_priority_for_token, link_object_attribs_get};
+use super::servo_support::referrer_policy_for_token;
 
 verus! {
 
@@ -43,6 +41,7 @@ pub(crate) open spec fn translate_a_preload_destination(destination: Seq<char>) 
 }
 
 // https://html.spec.whatwg.org/multipage/urls-and-fetching.html#cors-settings-attribute
+#[verifier::auto_reveal_strlit]
 pub(crate) open spec fn cors_settings_for_token(value: Seq<char>) -> Option<CorsSettings> {
     let keyword = SpecMime::ascii_lowercase(value);
     if keyword == "anonymous"@ { Some(CorsSettings::Anonymous) }

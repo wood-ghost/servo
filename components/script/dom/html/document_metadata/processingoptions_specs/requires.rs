@@ -16,9 +16,8 @@ use crate::dom::document::Document;
 use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
 use super::postconditions::{cors_settings_for_token, type_matches_destination_ok};
 use super::processing::{LinkHeaderView, LinkProcessingOptionsView, link_header_has_key, link_header_value_for_key};
-use super::processing::process_link_headers::{
-    get_attributes, link_object_attribs_get, referrer_policy_for_token,
-};
+use super::processing::process_link_headers::{get_attributes, link_object_attribs_get};
+use super::servo_support::referrer_policy_for_token;
 
 verus! {
 

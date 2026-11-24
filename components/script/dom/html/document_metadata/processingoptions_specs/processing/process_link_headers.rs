@@ -91,22 +91,6 @@ pub open spec fn whatwg_matches_environment(
     ||| media_query_list_matches_environment(media, doc)
 }
 
-// https://w3c.github.io/webappsec-referrer-policy/#referrer-policy
-// A referrer policy is the empty string, "no-referrer", "no-referrer-when-downgrade", "same-origin", "origin", "strict-origin", "origin-when-cross-origin", "strict-origin-when-cross-origin", or "unsafe-url".
-pub(crate) open spec fn referrer_policy_for_token(value: Seq<char>) -> Option<ReferrerPolicy> {
-    let keyword = ascii_lowercase(value);
-    if keyword == ""@ { Some(ReferrerPolicy::EmptyString) }
-    else if keyword == "no-referrer"@ { Some(ReferrerPolicy::NoReferrer) }
-    else if keyword == "no-referrer-when-downgrade"@ { Some(ReferrerPolicy::NoReferrerWhenDowngrade) }
-    else if keyword == "same-origin"@ { Some(ReferrerPolicy::SameOrigin) }
-    else if keyword == "origin"@ { Some(ReferrerPolicy::Origin) }
-    else if keyword == "strict-origin"@ { Some(ReferrerPolicy::StrictOrigin) }
-    else if keyword == "origin-when-cross-origin"@ { Some(ReferrerPolicy::OriginWhenCrossOrigin) }
-    else if keyword == "strict-origin-when-cross-origin"@ { Some(ReferrerPolicy::StrictOriginWhenCrossOrigin) }
-    else if keyword == "unsafe-url"@ { Some(ReferrerPolicy::UnsafeUrl) }
-    else { None }
-}
-
 // https://html.spec.whatwg.org/multipage/urls-and-fetching.html#fetch-priority-attribute
 pub(crate) open spec fn fetch_priority_for_token(value: Seq<char>) -> Option<LinkFetchPriority> {
     let keyword = ascii_lowercase(value);
@@ -233,12 +217,12 @@ proof fn first_index_after_push(keys: Seq<Seq<char>>, last: Seq<char>, key: Seq<
 }
 
 // get_attributes preserves the first matching parameter; only a missing value becomes "".
-pub(crate) proof fn first_normalized_attribute(header: LinkHeaderView, key: Seq<char>)
+pub(crate) broadcast proof fn lemme_first_normalized_attribute(header: LinkHeaderView, key: Seq<char>)
     requires
         super::super::requires::link_header_key_is_lowercase(header, key),
         ascii_lowercase(key) == key, key != "rel"@, key != "anchor"@,
     ensures
-        link_object_attribs_get(get_attributes(header.params), key) ==
+        #[trigger] link_object_attribs_get(get_attributes(header.params), key) ==
             (if super::types::link_header_has_key(header, key) {
                 Some(super::types::link_header_value_for_key(header, key).unwrap_or(Seq::empty()))
             } else { None }),
@@ -261,7 +245,7 @@ pub(crate) proof fn first_normalized_attribute(header: LinkHeaderView, key: Seq<
             (ascii_lowercase((#[trigger] prefix.params[i]).0) == key ==> prefix.params[i].0 == key) by {
             assert(prefix.params[i] == p[i]);
         }
-        first_normalized_attribute(prefix, key);
+        lemme_first_normalized_attribute(prefix, key);
         assert((ascii_lowercase(name) == key) == (name == key)) by { assert(name == p[p.len()-1].0); }
         if ascii_lowercase(name) != "rel"@ && ascii_lowercase(name) != "anchor"@ {
             let attrs = get_attributes(prefix.params);
