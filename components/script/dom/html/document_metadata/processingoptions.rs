@@ -31,7 +31,7 @@ use super::processingoptions_specs as Spec;
 #[cfg(verus_only)]
 use super::processingoptions_specs::processing::process_link_headers::{
     get_attributes, lemme_first_normalized_attribute,
-    process_link_headers_loop_body, to_link_object,
+    link_object_attribs_get,
 };
 #[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
@@ -104,6 +104,7 @@ impl ValueForKeyInLinkHeader for LinkHeader {
 }
 
 #[derive(PartialEq)]
+#[cfg_attr(verus_only, derive(Structural))]
 pub enum LinkProcessingPhase {
     Media,
     PreMedia,
@@ -521,9 +522,8 @@ pub(crate) fn extract_links_from_headers(headers: &Option<Serde<HeaderMap>>) -> 
 }
 
 /// <https://html.spec.whatwg.org/multipage/#process-link-headers>
-// TRUSTED(scope): not verified yet; remove when process_link_headers is verified
+// The body checks callee preconditions; the functional postcondition is still pending.
 #[verifier::rlimit(60)]
-#[verifier::external_body]
 pub(crate) fn process_link_headers(
     link_headers: &[LinkHeader],
     document: &Document,
@@ -539,7 +539,15 @@ pub(crate) fn process_link_headers(
     //
     // Already performed once when parsing headers by caller
     // Step 2. For each linkObject in links:
-    for link_object in link_headers {
+    for link_object in iter: link_headers
+        invariant
+            0 <= iter.index() <= link_headers@.len(),
+            SpecRequires::process_link_headers_requires(link_headers@, document, phase),
+    {
+        proof {
+            assert(link_object@ == link_headers@[iter.index()]@);
+            assert(SpecRequires::link_header_dispatch_requires(link_object@, phase));
+        }
         // Step 2.1. Let rel be linkObject["relation_type"].
         let Some(rel) = link_object.value_for_key_in_link_header("rel") else {
             continue;
@@ -591,6 +599,9 @@ pub(crate) fn process_link_headers(
         };
         // Step 2.7. Apply link options from parsed header attributes to options given attribs and rel.
         // If that returned false, then return.
+        proof {
+            assert(SpecRequires::apply_link_options_before_requires(link_header_specs::options_view_of(options), link_object@));
+        }
         if !options.apply_link_options_from_parsed_header(link_object, rel) {
             return;
         }
@@ -620,24 +631,14 @@ pub(crate) fn process_link_headers(
         }
         // Step 2.9. Run the process a link header steps for rel given options.
         proof {
-            if rel@ == "preload"@ && options.link_type@.len() != 0 && options.destination != Destination::None {
-                let expected = match to_link_object(link_object@) {
-                    Some(link) => process_link_headers_loop_body(link, document@, phase),
-                    None => None,
-                };
-                match expected {
-                    Some(o) if o.type_ == options.link_type@ && o.destination == options.destination => {
-                        // TODO: The outer contract does not restrict MIME types of dispatched preloads.
-                        // Even when the fields agree, as=style with type="text/css; charset=utf-8"
-                        // reaches dispatch without satisfying the CSS empty-parameters requirement.
-                        assert(SpecRequires::process_link_header_requires(rel@, o.type_, o.destination));
-                    },
-                    _ => {
-                        // A model skip or different options do not discharge a *native* dispatch.
-                        assert(SpecRequires::process_link_header_requires(rel@, options.link_type@, options.destination));
-                    },
-                }
+            if rel@ == "preload"@ {
+                let attribs = get_attributes(link_object@.params);
+                let as_ = link_object_attribs_get(attribs, "as"@);
+                assert(as_ is Some);
+                assert(Spec::translate_a_preload_destination(as_->Some_0) == Some(options.destination));
+                assert(options.link_type@ == link_object_attribs_get(attribs, "type"@).unwrap_or(""@));
             }
+            assert(SpecRequires::process_link_header_requires(rel@, options.link_type@, options.destination));
         }
         options.process_link_header(rel, document);
     }

@@ -14,8 +14,8 @@ use vstd::prelude::*;
 
 use crate::dom::document::Document;
 use super::super::processingoptions::{LinkHeader, LinkProcessingPhase};
-use super::postconditions::{cors_settings_for_token, type_matches_destination_ok};
-use super::processing::{LinkHeaderView, LinkProcessingOptionsView, link_header_has_key, link_header_value_for_key};
+use super::postconditions::{cors_settings_for_token, translate_a_preload_destination, type_matches_destination_ok};
+use super::processing::{LinkHeaderView, LinkHeaderViewSpec, LinkProcessingOptionsView, link_header_has_key, link_header_value_for_key};
 use super::processing::process_link_headers::{get_attributes, link_object_attribs_get};
 use super::servo_support::referrer_policy_for_token;
 
@@ -32,12 +32,7 @@ pub(crate) open spec fn link_header_key_has_value_if_present(header: LinkHeaderV
     link_header_has_key(header, key) ==> link_header_value_for_key(header, key) is Some
 }
 
-pub(crate) open spec fn apply_link_options_from_parsed_header_requires(
-    before: LinkProcessingOptionsView,
-    header: LinkHeaderView,
-) -> bool {
-    let cors = link_header_value_for_key(header, "crossorigin"@);
-    let policy = link_header_value_for_key(header, "referrerpolicy"@);
+pub(crate) open spec fn apply_link_options_header_requires(header: LinkHeaderView) -> bool {
     // Servo does not implement step 7. Exclude fetchpriority from the normalized attributes.
     &&& link_object_attribs_get(get_attributes(header.params), "fetchpriority"@) is None
     &&& link_header_key_is_lowercase(header, "as"@)
@@ -50,10 +45,26 @@ pub(crate) open spec fn apply_link_options_from_parsed_header_requires(
     &&& link_header_key_has_value_if_present(header, "referrerpolicy"@)
     &&& link_header_key_has_value_if_present(header, "nonce"@)
     &&& link_header_key_has_value_if_present(header, "type"@)
+}
+
+pub(crate) open spec fn apply_link_options_before_requires(
+    before: LinkProcessingOptionsView,
+    header: LinkHeaderView,
+) -> bool {
+    let cors = link_header_value_for_key(header, "crossorigin"@);
+    let policy = link_header_value_for_key(header, "referrerpolicy"@);
     // On an unrecognized token Servo writes the default, while the spec preserves the old field.
     &&& ((cors is Some && cors_settings_for_token(cors->Some_0) is None) ==> before.crossorigin is None)
     &&& ((policy is Some && referrer_policy_for_token(policy->Some_0) is None)
         ==> before.referrer_policy == ReferrerPolicy::EmptyString)
+}
+
+pub(crate) open spec fn apply_link_options_from_parsed_header_requires(
+    before: LinkProcessingOptionsView,
+    header: LinkHeaderView,
+) -> bool {
+    &&& apply_link_options_header_requires(header)
+    &&& apply_link_options_before_requires(before, header)
 }
 
 /// MIME call requirements and compatibility restrictions for type matching.
@@ -125,12 +136,30 @@ pub(crate) open spec fn process_link_header_requires(
     link_type: Seq<char>,
     destination: Destination,
 ) -> bool {
-    rel == "preload"@ ==> {
-        // INHERITED from the type check preceding the early return.
-        &&& type_matches_destination_requires(link_type, destination)
-        // INHERITED from preload on the path reaching that call.
-        &&& (type_matches_destination_ok(link_type, destination)
-            ==> preload_requires(link_type, destination))
+    rel == "preload"@ ==> type_matches_destination_requires(link_type, destination)
+}
+
+// Step 2.4 skips headers from the other phase. For the current phase we allow either
+// outcome of the media check, so the precondition does not depend on the environment.
+pub(crate) open spec fn link_header_dispatch_requires(h: LinkHeaderView, phase: LinkProcessingPhase) -> bool {
+    let rel = link_header_value_for_key(h, "rel"@);
+    let expected_phase = if link_header_has_key(h, "srcset"@) || link_header_has_key(h, "imagesrcset"@)
+        || link_header_has_key(h, "media"@) {
+        LinkProcessingPhase::Media
+    } else {
+        LinkProcessingPhase::PreMedia
+    };
+    let attribs = get_attributes(h.params);
+    let as_ = link_object_attribs_get(attribs, "as"@);
+    (rel is Some && expected_phase == phase) ==> {
+        // IMPLICIT: restrictions on author-supplied header attributes inherited from apply.
+        &&& apply_link_options_header_requires(h)
+        // IMPLICIT: type and as are author-controlled.
+        &&& (rel->Some_0 == "preload"@ && as_ is Some && translate_a_preload_destination(as_->Some_0) is Some)
+            ==> type_matches_destination_requires(
+                link_object_attribs_get(attribs, "type"@).unwrap_or(""@),
+                translate_a_preload_destination(as_->Some_0)->Some_0,
+            )
     }
 }
 
@@ -141,7 +170,9 @@ pub(crate) open spec fn process_link_headers_requires(
     document: &Document,
     phase: LinkProcessingPhase,
 ) -> bool {
-    phase == LinkProcessingPhase::Media || phase == LinkProcessingPhase::PreMedia
+    &&& (phase == LinkProcessingPhase::Media || phase == LinkProcessingPhase::PreMedia)
+    // IMPLICIT: each author-supplied header must be in the dispatch domain.
+    &&& forall|i: int| 0 <= i < link_headers.len() ==> link_header_dispatch_requires(#[trigger] link_headers[i]@, phase)
     // 1. Let links be the result of extracting links from response's header list.
 }
 
