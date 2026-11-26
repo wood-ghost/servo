@@ -39,7 +39,7 @@ macro_rules! test_verify_one_file {
 }
 
 const MIME_VERSION: &str = "0.3.17";
-const STATE_MACHINE_VERSION: &str = "0.0.0-2026-06-14-0213";
+const STATE_MACHINE_VERSION: &str = "0.0.0-2026-11-22-0344";
 const TIMEOUT: Duration = Duration::from_secs(120);
 static VERIFIER: LazyLock<Verifier> = LazyLock::new(Verifier::new);
 

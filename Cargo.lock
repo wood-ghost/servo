@@ -1843,7 +1843,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d045de693cb712d0b22c6a64be5b953f67b3ce00ab5ad3dd5d8b441886ab8e1a"
 dependencies = [
  "quote",
- "syn 2.0.119",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -9270,7 +9270,7 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
- "verus_state_machines_macros 0.0.0-2026-06-14-0213",
+ "verus_state_machines_macros",
  "vstd",
  "webrender_api",
 ]
@@ -11679,11 +11679,11 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "verus_builtin"
-version = "0.0.0-2026-10-11-0230"
+version = "0.0.0-2026-11-22-0344"
 
 [[package]]
 name = "verus_builtin_macros"
-version = "0.0.0-2026-10-25-0158"
+version = "0.0.0-2026-11-22-0344"
 dependencies = [
  "convert_case 0.4.0",
  "proc-macro2",
@@ -11691,53 +11691,30 @@ dependencies = [
  "syn 2.0.119",
  "synstructure",
  "verus_prettyplease",
- "verus_syn 0.0.0-2026-09-06-0133",
+ "verus_syn",
 ]
 
 [[package]]
 name = "verus_prettyplease"
-version = "0.0.0-2026-09-06-0133"
+version = "0.0.0-2026-11-01-0251"
 dependencies = [
  "proc-macro2",
- "verus_syn 0.0.0-2026-09-06-0133",
+ "verus_syn",
 ]
 
 [[package]]
 name = "verus_state_machines_macros"
-version = "0.0.0-2026-06-14-0213"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6704a9ce586a5027f87933d9a84817411c937804090a9585c28bf335ac37eefc"
-dependencies = [
- "indexmap 1.9.3",
- "proc-macro2",
- "quote",
- "verus_syn 0.0.0-2026-05-31-0205",
-]
-
-[[package]]
-name = "verus_state_machines_macros"
-version = "0.0.0-2026-10-25-0158"
+version = "0.0.0-2026-11-22-0344"
 dependencies = [
  "indexmap 2.14.2",
  "proc-macro2",
  "quote",
- "verus_syn 0.0.0-2026-09-06-0133",
+ "verus_syn",
 ]
 
 [[package]]
 name = "verus_syn"
-version = "0.0.0-2026-05-31-0205"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "030b774330d5ec618691c2cd6fba8bbb13bd538f3884a1143450baec25749706"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "verus_syn"
-version = "0.0.0-2026-09-06-0133"
+version = "0.0.0-2026-11-01-0251"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11752,11 +11729,11 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vstd"
-version = "0.0.0-2026-10-25-0158"
+version = "0.0.0-2026-11-22-0344"
 dependencies = [
  "verus_builtin",
  "verus_builtin_macros",
- "verus_state_machines_macros 0.0.0-2026-10-25-0158",
+ "verus_state_machines_macros",
 ]
 
 [[package]]

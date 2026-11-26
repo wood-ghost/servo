@@ -7,7 +7,6 @@ use ::mime::{Mime, Name, Params};
 use core::str::FromStr;
 use vstd::prelude::*;
 use vstd::std_specs::cmp::PartialEqSpec;
-use vstd::std_specs::fmt::fmt_req_all;
 use vstd::std_specs::iter::IteratorSpec;
 
 // use super::model::*;
@@ -95,11 +94,6 @@ pub struct ExMime(Mime);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 pub struct ExParams<'a>(Params<'a>);
-
-pub broadcast axiom fn axiom_fmt_req_all_mime()
-    ensures
-        #[trigger] fmt_req_all::<Mime>(),
-;
 
 // --------------------
 // PartialEq for Mime

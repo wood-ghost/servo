@@ -914,7 +914,6 @@ impl MIMEChecker for ByteMatcher {
     }
 
     fn validate(&self) -> Result<(), String> {
-        broadcast use SpecMime::axiom_fmt_req_all_mime;
 
         if self.pattern.is_empty() {
             return Err(format!("Zero length pattern for {:?}", self.content_type));
