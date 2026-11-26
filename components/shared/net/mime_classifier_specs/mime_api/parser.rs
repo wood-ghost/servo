@@ -1061,9 +1061,7 @@ pub broadcast proof fn lemma_mime_parse_strlit_index(s: &str, i: int)
         #![trigger mime_parse_plain_input(s@), strslice_get_char(s, i)]
         #![trigger mime_parse_plain_view(s@), strslice_get_char(s, i)]
         strslice_get_char(s, i) == s@[i],
-{
-    vstd::string::axiom_str_literal_get_char(s, i);
-}
+{}
 
 // Relate normalized components to literal views by their length and contents.
 pub broadcast proof fn lemma_mime_parse_lowercase_str(input: Seq<char>, expected: &str)
@@ -1121,7 +1119,6 @@ pub broadcast proof fn lemma_mime_parse_plain_plus(s: &str, i: int)
             .contains('+'),
         s@.index_of('/') + 1 < i ==> mime_parse_plain_view(s@).suffix.is_some(),
 {
-    vstd::string::axiom_str_literal_get_char(s, i);
     let input = s@;
     let slash = input.index_of('/');
     let subtype = ascii_lowercase(input.subrange(slash + 1, input.len() as int));
