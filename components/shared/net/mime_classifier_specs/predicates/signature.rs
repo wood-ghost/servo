@@ -1,7 +1,7 @@
 use vstd::prelude::*;
 
 use crate::mime_classifier::ByteMatcher;
-use crate::mime_classifier_specs::mime_api::*;
+use crate::verus_specs::external::mime::*;
 
 verus! {
 

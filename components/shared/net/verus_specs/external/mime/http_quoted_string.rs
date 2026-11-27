@@ -1,3 +1,4 @@
+//! Quoted-string handling in the mime 0.3.17 model.
 //! Quoted-string parser model and proofs for `mime 0.3.17`.
 //!
 //! The collector selects a completed trace. The accompanying proofs establish

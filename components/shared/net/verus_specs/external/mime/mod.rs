@@ -1,3 +1,4 @@
+//! Library model for mime 0.3.17.
 //! Specifications for the external `mime` library.
 //!
 //! Sub-modules:

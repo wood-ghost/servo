@@ -4,7 +4,8 @@
 
 use mime::{FromStrError, Mime};
 use net_traits::mime_classifier::MediaType;
-use net_traits::mime_classifier_specs::{classifier as SpecClassifier, mime_api as SpecMime};
+use net_traits::mime_classifier_specs::classifier as SpecClassifier;
+use net_traits::verus_specs::external::mime as SpecMime;
 use SpecMime::FromStrSpec;
 use net_traits::request::{CorsSettings, Destination};
 use vstd::prelude::*;

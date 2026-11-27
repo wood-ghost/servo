@@ -1,3 +1,4 @@
+//! Parsing model for mime 0.3.17.
 //! MIME parser model and specifications.
 //!
 //! The external FromStr/str::parse contracts are declared in `mime.rs`.

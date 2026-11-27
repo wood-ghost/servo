@@ -289,7 +289,7 @@ verus_state_machines_macros = "={STATE_MACHINE_VERSION}"
     fn verify(&self, name: &str, code: &str) -> Result<(), TestErr> {
         let directory = test_dir(name);
         let models =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("mime_classifier_specs/mime_api/mod.rs");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("verus_specs/external/mime/mod.rs");
         let entry = directory.path().join("test.rs");
         fs::write(
             &entry,

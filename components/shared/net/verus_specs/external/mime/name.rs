@@ -1,3 +1,4 @@
+//! Name specifications for mime 0.3.17.
 //! `Name` abstraction and external API contracts.
 //!
 //! External specifications and equality axioms are trusted. The existing

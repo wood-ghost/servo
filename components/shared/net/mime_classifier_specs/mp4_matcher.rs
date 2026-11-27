@@ -4,7 +4,7 @@ use crate::mime_classifier::{
     Mp4Matcher,
 };
 use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
-use crate::mime_classifier_specs::mime_api::{
+use crate::verus_specs::external::mime::{
     video_mp4_identity,
     MimeView,
 };

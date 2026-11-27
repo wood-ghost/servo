@@ -5,7 +5,7 @@ use crate::mime_classifier::{
     TagTerminatedByteMatcher,
 };
 use crate::mime_classifier_specs::classifier::MIMECheckerSpec;
-use crate::mime_classifier_specs::mime_api::{
+use crate::verus_specs::external::mime::{
     view,
     MimeView,
 };

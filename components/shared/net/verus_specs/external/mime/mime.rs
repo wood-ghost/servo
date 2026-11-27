@@ -1,3 +1,4 @@
+//! Type and operation specifications for mime 0.3.17.
 //! `Mime` abstraction, external API contracts, and essence proofs.
 //!
 //! The external type/operation specifications and formatting axiom are trusted.

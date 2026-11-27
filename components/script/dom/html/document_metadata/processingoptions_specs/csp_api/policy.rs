@@ -9,14 +9,6 @@ use super::super::processing::types::Origin;
 
 verus! {
 
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-#[verifier::external_type_specification]
-pub struct ExPolicyDisposition(PolicyDisposition);
-
-// TRUSTED(external-lib): content-security-policy 0.9.0; validated by not yet
-#[verifier::external_type_specification]
-pub struct ExPolicySource(PolicySource);
-
 // https://w3c.github.io/webappsec-csp/#csp-list
 // Editor's Draft 2026-10-27; inspected 2026-10-30.
 // A CSP list is a struct consisting of policies (a list of policies) and a self-origin (an origin which is used when matching the 'self' keyword).

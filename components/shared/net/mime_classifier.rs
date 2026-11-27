@@ -14,14 +14,16 @@ use mime::{self, Mime};
 use crate::LoadContext;
 
 #[cfg(verus_only)]
-use crate::mime_classifier_specs::{
-    predicates as Spec,
-    flag as SpecFlag,
-    classifier as SpecClassifier,
-    byte_matcher as SpecByteMatcher,
-    mime_api as SpecMime,
-    mp4_matcher as SpecMP4Matcher,
-    requires as SpecRequires,
+use crate::{
+    mime_classifier_specs::{
+        predicates as Spec,
+        flag as SpecFlag,
+        classifier as SpecClassifier,
+        byte_matcher as SpecByteMatcher,
+        mp4_matcher as SpecMP4Matcher,
+        requires as SpecRequires,
+    },
+    verus_specs::external::mime as SpecMime,
 };
 
 #[cfg(verus_only)]
@@ -34,7 +36,7 @@ pub(crate) use crate::mime_classifier_specs::classifier::checker_trait::ThreadSa
 verus! {
 
 broadcast use {
-    crate::mime_classifier_specs::iter::iterator_bridges,
+    crate::verus_specs::external::std::iter::iterator_bridges,
     SpecByteMatcher::lemma_byte_matcher_valid,
     SpecRequires::lemma_classifiers_match_whatwg,
     Spec::lemma_image_audio_video_disjoint,

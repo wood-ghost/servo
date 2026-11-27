@@ -23,7 +23,7 @@ use crate::mime_classifier::{
 use crate::mime_classifier_specs::byte_matcher as SpecByteMatcher;
 use crate::mime_classifier_specs::mp4_matcher as SpecMp4Matcher;
 use crate::mime_classifier_specs::classifier::checker_trait::MimeClassifierModel;
-use crate::mime_classifier_specs::mime_api::*;
+use crate::verus_specs::external::mime::*;
 use crate::mime_classifier_specs::predicates::{
     is_xml,
     is_html,

@@ -12,14 +12,12 @@
 use std::cell::Ref;
 use std::sync::Arc;
 
-use bytes::BytesMut;
-use http::{HeaderMap, HeaderValue, Method};
 use js::gc::Traceable;
 use js::context::NoGC;
 use nom_rfc8288::complete::LinkParamOwned;
 use net_traits::ReferrerPolicy;
 use net_traits::blob_url_store::UrlWithBlobClaim;
-use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
+use net_traits::verus_specs::external::mime::ascii_lowercase;
 use net_traits::policy_container::{PolicyContainer, RequestPolicyContainer};
 use net_traits::request::{
     CacheMode, CorsSettings, Initiator, InternalRequest, Origin, ParserMetadata, PreloadId,
@@ -57,33 +55,6 @@ pub struct ExLinkHeader(LinkHeader);
 // TRUSTED(external-lib): nom-rfc8288 0.4.0; expose LinkParamOwned's key and optional value.
 #[verifier::external_type_specification]
 pub struct ExLinkParamOwned(LinkParamOwned);
-
-// TRUSTED(std): Rust 1.99.1 alloc::string::impl_eq! compares the two string slices.
-// vstd specifies String == String, but not this String == &str implementation.
-// The impl lifetime and the method's elided input lifetimes must match std's signature.
-pub assume_specification<'a>[<String as PartialEq<&'a str>>::eq](
-    value: &String,
-    key: &&str,
-) -> (r: bool)
-    ensures r == (value@ == (*key)@),
-;
-
-// TRUSTED(std): str::eq_ignore_ascii_case compares with ASCII case folding on both sides.
-// Non-ASCII characters are unchanged.
-pub assume_specification[str::eq_ignore_ascii_case](left: &str, right: &str) -> (result: bool)
-    ensures result == (ascii_lowercase(left@) == ascii_lowercase(right@)),
-;
-
-// TRUSTED(std): Rust 1.99.1 Option::as_deref is self.as_ref().map(Deref::deref).
-// vstd has no as_deref contract. Preserve presence and the wrapped Deref contract;
-// vstd's existing String::deref specification then supplies the string contents.
-pub assume_specification<T: std::ops::Deref>[Option::<T>::as_deref](
-    value: &Option<T>,
-) -> (r: Option<&T::Target>)
-    ensures
-        r is Some <==> value is Some,
-        r is Some ==> call_ensures(T::deref, (&value->0,), r->0),
-;
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::CorsSettings is verified
 #[verifier::external_type_specification]
@@ -158,12 +129,6 @@ pub assume_specification[SourceSet::create_source_set](
 #[verifier::external_body]
 pub struct ExServoUrl(ServoUrl);
 
-// Required by ServoUrl's existing FromStr implementation.
-// TRUSTED(external-lib): url 2.5.8; validated by not yet
-#[verifier::external_type_specification]
-#[verifier::external_body]
-pub struct ExUrlParseError(url::ParseError);
-
 // TRUSTED(scope): not verified yet; remove when servo_url::ImmutableOrigin is verified
 #[verifier::external_type_specification]
 #[verifier::external_body]
@@ -172,11 +137,6 @@ pub struct ExImmutableOrigin(ImmutableOrigin);
 // TRUSTED(scope): expose the native types returned or borrowed while building link options.
 #[verifier::external_type_specification] #[verifier::external_body]
 pub struct ExMutableOrigin(MutableOrigin);
-
-// TRUSTED(external-lib): Rust's Ref guard; borrow tracking is not modelled.
-#[verifier::external_type_specification] #[verifier::external_body]
-#[verifier::reject_recursive_types(T)]
-pub struct ExRef<'a, T: ?Sized>(Ref<'a, T>);
 
 // TRUSTED(external-lib): mozjs token in the request_client signature.
 #[verifier::external_type_specification] #[verifier::external_body]
@@ -192,10 +152,6 @@ pub assume_specification<'a>[MutableOrigin::immutable](origin: &'a MutableOrigin
 pub(crate) assume_specification[Document::base_url](document: &Document) -> ServoUrl;
 pub(crate) assume_specification[GlobalScope::request_client](global: &GlobalScope, no_gc: Option<&NoGC>) -> RequestClient;
 pub(crate) assume_specification[GlobalScope::get_referrer](global: &GlobalScope) -> Referrer;
-
-// TRUSTED(external-lib): signature of the blanket Clone-based ToOwned implementation.
-// TODO: specify the result in terms of Clone's contract.
-pub assume_specification<T: Clone>[<T as ToOwned>::to_owned](value: &T) -> T;
 
 // TRUSTED(scope): not verified yet; remove when net_traits::request::Referrer is verified
 #[verifier::external_type_specification]
@@ -413,21 +369,6 @@ pub struct ExInitiator(Initiator);
 pub struct ExResponseTainting(ResponseTainting);
 #[verifier::external_type_specification] #[verifier::external_body]
 pub struct ExInternalRequest(InternalRequest);
-
-// TRUSTED(external-lib): opaque http field types and bytes response buffer.
-#[verifier::external_type_specification] #[verifier::external_body]
-pub struct ExHttpMethod(Method);
-#[verifier::external_type_specification] #[verifier::external_body]
-pub struct ExHeaderValue(HeaderValue);
-#[verifier::external_type_specification] #[verifier::external_body]
-#[verifier::reject_recursive_types(V)]
-pub struct ExHeaderMap<V>(HeaderMap<V>);
-#[verifier::external_type_specification] #[verifier::external_body]
-pub struct ExBytesMut(BytesMut);
-
-// TRUSTED(external-lib): bytes::BytesMut::new.
-// TODO: ensures the buffer is initially empty.
-pub assume_specification[BytesMut::new]() -> BytesMut;
 
 // TRUSTED(scope): only the listener bound is exposed; callbacks are not specified.
 #[verifier::external_trait_specification]

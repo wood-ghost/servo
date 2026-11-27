@@ -57,6 +57,8 @@ pub mod http_status;
 pub mod image_cache;
 #[cfg(verus_only)]
 pub mod mime_classifier_specs;
+#[cfg(verus_only)]
+pub mod verus_specs;
 // pub(crate) mod mime_classifier_helper;
 pub mod mime_classifier;
 pub mod policy_container;

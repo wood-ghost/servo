@@ -4,7 +4,7 @@ use crate::mime_classifier::{
     ByteMatcher,
     TagTerminatedByteMatcher,
 };
-use crate::mime_classifier_specs::mime_api::*;
+use crate::verus_specs::external::mime::*;
 
 verus! {
 

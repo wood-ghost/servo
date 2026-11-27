@@ -18,7 +18,7 @@
 #![verifier::auto_reveal_strlit]
 
 use net_traits::ReferrerPolicy;
-use net_traits::mime_classifier_specs::mime_api::is_http_whitespace;
+use net_traits::verus_specs::external::mime::is_http_whitespace;
 use net_traits::request::Destination;
 use vstd::prelude::*;
 
@@ -30,7 +30,7 @@ use super::model::LinkProcessingOptionsView;
 use super::types::{DocumentView, LinkFetchPriority, LinkHeaderView, LinkHeaderViewSpec};
 
 // ASCII lowercase, reused from mime_api.
-pub(crate) use net_traits::mime_classifier_specs::mime_api::ascii_lowercase;
+pub(crate) use net_traits::verus_specs::external::mime::ascii_lowercase;
 
 verus! {
 

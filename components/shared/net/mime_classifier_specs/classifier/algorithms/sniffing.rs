@@ -28,7 +28,7 @@ use super::pattern_matching::{
     image_type_pattern_matching_algo,
     audio_or_video_type_pattern_matching_algo,
 };
-use crate::mime_classifier_specs::mime_api::*;
+use crate::verus_specs::external::mime::*;
 use crate::mime_classifier_specs::predicates::{
     is_xml,
     is_html,

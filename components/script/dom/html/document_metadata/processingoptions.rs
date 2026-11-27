@@ -36,7 +36,10 @@ use super::processingoptions_specs::processing::process_link_headers::{
 #[cfg(verus_only)]
 use super::processingoptions_specs::requires as SpecRequires;
 #[cfg(verus_only)]
-use net_traits::mime_classifier_specs::{mime_api as SpecMime, predicates as SpecMimePredicates};
+use net_traits::{
+    mime_classifier_specs::predicates as SpecMimePredicates,
+    verus_specs::external::mime as SpecMime,
+};
 
 use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::csp::{GlobalCspReporting, Violation};
@@ -65,7 +68,7 @@ broadcast use {
     SpecMime::mime_essence_str_lemmas,
     SpecMimePredicates::mime_essence_parts_str_lemmas,
     link_header_specs::link_header_lemmas,
-    net_traits::mime_classifier_specs::iter::iterator_bridges,
+    net_traits::verus_specs::external::std::iter::iterator_bridges,
 };
 
 // Setup-only: external items are excluded from verification. Enable individual

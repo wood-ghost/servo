@@ -1,3 +1,4 @@
+//! Constant specifications for mime 0.3.17.
 //! Named model values and trusted bindings for `mime` library constants.
 //!
 //! Each library constant's external contract accompanies its model value.

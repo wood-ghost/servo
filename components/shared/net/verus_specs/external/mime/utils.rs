@@ -1,3 +1,4 @@
+//! Utilities used by the mime 0.3.17 model.
 //! Character and sequence utilities for MIME parsing specifications.
 
 use vstd::prelude::*;

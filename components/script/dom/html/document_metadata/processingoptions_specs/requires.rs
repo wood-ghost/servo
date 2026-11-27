@@ -5,11 +5,11 @@
 use mime::Mime;
 use net_traits::ReferrerPolicy;
 use net_traits::mime_classifier_specs::{
-    mime_api::{self as SpecMime, FromStrSpec},
     predicates as SpecMimePredicates,
     requires as MimeRequires,
 };
 use net_traits::request::Destination;
+use net_traits::verus_specs::external::mime::{self as SpecMime, FromStrSpec};
 use vstd::prelude::*;
 
 use crate::dom::document::Document;

@@ -2,7 +2,7 @@ use mime::Mime;
 use vstd::prelude::*;
 
 use crate::LoadContext;
-use crate::mime_classifier_specs::mime_api::view;
+use crate::verus_specs::external::mime::view;
 use crate::mime_classifier_specs::predicates::*;
 
 verus! {

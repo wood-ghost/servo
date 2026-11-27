@@ -1,3 +1,4 @@
+//! Iterator proof support for Rust 1.100.0.
 //! Proved sequence bridges for the iterator contracts available in servo-stable.
 use vstd::prelude::*;
 
