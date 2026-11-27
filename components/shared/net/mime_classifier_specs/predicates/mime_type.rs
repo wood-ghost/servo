@@ -62,6 +62,7 @@ pub broadcast group mime_essence_parts_str_lemmas {
     lemma_mime_essence_parts_str,
 }
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn essence_is_text_xml(mt: &Mime) -> bool {
     essence_str(mt) == "text/xml"@
 }
@@ -72,6 +73,7 @@ pub open spec fn essence_is_application_ogg(mt: &Mime) -> bool {
 
 pub uninterp spec fn has_html_suffix(mt: &Mime) -> bool;
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_text_plain(mt: &Mime) -> bool {
     essence_str(mt) == "text/plain"@
 }
@@ -88,6 +90,7 @@ pub open spec fn has_xml_suffix(mt: &Mime) -> bool {
     view(mt).suffix == Some(xml_name())
 }
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_xml(mt: &Mime) -> bool {
     !is_image(mt) && (
         has_xml_suffix(mt)
@@ -96,6 +99,7 @@ pub open spec fn is_xml(mt: &Mime) -> bool {
     )
 } 
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_html(mt: &Mime) -> bool {
     essence_str(mt) == "text/html"@
 }
@@ -104,6 +108,7 @@ pub open spec fn is_audio_video(mt: &Mime) -> bool {
     is_audio(mt) || is_video(mt) || essence_is_application_ogg(mt)
 }
 
+#[verifier::auto_reveal_strlit]
 pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
     ensures
         #[trigger] is_image(mt) ==> !is_audio_video(mt),
@@ -146,6 +151,7 @@ pub(crate) broadcast proof fn lemma_image_audio_video_disjoint(mt: &Mime)
 }
 
 /// <https://mimesniff.spec.whatwg.org/#javascript-mime-type>
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_javascript(mt: &Mime) -> bool {
     ||| essence_str(mt) == "application/ecmascript"@
     ||| essence_str(mt) == "application/javascript"@
@@ -166,6 +172,7 @@ pub open spec fn is_javascript(mt: &Mime) -> bool {
 }
 
 /// <https://mimesniff.spec.whatwg.org/#font-mime-type>
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_font(mt: &Mime) -> bool { 
     ||| view(mt).type_ == font_name()
     ||| essence_str(mt) == "application/font-cff"@
@@ -194,6 +201,7 @@ pub open spec fn is_css(mt: &Mime) -> bool {
     essence_str(mt) == "text/css"@
 }
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_explicit_unknown(mt: &Mime) -> bool {
     ||| essence_str(mt) == "application/unknown"@
     ||| essence_str(mt) == "unknown/unknown"@

@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-#![cfg_attr(verus_only, verifier::auto_reveal_byteslit)]
 use vstd::prelude::*;
 #[cfg(verus_only)]
 use vstd::std_specs::iter::IteratorSpec;
@@ -181,11 +180,6 @@ impl MimeClassifier {
             Self::is_html(supplied_type_or_octet_stream)
         {
             proof {
-                reveal_strlit("application/octet-stream");
-                reveal_strlit("text/xml");
-                reveal_strlit("application/xml");
-                reveal_strlit("text/html");
-
                 SpecClassifier::lemma_mime_classify_browsing_step1_result(
                     self,
                     no_sniff_flag,
@@ -1393,6 +1387,7 @@ impl MIMEChecker for GroupedClassifier {
 // Contains hard coded byte matchers
 // TODO: These should be configured and not hard coded
 #[verifier::auto_reveal_strlit]
+#[verifier::auto_reveal_byteslit]
 impl ByteMatcher {
     // A Windows Icon signature
     fn image_x_icon() -> (r: ByteMatcher) 

@@ -78,6 +78,7 @@ pub open spec fn option_view(value: &Option<Mime>) -> Option<MimeView> {
 pub open spec fn essence_str(mt: &Mime) -> Seq<char> {
     essence_str_view(&view(mt))
 }
+#[verifier::auto_reveal_strlit]
 pub open spec fn essence_str_view(mt: &MimeView) -> Seq<char> {
     match(mt.suffix) {
         Some(suffix) => mt.type_ + "/"@ + mt.subtype + "+"@ + suffix,

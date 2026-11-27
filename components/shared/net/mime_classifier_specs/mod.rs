@@ -1,6 +1,4 @@
 #![allow(unsafe_code)]
-#![verifier::auto_reveal_strlit]
-#![verifier::auto_reveal_byteslit]
 
 // pub mod model;
 pub mod predicates;

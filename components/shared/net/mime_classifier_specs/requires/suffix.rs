@@ -9,6 +9,7 @@ verus! {
 
 // These executable predicates compare mime 0.3's suffix-free subtype(),
 // rather than the full essence. Keep their conformance restrictions explicit.
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_font_requires(mime: &Mime) -> bool {
     view(mime).type_ == "application"@
         && (view(mime).subtype == "font-cff"@
@@ -21,6 +22,7 @@ pub open spec fn is_font_requires(mime: &Mime) -> bool {
         ==> view(mime).suffix.is_none()
 }
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_javascript_requires(mime: &Mime) -> bool {
     &&& view(mime).type_ == "application"@
         && (view(mime).subtype == "ecmascript"@
@@ -44,6 +46,7 @@ pub open spec fn is_javascript_requires(mime: &Mime) -> bool {
         ==> view(mime).suffix.is_none()
 }
 
+#[verifier::auto_reveal_strlit]
 pub open spec fn is_explicit_unknown_requires(mime: &Mime) -> bool {
     &&& view(mime).type_ == "unknown"@ && view(mime).subtype == "unknown"@
         ==> view(mime).suffix.is_none()

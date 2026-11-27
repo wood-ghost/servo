@@ -259,6 +259,7 @@ pub assume_specification [mime::UTF_8] -> (result: Name<'static>)
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#750
 // TEXT_PLAIN, "text/plain", 4;
+#[verifier::auto_reveal_strlit]
 pub open spec fn text_plain_identity() -> MimeView {
     MimeView {
         type_: "text"@,
@@ -325,6 +326,7 @@ pub(crate) assume_specification [mime::TEXT_HTML_UTF_8] -> (result: Mime)
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#754
 // TEXT_CSS, "text/css", 4;
+#[verifier::auto_reveal_strlit]
 pub open spec fn text_css_identity() -> MimeView {
     MimeView {
         type_: "text"@,
@@ -693,6 +695,7 @@ pub(crate) assume_specification [mime::APPLICATION_WWW_FORM_URLENCODED] -> (resu
 
 // https://docs.rs/mime/0.3.17/src/mime/lib.rs.html#779
 // APPLICATION_OCTET_STREAM, "application/octet-stream", 11;
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_octet_stream_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -768,6 +771,7 @@ pub(crate) assume_specification [mime::TEXT_JAVSCRIPT] -> (result: Mime)
 // parse from string
 // Canonical values for supported parsing literals, not additional library constants.
 // "image/x-icon"
+#[verifier::auto_reveal_strlit]
 pub open spec fn image_x_icon_identity() -> MimeView {
     MimeView {
         type_: "image"@,
@@ -777,6 +781,7 @@ pub open spec fn image_x_icon_identity() -> MimeView {
     }
 }
 // "image/webp"
+#[verifier::auto_reveal_strlit]
 pub open spec fn image_webp_identity() -> MimeView {
     MimeView {
         type_: "image"@,
@@ -795,6 +800,7 @@ pub open spec fn video_webm_identity() -> MimeView {
     }
 }
 // "audio/basic"
+#[verifier::auto_reveal_strlit]
 pub open spec fn audio_basic_identity() -> MimeView {
     MimeView {
         type_: "audio"@,
@@ -804,6 +810,7 @@ pub open spec fn audio_basic_identity() -> MimeView {
     }
 }
 // "audio/aiff"
+#[verifier::auto_reveal_strlit]
 pub open spec fn audio_aiff_identity() -> MimeView {
     MimeView {
         type_: "audio"@,
@@ -813,6 +820,7 @@ pub open spec fn audio_aiff_identity() -> MimeView {
     }
 }
 // "audio/mpeg"
+#[verifier::auto_reveal_strlit]
 pub open spec fn audio_mpeg_identity() -> MimeView {
     MimeView {
         type_: "audio"@,
@@ -822,6 +830,7 @@ pub open spec fn audio_mpeg_identity() -> MimeView {
     }
 }
 // "application/ogg"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_ogg_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -831,6 +840,7 @@ pub open spec fn application_ogg_identity() -> MimeView {
     }
 }
 // "audio/midi"
+#[verifier::auto_reveal_strlit]
 pub open spec fn audio_midi_identity() -> MimeView {
     MimeView {
         type_: "audio"@,
@@ -840,6 +850,7 @@ pub open spec fn audio_midi_identity() -> MimeView {
     }
 }
 // "video/avi"
+#[verifier::auto_reveal_strlit]
 pub open spec fn video_avi_identity() -> MimeView {
     MimeView {
         type_: "video"@,
@@ -849,6 +860,7 @@ pub open spec fn video_avi_identity() -> MimeView {
     }
 }
 // "audio/wave"
+#[verifier::auto_reveal_strlit]
 pub open spec fn audio_wave_identity() -> MimeView {
     MimeView {
         type_: "audio"@,
@@ -859,6 +871,7 @@ pub open spec fn audio_wave_identity() -> MimeView {
 }
 
 // "application/postscript"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_postscript_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -868,6 +881,7 @@ pub open spec fn application_postscript_identity() -> MimeView {
     }
 }
 // "application/x-gzip"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_x_gzip_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -877,6 +891,7 @@ pub open spec fn application_x_gzip_identity() -> MimeView {
     }
 }
 // "application/zip"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_zip_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -886,6 +901,7 @@ pub open spec fn application_zip_identity() -> MimeView {
     }
 }
 // "application/x-rar-compressed"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_x_rar_compressed_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -895,6 +911,7 @@ pub open spec fn application_x_rar_compressed_identity() -> MimeView {
     }
 }
 // "application/font-woff"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_font_woff_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -913,6 +930,7 @@ pub open spec fn application_font_woff2_identity() -> MimeView {
     }
 }
 // "application/font-sfnt"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_font_sfnt_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -922,6 +940,7 @@ pub open spec fn application_font_sfnt_identity() -> MimeView {
     }
 }
 // "application/vnd.ms-fontobject"
+#[verifier::auto_reveal_strlit]
 pub open spec fn application_vnd_ms_fontobject_identity() -> MimeView {
     MimeView {
         type_: "application"@,
@@ -931,6 +950,7 @@ pub open spec fn application_vnd_ms_fontobject_identity() -> MimeView {
     }
 }
 // "video/mp4"
+#[verifier::auto_reveal_strlit]
 pub open spec fn video_mp4_identity() -> MimeView {
     MimeView {
         type_: "video"@,
